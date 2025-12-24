@@ -5,12 +5,24 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get("code")
   const next = searchParams.get("next") ?? "/dashboard"
+  const error = searchParams.get("error")
+  const error_description = searchParams.get("error_description")
+
+  if (error) {
+    console.log("[v0] OAuth error received:", error, error_description)
+    return NextResponse.redirect(
+      `${origin}/auth/auth-error?error=${encodeURIComponent(error)}&message=${encodeURIComponent(error_description || "Authentication failed")}`,
+    )
+  }
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
 
-    if (!error) {
+    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (!exchangeError && data.session) {
+      console.log("[v0] Successfully exchanged code for session, user:", data.user?.email)
+
       const forwardedHost = request.headers.get("x-forwarded-host")
       const isLocalEnv = process.env.NODE_ENV === "development"
 
@@ -21,9 +33,14 @@ export async function GET(request: Request) {
       } else {
         return NextResponse.redirect(`${origin}${next}`)
       }
+    } else {
+      console.log("[v0] Failed to exchange code:", exchangeError?.message)
+      return NextResponse.redirect(
+        `${origin}/auth/auth-error?error=exchange_failed&message=${encodeURIComponent(exchangeError?.message || "Failed to authenticate")}`,
+      )
     }
   }
 
-  // Return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/auth/auth-error`)
+  console.log("[v0] No code provided in callback")
+  return NextResponse.redirect(`${origin}/auth/auth-error?error=no_code&message=No authentication code provided`)
 }
