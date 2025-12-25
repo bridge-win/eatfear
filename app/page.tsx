@@ -1,8 +1,14 @@
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Bell, LineChart, TrendingDown } from "lucide-react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/server"
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   return (
     <div className="flex min-h-svh flex-col bg-background">
       {/* Header */}
@@ -13,12 +19,25 @@ export default function HomePage() {
             <span className="text-xl font-bold">eatfear</span>
           </div>
           <nav className="flex items-center gap-4">
-            <Link href="/auth/login">
-              <Button variant="ghost">Login</Button>
-            </Link>
-            <Link href="/auth/sign-up">
-              <Button>Get Started</Button>
-            </Link>
+            {user ? (
+              <>
+                <Link href="/dashboard">
+                  <Button variant="ghost">Dashboard</Button>
+                </Link>
+                <Link href="/profile">
+                  <Button>Profile</Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/auth/login">
+                  <Button variant="ghost">Login</Button>
+                </Link>
+                <Link href="/auth/sign-up">
+                  <Button>Get Started</Button>
+                </Link>
+              </>
+            )}
           </nav>
         </div>
       </header>
