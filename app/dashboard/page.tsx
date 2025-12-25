@@ -205,7 +205,7 @@ export default function DashboardPage() {
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <TrendingDown className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">CrashWatch</span>
+            <span className="text-xl font-bold">eatfear</span>
           </div>
           <nav className="flex items-center gap-4">
             <Link href="/profile">

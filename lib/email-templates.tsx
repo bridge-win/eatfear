@@ -22,7 +22,7 @@ export function generateCrashAlertEmail(
   const subject = `🚨 ${assetName} Crash Alert: ${dropPercentage.toFixed(2)}% Drop`
 
   const text = `
-CRASH ALERT from CrashWatch
+CRASH ALERT from eatfear
 
 ${assetName} (${assetSymbol}) has dropped significantly!
 
@@ -32,12 +32,12 @@ Your Alert Threshold: ${threshold}%
 
 This alert was triggered because the price drop exceeded your configured threshold.
 
-View Dashboard: ${process.env.NEXT_PUBLIC_APP_URL || "https://crashwatch.app"}/dashboard
+View Dashboard: ${process.env.NEXT_PUBLIC_APP_URL || "https://eatfear.app"}/dashboard
 
-Manage your subscriptions: ${process.env.NEXT_PUBLIC_APP_URL || "https://crashwatch.app"}/profile
+Manage your subscriptions: ${process.env.NEXT_PUBLIC_APP_URL || "https://eatfear.app"}/profile
 
 ---
-CrashWatch - Real-time Market Crash Monitoring
+eatfear - Real-time Market Crash Monitoring
   `.trim()
 
   const html = `
@@ -106,11 +106,11 @@ CrashWatch - Real-time Market Crash Monitoring
               <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
                 <tr>
                   <td align="center">
-                    <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://crashwatch.app"}/dashboard" 
+                    <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://eatfear.app"}/dashboard" 
                        style="display: inline-block; padding: 14px 32px; background-color: #1f2937; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 0 8px;">
                       View Dashboard
                     </a>
-                    <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://crashwatch.app"}/profile" 
+                    <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://eatfear.app"}/profile" 
                        style="display: inline-block; padding: 14px 32px; background-color: #f3f4f6; color: #1f2937; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 0 8px;">
                       Manage Alerts
                     </a>
@@ -124,12 +124,12 @@ CrashWatch - Real-time Market Crash Monitoring
           <tr>
             <td style="background-color: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; text-align: center; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px;">
-                <strong>CrashWatch</strong> - Real-time Market Crash Monitoring
+                <strong>eatfear</strong> - Real-time Market Crash Monitoring
               </p>
               <p style="margin: 0; color: #9ca3af; font-size: 12px;">
                 You received this email because you subscribed to alerts for ${assetName}.
                 <br>
-                <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://crashwatch.app"}/profile" style="color: #6b7280; text-decoration: underline;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://eatfear.app"}/profile" style="color: #6b7280; text-decoration: underline;">
                   Manage your alert preferences
                 </a>
               </p>

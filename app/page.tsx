@@ -10,7 +10,7 @@ export default function HomePage() {
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <TrendingDown className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">CrashWatch</span>
+            <span className="text-xl font-bold">eatfear</span>
           </div>
           <nav className="flex items-center gap-4">
             <Link href="/auth/login">
@@ -86,7 +86,7 @@ export default function HomePage() {
       <footer className="border-t py-8">
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
-            <p>&copy; 2025 CrashWatch. Real-time market crash monitoring.</p>
+            <p>&copy; 2025 eatfear. Real-time market crash monitoring.</p>
             <Link href="/privacy-policy" className="underline hover:text-foreground">
               Privacy Policy
             </Link>
