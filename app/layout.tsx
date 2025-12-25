@@ -9,7 +9,7 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "CrashWatch - Real-time Market Monitoring",
+  title: "eatfear - Real-time Market Monitoring",
   description: "Monitor cryptocurrency and stock market crashes with automated alerts",
   generator: "v0.app",
   icons: {
