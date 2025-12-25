@@ -40,7 +40,7 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "CrashWatch <alerts@crashwatch.app>",
+        from: "eatfear <onboarding@resend.dev>",
         to: [profile.email],
         subject: email.subject,
         html: email.html,
@@ -50,6 +50,7 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const error = await response.text()
+      console.error("[v0] Resend API error:", error)
       return NextResponse.json({ error: "Failed to send email", details: error }, { status: 500 })
     }
 

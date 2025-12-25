@@ -1,4 +1,4 @@
-# CrashWatch - Real-time Market Monitoring System
+# eatfear - Real-time Market Crash Monitoring
 
 A comprehensive platform for monitoring cryptocurrency and stock market crashes with automated email alerts.
 
@@ -15,90 +15,195 @@ A comprehensive platform for monitoring cryptocurrency and stock market crashes 
 - **Market Sentiment**: View Fear & Greed Index and global market statistics
 - **Subscription Management**: Full control over alerts with pause/resume/edit capabilities
 
-## Environment Variables
+## Quick Start
 
-Required environment variables:
+### 1. Deploy to Vercel
+
+Click the "Publish" button in v0 to deploy your app to Vercel.
+
+### 2. Setup Environment Variables
+
+Add these environment variables in your Vercel project settings (or in the **Vars** section in v0):
 
 ```bash
-# Supabase (already configured)
+# Supabase (already configured in v0)
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
-# Email Service (Resend)
-RESEND_API_KEY=your_resend_api_key
+# Email Service - Required for alerts
+RESEND_API_KEY=re_xxxxxxxxxxxx
 
-# Cron Job Security
+# Cron Job Security - Required for automated alerts
 CRON_SECRET=your_random_secret_string
 
-# App URL (optional, for development redirects)
+# Optional: Development OAuth redirect
 NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL=http://localhost:3000
 ```
 
-### Adding Environment Variables
+### 3. Configure Resend (Required)
 
-Add the following environment variables in the **Vars** section of the in-chat sidebar:
+**Step 1: Sign up for Resend**
+1. Go to [resend.com](https://resend.com) and create a free account
+2. Navigate to **API Keys** in the dashboard
+3. Click **Create API Key**
+4. Copy the API key (starts with `re_`)
 
-1. **RESEND_API_KEY**: Get from [Resend.com](https://resend.com) after signing up
-2. **CRON_SECRET**: Generate a random string (e.g., `openssl rand -base64 32`)
+**Step 2: Add API Key to Vercel**
+1. In Vercel dashboard, go to your project **Settings**
+2. Click **Environment Variables**
+3. Add new variable:
+   - Name: `RESEND_API_KEY`
+   - Value: Your API key from Resend
+   - Environment: Production, Preview, Development
 
-## Setup Instructions
+**Step 3: Email Domain Configuration**
 
-### 1. Database Setup
+**Option A: Use Test Domain (Quick Start)**
+- The app is pre-configured to use `onboarding@resend.dev`
+- This works immediately without any setup
+- ⚠️ Limited to 100 emails/day, only for testing
+- Emails may land in spam folder
 
-Run the SQL scripts in order from the Scripts panel:
+**Option B: Use Your Own Domain (Recommended for Production)**
+1. In Resend dashboard, click **Domains**
+2. Click **Add Domain** and enter your domain (e.g., `yourdomain.com`)
+3. Add DNS records shown by Resend to your domain provider
+4. Wait for verification (usually 5-10 minutes)
+5. Update the `from` email in these files:
+   - `app/api/check-alerts/route.ts` (line ~182)
+   - `app/api/send-immediate-alert/route.ts` (line ~90)
+   - `app/api/send-test-alert/route.ts` (line ~33)
+   
+   Change from:
+   ```typescript
+   from: "eatfear <onboarding@resend.dev>",
+   ```
+   To:
+   ```typescript
+   from: "eatfear <alerts@yourdomain.com>",
+   ```
+
+### 4. Configure Cron Secret
+
+Generate a secure random string:
+
+```bash
+# On macOS/Linux:
+openssl rand -base64 32
+
+# Or use any random string generator
+```
+
+Add to Vercel environment variables:
+- Name: `CRON_SECRET`
+- Value: Your generated random string
+
+### 5. Setup Database
+
+The database schema is automatically created when you deploy. The SQL scripts run in order:
 1. `scripts/001_create_database_schema.sql` - Creates tables and RLS policies
 2. `scripts/002_create_profile_trigger.sql` - Auto-creates user profiles
 
-### 2. Email Configuration
+### 6. Test Email Alerts
 
-1. Sign up for [Resend](https://resend.com)
-2. Add your domain or use their test domain (`onboarding@resend.dev`)
-3. Get your API key and add to environment variables in Vars section
-4. Update the `from` email in both:
-   - `/app/api/check-alerts/route.ts`
-   - `/app/api/send-immediate-alert/route.ts`
-   
-   Example: Change `alerts@crashwatch.app` to your verified domain
+1. Log in to your account
+2. Go to **Profile** page
+3. Enable **Email Alerts** toggle
+4. Click **Send Test Alert** button
+5. Check your email inbox (and spam folder)
 
-### 3. Cron Job Setup
+If the test alert fails:
+- ✅ Verify `RESEND_API_KEY` is set in Vercel environment variables
+- ✅ Check that the from email domain is verified (if using custom domain)
+- ✅ Check browser console for error messages
+- ✅ Verify you're using the correct Resend API key
 
-The system uses a **hybrid alert approach**:
+## Email Configuration Troubleshooting
 
-#### For Hobby Plan Users (Default)
-- Cron runs every 6 hours: `0 */6 * * *`
-- Real-time monitoring when dashboard is open
-- Instant toast notifications in browser
+### Test Alert Returns "Email service not configured"
+- **Solution**: Add `RESEND_API_KEY` to environment variables and redeploy
 
-#### For Pro Plan Users (Optional)
+### Test Alert Returns "Failed to send email"
+- **Cause 1**: Invalid API key
+  - **Solution**: Verify the API key in Resend dashboard
+- **Cause 2**: Unverified domain (if using custom domain)
+  - **Solution**: Check DNS records in Resend dashboard
+  - **Workaround**: Use `onboarding@resend.dev` temporarily
+
+### Emails Land in Spam
+- **Cause**: Using test domain `onboarding@resend.dev`
+- **Solution**: Setup your own verified domain in Resend
+
+### "Domain not found" Error
+- **Cause**: Trying to use a domain that isn't verified in Resend
+- **Solution**: Either verify the domain or use `onboarding@resend.dev`
+
+## Cron Job Configuration
+
+### For Vercel Hobby Plan (Default)
+- Cron runs once per day at midnight UTC
+- Configuration in `vercel.json`:
+  ```json
+  {
+    "crons": [{
+      "path": "/api/check-alerts",
+      "schedule": "0 0 * * *"
+    }]
+  }
+  ```
+- Real-time monitoring compensates with instant alerts when dashboard is open
+
+### For Vercel Pro Plan (Optional)
 Edit `vercel.json` to run every 5 minutes:
 ```json
 {
-  "crons": [
-    {
-      "path": "/api/check-alerts",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  "crons": [{
+    "path": "/api/check-alerts",
+    "schedule": "*/5 * * * *"
+  }]
 }
 ```
 
-To manually trigger alerts:
+### Manual Trigger (Testing)
 ```bash
-curl -X GET https://your-domain.com/api/check-alerts \
+curl -X GET https://your-domain.vercel.app/api/check-alerts \
   -H "Authorization: Bearer YOUR_CRON_SECRET"
 ```
 
-### 4. Testing Alerts
+## Architecture
 
-Users can send a test alert from their profile page to verify email delivery.
+### Dual Alert System
+
+**1. Client-side Real-time Monitoring** (Primary)
+- Runs when dashboard is open in browser
+- WebSocket connections provide instant price updates
+- Checks user subscriptions against live prices every 30 seconds
+- Shows toast notifications immediately
+- Records alerts in database
+- Triggers email via `/api/send-immediate-alert`
+- 5-minute cooldown between duplicate alerts
+
+**2. Server-side Cron Job** (Backup)
+- Runs daily (Hobby plan) or every 5 minutes (Pro plan)
+- Checks all active subscriptions
+- Sends emails for crashes detected while users are offline
+- Anti-spam: Maximum 1 email per asset per 24 hours
+
+### Security Features
+
+- Row Level Security (RLS) on all database tables
+- Cron job authorization via Bearer token
+- Secure session management with HTTP-only cookies
+- Environment variables for sensitive keys
+- Email verification required for signup
 
 ## Tech Stack
 
 - **Frontend**: Next.js 16, React 19, TailwindCSS v4
 - **Backend**: Next.js API Routes (Edge Runtime)
 - **Database**: Supabase (PostgreSQL with RLS)
-- **Authentication**: Supabase Auth with email/password
+- **Authentication**: Supabase Auth (Email/Password + Google OAuth)
 - **Email**: Resend
 - **Real-time Data**: 
   - Binance WebSocket API (crypto prices)
@@ -113,66 +218,33 @@ Users can send a test alert from their profile page to verify email delivery.
 - `POST /api/send-test-alert` - Send test alert to authenticated user
 - `POST /api/send-immediate-alert` - Trigger immediate alert from client
 
-## Architecture
-
-### Dual Alert System
-
-**1. Client-side Real-time Monitoring** (Primary)
-- Runs when user has dashboard open
-- WebSocket connections provide instant price updates
-- Checks user subscriptions against live prices
-- Shows toast notifications immediately
-- Records alerts in database
-- Triggers email via `/api/send-immediate-alert`
-- 5-minute cooldown between same alerts
-
-**2. Server-side Cron Job** (Backup)
-- Runs every 6 hours (Hobby) or 5 minutes (Pro)
-- Checks all active subscriptions
-- Sends emails for crashes detected
-- Anti-spam: Max 1 email per asset per 24 hours
-
-### Crash Detection System
-
-1. **Real-time Monitoring**: WebSocket connections track price changes
-2. **Historical Analysis**: Price history stored for 15-minute and 24-hour crash detection
-3. **Alert Triggers**: Compares current prices against user-defined thresholds
-4. **Toast Notifications**: Instant in-app alerts with Radix UI Toast
-5. **Email Delivery**: Professional HTML emails sent via Resend
-6. **Anti-spam**: Maximum 1 alert per asset per 24 hours
-
-### Security
-
-- Row Level Security (RLS) on all database tables
-- Server-side API key management
-- Cron job authorization via Bearer token
-- Secure session management with HTTP-only cookies
-- Email verification required for signup
-
-## Usage
-
-1. **Sign Up**: Create account with email/password
-2. **Verify Email**: Check inbox for confirmation email
-3. **Browse Markets**: View real-time crypto and stock prices
-4. **Subscribe**: Click bell icon on assets you want to monitor
-5. **Customize**: Set alert thresholds in profile settings
-6. **Enable Notifications**: Toggle email notifications in profile
-7. **Receive Alerts**: 
-   - Toast notifications while dashboard is open
-   - Email notifications when away
-
 ## Default Alert Thresholds
 
 - **Cryptocurrencies**: 5% drop in 15 minutes
 - **Stocks**: 3% daily drop
 
-These can be customized per subscription in the profile page.
+Thresholds can be customized per subscription in the profile page.
 
-## Crash Detection Rules
+## Usage
 
-- **15-minute crashes**: Price drops > 3% in 15 minutes (crypto only)
-- **24-hour crashes**: Price drops > 10% in 24 hours (crypto and stocks)
-- **Visual alerts**: Red banner at top of dashboard when crashes detected
+1. **Sign Up**: Create account with email/password or Google
+2. **Verify Email**: Check inbox for confirmation (email/password only)
+3. **Browse Markets**: View real-time crypto and stock prices on dashboard
+4. **Subscribe**: Click bell icon on any asset to enable alerts
+5. **Customize Thresholds**: Edit alert thresholds in profile page
+6. **Enable Notifications**: Toggle email notifications in profile
+7. **Test Alerts**: Click "Send Test Alert" to verify email delivery
+8. **Receive Alerts**: 
+   - Instant toast notifications while dashboard is open
+   - Email notifications delivered within 1 minute
+
+## Support
+
+For issues with:
+- **Email delivery**: Check Resend dashboard logs
+- **Cron jobs**: Check Vercel deployment logs
+- **Authentication**: Check Supabase Auth logs
+- **Database**: Check Supabase table editor
 
 ## License
 
