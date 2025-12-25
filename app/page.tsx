@@ -84,8 +84,13 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t py-8">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>&copy; 2025 CrashWatch. Real-time market crash monitoring.</p>
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+            <p>&copy; 2025 CrashWatch. Real-time market crash monitoring.</p>
+            <Link href="/privacy-policy" className="underline hover:text-foreground">
+              Privacy Policy
+            </Link>
+          </div>
         </div>
       </footer>
     </div>
