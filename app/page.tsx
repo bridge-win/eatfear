@@ -5,9 +5,12 @@ import { createClient } from "@/lib/supabase/server"
 
 export default async function HomePage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = null
+  
+  if (supabase) {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  }
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
