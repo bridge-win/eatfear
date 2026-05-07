@@ -12,7 +12,7 @@ import { MarketStatsPanel } from "@/components/market-stats-panel"
 import { FearGreedGauge } from "@/components/fear-greed-gauge"
 import { CrashLeaderboard } from "@/components/crash-leaderboard"
 import { BinanceWebSocketService, fetchFearGreedIndex, fetchMarketStats } from "@/lib/crypto-service"
-import { fetchStockData, calculateCrashLeaderboard, ALL_STOCKS } from "@/lib/stock-service"
+import { fetchStockData, calculateCrashLeaderboard, STOCK_CATEGORIES } from "@/lib/stock-service"
 import { CrashDetector } from "@/lib/crash-detector"
 import { ClientAlertChecker } from "@/lib/client-alert-checker"
 import { useToast } from "@/hooks/use-toast"
@@ -24,7 +24,9 @@ export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [cryptoAssets, setCryptoAssets] = useState<Map<string, CryptoAsset>>(new Map())
-  const [stockAssets, setStockAssets] = useState<Map<string, StockAsset>>(new Map())
+  const [usStockAssets, setUsStockAssets] = useState<Map<string, StockAsset>>(new Map())
+  const [hkStockAssets, setHkStockAssets] = useState<Map<string, StockAsset>>(new Map())
+  const [vietnamStockAssets, setVietnamStockAssets] = useState<Map<string, StockAsset>>(new Map())
   const [fearGreed, setFearGreed] = useState<FearGreedIndex | null>(null)
   const [marketStats, setMarketStats] = useState<MarketStats | null>(null)
   const [crashes, setCrashes] = useState<CrashAlert[]>([])
@@ -117,13 +119,27 @@ export default function DashboardPage() {
     }
 
     async function loadStockData() {
-      const symbols = ALL_STOCKS.map((s) => s.symbol)
-      const stockData = await fetchStockData(symbols)
-      setStockAssets(stockData)
+      // Load US stocks
+      const usSymbols = STOCK_CATEGORIES.us.stocks.map((s) => s.symbol)
+      const usData = await fetchStockData(usSymbols)
+      setUsStockAssets(usData)
 
-      stockData.forEach((stock) => {
+      // Load HK stocks
+      const hkSymbols = STOCK_CATEGORIES.hk.stocks.map((s) => s.symbol)
+      const hkData = await fetchStockData(hkSymbols)
+      setHkStockAssets(hkData)
+
+      // Load Vietnam concept stocks
+      const vietnamSymbols = STOCK_CATEGORIES.vietnam.stocks.map((s) => s.symbol)
+      const vietnamData = await fetchStockData(vietnamSymbols)
+      setVietnamStockAssets(vietnamData)
+
+      // Process all stocks for crash detection
+      const allStockData = new Map([...usData, ...hkData, ...vietnamData])
+      allStockData.forEach((stock) => {
         crashDetector.updatePrice(stock.symbol, stock.price)
-        const detectedCrashes = crashDetector.detectCrashes(stock, "stock")
+        const assetType = stock.symbol.includes(".HK") ? "hk_stock" : "stock"
+        const detectedCrashes = crashDetector.detectCrashes(stock, assetType)
 
         if (detectedCrashes.length > 0) {
           setCrashes((prev) => {
@@ -145,7 +161,7 @@ export default function DashboardPage() {
     }
   }, [router, toast])
 
-  const handleSubscribeToggle = async (symbol: string, assetType: "crypto" | "stock") => {
+  const handleSubscribeToggle = async (symbol: string, assetType: "crypto" | "stock" | "hk_stock" | "vietnam_stock") => {
     if (!user) return
 
     const supabase = createClient()
@@ -169,7 +185,7 @@ export default function DashboardPage() {
           user_id: user.id,
           asset_symbol: symbol,
           asset_type: assetType,
-          threshold_percentage: assetType === "crypto" ? 5.0 : 3.0,
+          threshold_percent: assetType === "crypto" ? 5.0 : 3.0,
         })
         .select()
         .single()
@@ -196,8 +212,11 @@ export default function DashboardPage() {
   }
 
   const cryptoArray = Array.from(cryptoAssets.values())
-  const stockArray = Array.from(stockAssets.values())
-  const crashLeaderboard = calculateCrashLeaderboard(stockArray)
+  const usStockArray = Array.from(usStockAssets.values())
+  const hkStockArray = Array.from(hkStockAssets.values())
+  const vietnamStockArray = Array.from(vietnamStockAssets.values())
+  const allStockArray = [...usStockArray, ...hkStockArray, ...vietnamStockArray]
+  const crashLeaderboard = calculateCrashLeaderboard(allStockArray)
 
   return (
     <div className="min-h-svh bg-background">
@@ -239,9 +258,11 @@ export default function DashboardPage() {
           <CrashLeaderboard stocks={crashLeaderboard} />
 
           <Tabs defaultValue="crypto" className="w-full">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="crypto">Cryptocurrencies</TabsTrigger>
-              <TabsTrigger value="stocks">Stocks</TabsTrigger>
+            <TabsList className="grid w-full max-w-2xl grid-cols-4">
+              <TabsTrigger value="crypto">加密货币</TabsTrigger>
+              <TabsTrigger value="us-stocks">美股 Top 50</TabsTrigger>
+              <TabsTrigger value="hk-stocks">港股 Top 20</TabsTrigger>
+              <TabsTrigger value="vietnam">越南概念股</TabsTrigger>
             </TabsList>
             <TabsContent value="crypto" className="mt-6">
               <div>
@@ -264,17 +285,17 @@ export default function DashboardPage() {
                 )}
               </div>
             </TabsContent>
-            <TabsContent value="stocks" className="mt-6">
+            <TabsContent value="us-stocks" className="mt-6">
               <div>
-                <h2 className="text-2xl font-bold mb-4">Major Indices & Top Stocks</h2>
+                <h2 className="text-2xl font-bold mb-4">美股 Top 50</h2>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Data delayed 15-30 minutes. Updates every 60 seconds.
+                  数据延迟 15-30 分钟，每 60 秒更新一次
                 </p>
-                {stockArray.length === 0 ? (
+                {usStockArray.length === 0 ? (
                   <p className="text-muted-foreground">Loading stock data...</p>
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {stockArray.map((asset) => (
+                    {usStockArray.map((asset) => (
                       <StockPriceCard
                         key={asset.symbol}
                         asset={asset}
@@ -282,6 +303,54 @@ export default function DashboardPage() {
                           (s) => s.asset_symbol === asset.symbol && s.asset_type === "stock",
                         )}
                         onSubscribeToggle={(symbol) => handleSubscribeToggle(symbol, "stock")}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            <TabsContent value="hk-stocks" className="mt-6">
+              <div>
+                <h2 className="text-2xl font-bold mb-4">港股 Top 20</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  数据延迟 15-30 分钟，每 60 秒更新一次
+                </p>
+                {hkStockArray.length === 0 ? (
+                  <p className="text-muted-foreground">Loading stock data...</p>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {hkStockArray.map((asset) => (
+                      <StockPriceCard
+                        key={asset.symbol}
+                        asset={asset}
+                        isSubscribed={subscriptions.some(
+                          (s) => s.asset_symbol === asset.symbol && s.asset_type === "hk_stock",
+                        )}
+                        onSubscribeToggle={(symbol) => handleSubscribeToggle(symbol, "hk_stock")}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            <TabsContent value="vietnam" className="mt-6">
+              <div>
+                <h2 className="text-2xl font-bold mb-4">越南概念股</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  包含 VNM ETF 及中概股，数据延迟 15-30 分钟
+                </p>
+                {vietnamStockArray.length === 0 ? (
+                  <p className="text-muted-foreground">Loading stock data...</p>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {vietnamStockArray.map((asset) => (
+                      <StockPriceCard
+                        key={asset.symbol}
+                        asset={asset}
+                        isSubscribed={subscriptions.some(
+                          (s) => s.asset_symbol === asset.symbol && s.asset_type === "vietnam_stock",
+                        )}
+                        onSubscribeToggle={(symbol) => handleSubscribeToggle(symbol, "vietnam_stock")}
                       />
                     ))}
                   </div>

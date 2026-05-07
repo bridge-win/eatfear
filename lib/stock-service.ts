@@ -1,13 +1,14 @@
 import type { StockAsset } from "./types"
 
-// Major indices and top U.S. stocks
-export const MAJOR_INDICES = [
+// Major U.S. indices
+export const US_INDICES = [
   { symbol: "SPY", name: "S&P 500" },
-  { symbol: "QQQ", name: "NASDAQ" },
+  { symbol: "QQQ", name: "NASDAQ 100" },
   { symbol: "DIA", name: "Dow Jones" },
 ]
 
-export const TOP_STOCKS = [
+// Top 50 U.S. stocks by market cap
+export const US_TOP_50 = [
   { symbol: "AAPL", name: "Apple Inc." },
   { symbol: "MSFT", name: "Microsoft Corporation" },
   { symbol: "GOOGL", name: "Alphabet Inc." },
@@ -28,9 +29,93 @@ export const TOP_STOCKS = [
   { symbol: "XOM", name: "Exxon Mobil" },
   { symbol: "NFLX", name: "Netflix Inc." },
   { symbol: "KO", name: "Coca-Cola" },
+  { symbol: "AVGO", name: "Broadcom Inc." },
+  { symbol: "PEP", name: "PepsiCo Inc." },
+  { symbol: "COST", name: "Costco Wholesale" },
+  { symbol: "CSCO", name: "Cisco Systems" },
+  { symbol: "TMO", name: "Thermo Fisher" },
+  { symbol: "ADBE", name: "Adobe Inc." },
+  { symbol: "CRM", name: "Salesforce Inc." },
+  { symbol: "ABBV", name: "AbbVie Inc." },
+  { symbol: "MRK", name: "Merck & Co." },
+  { symbol: "AMD", name: "AMD Inc." },
+  { symbol: "LLY", name: "Eli Lilly" },
+  { symbol: "ACN", name: "Accenture" },
+  { symbol: "INTC", name: "Intel Corporation" },
+  { symbol: "ORCL", name: "Oracle Corporation" },
+  { symbol: "NKE", name: "Nike Inc." },
+  { symbol: "TXN", name: "Texas Instruments" },
+  { symbol: "QCOM", name: "Qualcomm Inc." },
+  { symbol: "INTU", name: "Intuit Inc." },
+  { symbol: "AMAT", name: "Applied Materials" },
+  { symbol: "IBM", name: "IBM Corporation" },
+  { symbol: "GE", name: "General Electric" },
+  { symbol: "CAT", name: "Caterpillar Inc." },
+  { symbol: "GS", name: "Goldman Sachs" },
+  { symbol: "NOW", name: "ServiceNow Inc." },
+  { symbol: "SPGI", name: "S&P Global" },
+  { symbol: "AXP", name: "American Express" },
+  { symbol: "BKNG", name: "Booking Holdings" },
+  { symbol: "ISRG", name: "Intuitive Surgical" },
+  { symbol: "UBER", name: "Uber Technologies" },
+  { symbol: "BLK", name: "BlackRock Inc." },
 ]
 
-export const ALL_STOCKS = [...MAJOR_INDICES, ...TOP_STOCKS]
+// Hong Kong Top 20 stocks (using Yahoo Finance HK tickers)
+export const HK_TOP_20 = [
+  { symbol: "0700.HK", name: "腾讯控股" },
+  { symbol: "9988.HK", name: "阿里巴巴" },
+  { symbol: "0941.HK", name: "中国移动" },
+  { symbol: "1299.HK", name: "友邦保险" },
+  { symbol: "0005.HK", name: "汇丰控股" },
+  { symbol: "3690.HK", name: "美团" },
+  { symbol: "0939.HK", name: "建设银行" },
+  { symbol: "1398.HK", name: "工商银行" },
+  { symbol: "2318.HK", name: "中国平安" },
+  { symbol: "0883.HK", name: "中国海洋石油" },
+  { symbol: "9618.HK", name: "京东集团" },
+  { symbol: "9999.HK", name: "网易" },
+  { symbol: "1810.HK", name: "小米集团" },
+  { symbol: "0388.HK", name: "香港交易所" },
+  { symbol: "2628.HK", name: "中国人寿" },
+  { symbol: "0011.HK", name: "恒生银行" },
+  { symbol: "0016.HK", name: "新鸿基地产" },
+  { symbol: "0027.HK", name: "银河娱乐" },
+  { symbol: "0001.HK", name: "长江实业" },
+  { symbol: "0002.HK", name: "中电控股" },
+]
+
+// Vietnam concept stocks (US-listed Vietnam exposure)
+export const VIETNAM_STOCKS = [
+  { symbol: "VNM", name: "VanEck Vietnam ETF" },
+  { symbol: "FUTU", name: "富途控股" },
+  { symbol: "BIDU", name: "百度" },
+  { symbol: "JD", name: "京东" },
+  { symbol: "PDD", name: "拼多多" },
+  { symbol: "BABA", name: "阿里巴巴ADR" },
+  { symbol: "NIO", name: "蔚来汽车" },
+  { symbol: "XPEV", name: "小鹏汽车" },
+  { symbol: "LI", name: "理想汽车" },
+  { symbol: "BILI", name: "哔哩哔哩" },
+  { symbol: "TME", name: "腾讯音乐" },
+  { symbol: "EDU", name: "新东方" },
+  { symbol: "TAL", name: "好未来" },
+  { symbol: "VIPS", name: "唯品会" },
+  { symbol: "IQ", name: "爱奇艺" },
+]
+
+// All US stocks (indices + top 50)
+export const ALL_US_STOCKS = [...US_INDICES, ...US_TOP_50]
+
+// Combined all stocks for backward compatibility
+export const ALL_STOCKS = ALL_US_STOCKS
+
+// Export categories for dashboard tabs
+export const STOCK_CATEGORIES = {
+  us: { name: "美股 Top 50", stocks: ALL_US_STOCKS },
+  hk: { name: "港股 Top 20", stocks: HK_TOP_20 },
+  vietnam: { name: "越南概念股", stocks: VIETNAM_STOCKS },
+}
 
 // Fetch stock data via Yahoo Finance API
 export async function fetchStockData(symbols: string[]): Promise<Map<string, StockAsset>> {
