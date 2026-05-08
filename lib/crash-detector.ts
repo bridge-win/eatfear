@@ -1,4 +1,4 @@
-import type { CryptoAsset, StockAsset, CrashAlert } from "./types"
+import type { CryptoAsset, StockAsset, CrashAlert, AssetType } from "./types"
 
 interface PriceHistory {
   timestamp: number
@@ -23,7 +23,7 @@ export class CrashDetector {
     this.priceHistory.set(symbol, filtered)
   }
 
-  detectCrashes(asset: CryptoAsset | StockAsset, assetType: "crypto" | "stock"): CrashAlert[] {
+  detectCrashes(asset: CryptoAsset | StockAsset, assetType: AssetType): CrashAlert[] {
     const crashes: CrashAlert[] = []
     const history = this.priceHistory.get(asset.symbol)
 

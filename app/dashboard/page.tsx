@@ -11,6 +11,7 @@ import { CrashAlertBanner } from "@/components/crash-alert-banner"
 import { MarketStatsPanel } from "@/components/market-stats-panel"
 import { FearGreedGauge } from "@/components/fear-greed-gauge"
 import { CrashLeaderboard } from "@/components/crash-leaderboard"
+import { BtcVolatilitySystem } from "@/components/btc-volatility-system"
 import { BinanceWebSocketService, fetchFearGreedIndex, fetchMarketStats } from "@/lib/crypto-service"
 import { fetchStockData, calculateCrashLeaderboard, STOCK_CATEGORIES } from "@/lib/stock-service"
 import { CrashDetector } from "@/lib/crash-detector"
@@ -185,7 +186,7 @@ export default function DashboardPage() {
           user_id: user.id,
           asset_symbol: symbol,
           asset_type: assetType,
-          threshold_percent: assetType === "crypto" ? 5.0 : 3.0,
+          threshold_percentage: assetType === "crypto" ? 5.0 : 3.0,
         })
         .select()
         .single()
@@ -257,13 +258,17 @@ export default function DashboardPage() {
 
           <CrashLeaderboard stocks={crashLeaderboard} />
 
-          <Tabs defaultValue="crypto" className="w-full">
-            <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <Tabs defaultValue="btc-volatility" className="w-full">
+            <TabsList className="grid h-auto w-full max-w-4xl grid-cols-2 md:grid-cols-5">
+              <TabsTrigger value="btc-volatility">BTC 极端波动</TabsTrigger>
               <TabsTrigger value="crypto">加密货币</TabsTrigger>
               <TabsTrigger value="us-stocks">美股 Top 50</TabsTrigger>
               <TabsTrigger value="hk-stocks">港股 Top 20</TabsTrigger>
               <TabsTrigger value="vietnam">越南概念股</TabsTrigger>
             </TabsList>
+            <TabsContent value="btc-volatility" className="mt-6">
+              <BtcVolatilitySystem />
+            </TabsContent>
             <TabsContent value="crypto" className="mt-6">
               <div>
                 <h2 className="text-2xl font-bold mb-4">Top Cryptocurrencies</h2>
