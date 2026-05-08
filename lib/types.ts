@@ -17,10 +17,12 @@ export interface StockAsset {
   lastUpdate: number
 }
 
+export type AssetType = "crypto" | "stock" | "hk_stock" | "vietnam_stock"
+
 export interface CrashAlert {
   symbol: string
   name: string
-  assetType: "crypto" | "stock"
+  assetType: AssetType
   dropPercentage: number
   timeframe: string
   currentPrice: number
@@ -44,7 +46,7 @@ export interface Subscription {
   id: string
   user_id: string
   asset_symbol: string
-  asset_type: "crypto" | "stock"
+  asset_type: AssetType
   threshold_percentage: number
   is_active: boolean
   created_at: string
