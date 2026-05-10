@@ -4,6 +4,7 @@ export interface CryptoAsset {
   price: number
   change24h: number
   changePercent24h: number
+  volume24h?: number
   lastUpdate: number
 }
 
@@ -51,4 +52,34 @@ export interface Subscription {
   is_active: boolean
   created_at: string
   updated_at: string
+}
+
+export interface MacroSeriesPoint {
+  timestamp: number
+  date: string
+  value: number
+}
+
+export interface MacroIndicator {
+  symbol: string
+  name: string
+  group: "Equity" | "Rates" | "Volatility" | "Dollar" | "Commodity" | "FX" | "Credit" | "Crypto"
+  unit: "index" | "percent" | "usd" | "ratio"
+  source: string
+  value: number
+  change: number
+  changePercent: number
+  lastUpdate: number
+  history: MacroSeriesPoint[]
+}
+
+export interface MarketNewsArticle {
+  title: string
+  url: string
+  domain: string
+  sourceCountry: string
+  language: string
+  publishedAt: string
+  imageUrl?: string
+  tone?: number
 }

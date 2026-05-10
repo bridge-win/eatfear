@@ -4,17 +4,48 @@ import type { CryptoAsset, FearGreedIndex, MarketStats } from "./types"
 export const TOP_CRYPTOS = [
   { symbol: "BTCUSDT", name: "Bitcoin" },
   { symbol: "ETHUSDT", name: "Ethereum" },
-  { symbol: "BNBUSDT", name: "BNB" },
   { symbol: "SOLUSDT", name: "Solana" },
   { symbol: "XRPUSDT", name: "XRP" },
-  { symbol: "ADAUSDT", name: "Cardano" },
+  { symbol: "BNBUSDT", name: "BNB" },
   { symbol: "DOGEUSDT", name: "Dogecoin" },
-  { symbol: "MATICUSDT", name: "Polygon" },
-  { symbol: "DOTUSDT", name: "Polkadot" },
-  { symbol: "LTCUSDT", name: "Litecoin" },
-  { symbol: "AVAXUSDT", name: "Avalanche" },
+  { symbol: "ADAUSDT", name: "Cardano" },
+  { symbol: "TRXUSDT", name: "TRON" },
+  { symbol: "TONUSDT", name: "Toncoin" },
   { symbol: "LINKUSDT", name: "Chainlink" },
+  { symbol: "AVAXUSDT", name: "Avalanche" },
+  { symbol: "BCHUSDT", name: "Bitcoin Cash" },
+  { symbol: "DOTUSDT", name: "Polkadot" },
+  { symbol: "UNIUSDT", name: "Uniswap" },
+  { symbol: "LTCUSDT", name: "Litecoin" },
+  { symbol: "NEARUSDT", name: "NEAR Protocol" },
+  { symbol: "APTUSDT", name: "Aptos" },
+  { symbol: "SUIUSDT", name: "Sui" },
+  { symbol: "ICPUSDT", name: "Internet Computer" },
+  { symbol: "ETCUSDT", name: "Ethereum Classic" },
 ]
+
+interface CryptoMarketsResponse {
+  assets?: CryptoAsset[]
+}
+
+export async function fetchCryptoMarketSnapshot(): Promise<Map<string, CryptoAsset>> {
+  const assetMap = new Map<string, CryptoAsset>()
+
+  try {
+    const response = await fetch("/api/crypto/markets")
+    if (!response.ok) return assetMap
+
+    const payload = (await response.json()) as CryptoMarketsResponse
+
+    for (const asset of payload.assets ?? []) {
+      assetMap.set(asset.symbol, asset)
+    }
+  } catch (error) {
+    console.error("Error fetching crypto market snapshot:", error)
+  }
+
+  return assetMap
+}
 
 export class BinanceWebSocketService {
   private ws: WebSocket | null = null
