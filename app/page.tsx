@@ -1,49 +1,12 @@
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Bell, LineChart, TrendingDown } from "lucide-react"
+import { SiteHeader } from "@/components/site-header"
+import { ArrowRight, LineChart, Newspaper, TrendingDown } from "lucide-react"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/server"
 
-export default async function HomePage() {
-  const supabase = await createClient()
-  let user = null
-  
-  if (supabase) {
-    const { data } = await supabase.auth.getUser()
-    user = data.user
-  }
-
+export default function HomePage() {
   return (
     <div className="flex min-h-svh flex-col bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <TrendingDown className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">eatfear</span>
-          </div>
-          <nav className="flex items-center gap-4">
-            {user ? (
-              <>
-                <Link href="/dashboard">
-                  <Button variant="ghost">Dashboard</Button>
-                </Link>
-                <Link href="/profile">
-                  <Button>Profile</Button>
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link href="/auth/login">
-                  <Button variant="ghost">Login</Button>
-                </Link>
-                <Link href="/auth/sign-up">
-                  <Button>Get Started</Button>
-                </Link>
-              </>
-            )}
-          </nav>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* Hero Section */}
       <main className="flex-1">
@@ -53,14 +16,18 @@ export default async function HomePage() {
               Never Miss a Market Crash Again
             </h1>
             <p className="mt-6 text-pretty text-lg text-muted-foreground sm:text-xl">
-              Real-time monitoring platform for cryptocurrency and stock market crashes. Get instant email alerts when
-              your subscribed assets drop significantly.
+              Public market dashboard for crypto, stocks, macro signals, and news. No login required.
             </p>
-            <div className="mt-10 flex items-center justify-center gap-4">
-              <Link href="/auth/sign-up">
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+              <Link href="/crypto">
                 <Button size="lg" className="gap-2">
-                  Start Monitoring Free
+                  Open Crypto Dashboard
                   <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+              <Link href="/macro">
+                <Button size="lg" variant="outline">
+                  View Macro Signals
                 </Button>
               </Link>
             </div>
@@ -76,27 +43,27 @@ export default async function HomePage() {
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                   <LineChart className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="mb-2 text-xl font-semibold">Real-time Tracking</h3>
+                <h3 className="mb-2 text-xl font-semibold">Crypto Signals</h3>
                 <p className="text-muted-foreground">
-                  Monitor top 100 cryptocurrencies and major stocks with live WebSocket updates
+                  BTC extreme-volatility monitor plus live top crypto prices from public exchange APIs.
                 </p>
               </div>
               <div className="flex flex-col items-center text-center">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                   <TrendingDown className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="mb-2 text-xl font-semibold">Crash Detection</h3>
+                <h3 className="mb-2 text-xl font-semibold">Stock Watchlists</h3>
                 <p className="text-muted-foreground">
-                  Automatically detect significant drops with customizable thresholds
+                  U.S., Hong Kong, and Vietnam exposure lists with delayed Yahoo Finance quotes.
                 </p>
               </div>
               <div className="flex flex-col items-center text-center">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <Bell className="h-6 w-6 text-primary" />
+                  <Newspaper className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="mb-2 text-xl font-semibold">Instant Alerts</h3>
+                <h3 className="mb-2 text-xl font-semibold">Macro & News</h3>
                 <p className="text-muted-foreground">
-                  Receive email notifications within 1 minute when subscribed assets crash
+                  Curated macro proxies, historical charts, and global market news from open data sources.
                 </p>
               </div>
             </div>

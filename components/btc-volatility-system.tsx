@@ -24,57 +24,6 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 type SignalDirection = "Buy Watch" | "Sell Watch" | "Neutral" | "High Risk"
-type StreamName =
-  | "btcusdt@ticker"
-  | "btcusdt@kline_1m"
-  | "btcusdt@kline_5m"
-  | "btcusdt@depth20@100ms"
-  | "btcusdt@forceOrder"
-  | "btcusdt@markPrice@1s"
-
-interface TickerPayload {
-  s: string
-  c: string
-  p: string
-  P: string
-}
-
-interface KlinePayload {
-  k: {
-    t: number
-    T: number
-    i: "1m" | "5m"
-    o: string
-    h: string
-    l: string
-    c: string
-    v: string
-    x: boolean
-  }
-}
-
-interface DepthPayload {
-  bids: [string, string][]
-  asks: [string, string][]
-}
-
-interface ForceOrderPayload {
-  o: {
-    S: "BUY" | "SELL"
-    q: string
-    ap: string
-    T: number
-  }
-}
-
-interface MarkPricePayload {
-  r: string
-}
-
-interface BinanceStreamMessage {
-  stream: StreamName
-  data: TickerPayload | KlinePayload | DepthPayload | ForceOrderPayload | MarkPricePayload
-}
 
 interface KlinePoint {
   time: number
@@ -100,6 +49,16 @@ interface LiquidationEvent {
 interface OpenInterestPoint {
   time: number
   value: number
+}
+
+interface FundingRatePoint {
+  time: number
+  rate: number
+}
+
+interface LongShortRatioPoint {
+  time: number
+  ratio: number
 }
 
 interface OrderBookState {
@@ -134,12 +93,35 @@ interface HistorySignal extends VolatilitySignal {
   price: number
 }
 
-const STREAM_URL =
-  "wss://fstream.binance.com/stream?streams=btcusdt@ticker/btcusdt@kline_1m/btcusdt@kline_5m/btcusdt@depth20@100ms/btcusdt@forceOrder/btcusdt@markPrice@1s"
+interface BtcDerivativesResponse {
+  source: string
+  ticker: {
+    price: number
+    changePercent24h: number
+  }
+  oneMinuteKlines: KlinePoint[]
+  fiveMinuteKlines: KlinePoint[]
+  orderBook: OrderBookState
+  openInterest: {
+    btc: number
+    usd: number
+  }
+  openInterestHistory: Array<{
+    time: number
+    valueUsd: number
+  }>
+  fundingRate: {
+    rate: number
+    nextFundingTime: number
+  }
+  fundingRateHistory: FundingRatePoint[]
+  longShortAccountRatioHistory: LongShortRatioPoint[]
+  contractLongShortRatioHistory: LongShortRatioPoint[]
+}
 
 const MAX_KLINES = 80
 const FIVE_MINUTES = 5 * 60 * 1000
-const OPEN_INTEREST_POLL_MS = 30 * 1000
+const DERIVATIVES_POLL_MS = 10 * 1000
 
 const THRESHOLDS = {
   priceZ: 2.5,
@@ -191,44 +173,6 @@ const calculateZScore = (values: number[], currentValue: number) => {
   return (currentValue - mean) / standardDeviation
 }
 
-const normalizeKline = (payload: KlinePayload): KlinePoint => {
-  const { k } = payload
-  const open = Number(k.o)
-  const high = Number(k.h)
-  const low = Number(k.l)
-  const close = Number(k.c)
-  const volume = Number(k.v)
-  const range = Math.max(high - low, Number.EPSILON)
-  const upperWickRatio = Math.max(0, (high - Math.max(open, close)) / range)
-  const lowerWickRatio = Math.max(0, (Math.min(open, close) - low) / range)
-
-  return {
-    time: k.t,
-    label: new Date(k.t).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
-    open,
-    high,
-    low,
-    close,
-    volume,
-    changePercent: ((close - open) / open) * 100,
-    upperWickRatio,
-    lowerWickRatio,
-    isClosed: k.x,
-  }
-}
-
-const upsertKline = (klines: KlinePoint[], next: KlinePoint) => {
-  const index = klines.findIndex((kline) => kline.time === next.time)
-
-  if (index === -1) {
-    return [...klines, next].slice(-MAX_KLINES)
-  }
-
-  const updated = [...klines]
-  updated[index] = next
-  return updated
-}
-
 const sumLiquidations = (events: LiquidationEvent[], side: "long" | "short") =>
   events.reduce((sum, event) => (event.side === side ? sum + event.usd : sum), 0)
 
@@ -243,44 +187,6 @@ const calculateOiChangeRate = (history: OpenInterestPoint[]) => {
   if (!prior || prior.value === 0) return 0
 
   return ((latest.value - prior.value) / prior.value) * 100
-}
-
-const calculateOrderBook = (payload: DepthPayload): OrderBookState => {
-  const bids = payload.bids.map(([price, quantity]) => {
-    const parsedPrice = Number(price)
-    const parsedQuantity = Number(quantity)
-
-    return {
-      price: parsedPrice,
-      quantity: parsedQuantity,
-      notional: parsedPrice * parsedQuantity,
-    }
-  })
-
-  const asks = payload.asks.map(([price, quantity]) => {
-    const parsedPrice = Number(price)
-    const parsedQuantity = Number(quantity)
-
-    return {
-      price: parsedPrice,
-      quantity: parsedQuantity,
-      notional: parsedPrice * parsedQuantity,
-    }
-  })
-
-  const bidDepth = bids.reduce((sum, level) => sum + level.notional, 0)
-  const askDepth = asks.reduce((sum, level) => sum + level.notional, 0)
-  const bidAskRatio = askDepth > 0 ? bidDepth / askDepth : 1
-  const imbalance = bidDepth + askDepth > 0 ? ((bidDepth - askDepth) / (bidDepth + askDepth)) * 100 : 0
-
-  return {
-    bidDepth,
-    askDepth,
-    bidAskRatio,
-    imbalance,
-    bids,
-    asks,
-  }
 }
 
 const getCurrentSignal = ({
@@ -385,7 +291,20 @@ const getCurrentSignal = ({
     }
   }
 
-  if (Object.values(buyConditions).every(Boolean)) {
+  const hasCoreBuySetup =
+    buyConditions.downsideShock &&
+    buyConditions.lowerWick &&
+    buyConditions.volumeExpansion &&
+    buyConditions.oiFlush &&
+    buyConditions.bidDepthRecovery
+  const hasCoreSellSetup =
+    sellConditions.upsideShock &&
+    sellConditions.upperWick &&
+    sellConditions.volumeExpansion &&
+    sellConditions.oiFlush &&
+    sellConditions.askDepthRecovery
+
+  if (hasCoreBuySetup) {
     return {
       direction: "Buy Watch",
       headline: "暴跌插针后的反弹观察",
@@ -397,7 +316,9 @@ const getCurrentSignal = ({
         `5m 跌幅 z-score ${fiveMinuteReturnZScore.toFixed(2)} < -${THRESHOLDS.priceZ}`,
         `下影线比例 ${((latest5m?.lowerWickRatio ?? 0) * 100).toFixed(0)}% > 55%`,
         `成交量 z-score ${volumeZScore.toFixed(2)} > ${THRESHOLDS.volumeZ}`,
-        `5m 多头爆仓 ${formatCompactUsd(longLiquidations)} 明显放大`,
+        longLiquidations > 0
+          ? `5m 多头爆仓 ${formatCompactUsd(longLiquidations)} 明显放大`
+          : "公开源未返回逐笔爆仓，信号以 OI 清洗、盘口恢复和放量确认",
         `OI 5m 变化率 ${formatPercent(oiChangeRate)} < -2%`,
         `Bid / Ask Ratio ${orderBook.bidAskRatio.toFixed(2)} > 1.20，买盘深度恢复`,
       ],
@@ -409,7 +330,7 @@ const getCurrentSignal = ({
     }
   }
 
-  if (Object.values(sellConditions).every(Boolean)) {
+  if (hasCoreSellSetup) {
     return {
       direction: "Sell Watch",
       headline: "暴涨插针后的回落观察",
@@ -421,7 +342,9 @@ const getCurrentSignal = ({
         `5m 涨幅 z-score ${fiveMinuteReturnZScore.toFixed(2)} > ${THRESHOLDS.priceZ}`,
         `上影线比例 ${((latest5m?.upperWickRatio ?? 0) * 100).toFixed(0)}% > 55%`,
         `成交量 z-score ${volumeZScore.toFixed(2)} > ${THRESHOLDS.volumeZ}`,
-        `5m 空头爆仓 ${formatCompactUsd(shortLiquidations)} 明显放大`,
+        shortLiquidations > 0
+          ? `5m 空头爆仓 ${formatCompactUsd(shortLiquidations)} 明显放大`
+          : "公开源未返回逐笔爆仓，信号以 OI 清洗、盘口恢复和放量确认",
         `OI 5m 变化率 ${formatPercent(oiChangeRate)} < -2%`,
         `Bid / Ask Ratio ${orderBook.bidAskRatio.toFixed(2)} < 0.80，卖盘深度恢复`,
       ],
@@ -567,6 +490,8 @@ export function BtcVolatilitySystem() {
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "live" | "reconnecting" | "offline">(
     "connecting",
   )
+  const [dataSource, setDataSource] = useState("OKX Public API")
+  const [dataError, setDataError] = useState<string | null>(null)
   const [price, setPrice] = useState(0)
   const [priceChange24h, setPriceChange24h] = useState(0)
   const [oneMinuteKlines, setOneMinuteKlines] = useState<KlinePoint[]>([])
@@ -575,122 +500,55 @@ export function BtcVolatilitySystem() {
   const [liquidations, setLiquidations] = useState<LiquidationEvent[]>([])
   const [fundingRate, setFundingRate] = useState(0)
   const [openInterest, setOpenInterest] = useState(0)
+  const [openInterestUsd, setOpenInterestUsd] = useState(0)
   const [openInterestHistory, setOpenInterestHistory] = useState<OpenInterestPoint[]>([])
+  const [fundingRateHistory, setFundingRateHistory] = useState<FundingRatePoint[]>([])
+  const [longShortAccountRatioHistory, setLongShortAccountRatioHistory] = useState<LongShortRatioPoint[]>([])
+  const [contractLongShortRatioHistory, setContractLongShortRatioHistory] = useState<LongShortRatioPoint[]>([])
   const [historySignals, setHistorySignals] = useState<HistorySignal[]>([])
   const lastSignalKeyRef = useRef("")
 
   useEffect(() => {
-    let reconnectTimer: ReturnType<typeof setTimeout> | undefined
-    let reconnectAttempts = 0
-    let ws: WebSocket | undefined
-
-    const connect = () => {
-      setConnectionStatus(reconnectAttempts === 0 ? "connecting" : "reconnecting")
-      ws = new WebSocket(STREAM_URL)
-
-      ws.onopen = () => {
-        reconnectAttempts = 0
-        setConnectionStatus("live")
-      }
-
-      ws.onmessage = (event) => {
-        const message = JSON.parse(String(event.data)) as BinanceStreamMessage
-
-        if (message.stream === "btcusdt@ticker") {
-          const ticker = message.data as TickerPayload
-          setPrice(Number(ticker.c))
-          setPriceChange24h(Number(ticker.P))
-          return
-        }
-
-        if (message.stream === "btcusdt@kline_1m") {
-          const kline = normalizeKline(message.data as KlinePayload)
-          setOneMinuteKlines((previous) => upsertKline(previous, kline))
-          return
-        }
-
-        if (message.stream === "btcusdt@kline_5m") {
-          const kline = normalizeKline(message.data as KlinePayload)
-          setFiveMinuteKlines((previous) => upsertKline(previous, kline))
-          return
-        }
-
-        if (message.stream === "btcusdt@depth20@100ms") {
-          setOrderBook(calculateOrderBook(message.data as DepthPayload))
-          return
-        }
-
-        if (message.stream === "btcusdt@forceOrder") {
-          const liquidation = message.data as ForceOrderPayload
-          const eventTime = liquidation.o.T
-          const averagePrice = Number(liquidation.o.ap)
-          const quantity = Number(liquidation.o.q)
-          const side: LiquidationEvent["side"] = liquidation.o.S === "SELL" ? "long" : "short"
-
-          setLiquidations((previous) =>
-            [
-              ...previous.filter((item) => eventTime - item.time <= FIVE_MINUTES),
-              {
-                id: `${eventTime}-${liquidation.o.S}-${quantity}`,
-                time: eventTime,
-                side,
-                usd: averagePrice * quantity,
-              },
-            ].slice(-80),
-          )
-          return
-        }
-
-        if (message.stream === "btcusdt@markPrice@1s") {
-          const markPrice = message.data as MarkPricePayload
-          setFundingRate(Number(markPrice.r) * 100)
-        }
-      }
-
-      ws.onerror = () => {
-        setConnectionStatus("offline")
-      }
-
-      ws.onclose = () => {
-        setConnectionStatus("offline")
-        reconnectAttempts += 1
-        reconnectTimer = setTimeout(connect, Math.min(15_000, 2_000 * reconnectAttempts))
-      }
-    }
-
-    connect()
-
-    return () => {
-      if (reconnectTimer) clearTimeout(reconnectTimer)
-      ws?.close()
-    }
-  }, [])
-
-  useEffect(() => {
     let isActive = true
 
-    const fetchOpenInterest = async () => {
+    async function loadDerivativesData() {
       try {
-        const response = await fetch("https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT")
-        const payload = (await response.json()) as { openInterest?: string; time?: number }
-        const value = Number(payload.openInterest ?? 0)
-        const time = payload.time ?? Date.now()
+        setConnectionStatus((status) => (status === "live" ? "live" : "connecting"))
+        const response = await fetch("/api/crypto/btc-derivatives", { cache: "no-store" })
+        const payload = (await response.json()) as BtcDerivativesResponse & { error?: string }
 
-        if (!isActive || !Number.isFinite(value)) return
-
-        setOpenInterest(value)
-        setOpenInterestHistory((previous) =>
-          [...previous.filter((point) => time - point.time <= 15 * 60 * 1000), { time, value }].slice(-40),
-        )
-      } catch {
-        if (isActive) {
-          setOpenInterestHistory((previous) => previous)
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Failed to load BTC derivatives data")
         }
+
+        if (!isActive) return
+
+        setDataSource(payload.source)
+        setPrice(payload.ticker.price)
+        setPriceChange24h(payload.ticker.changePercent24h)
+        setOneMinuteKlines(payload.oneMinuteKlines.slice(-MAX_KLINES))
+        setFiveMinuteKlines(payload.fiveMinuteKlines.slice(-MAX_KLINES))
+        setOrderBook(payload.orderBook)
+        setOpenInterest(payload.openInterest.btc)
+        setOpenInterestUsd(payload.openInterest.usd)
+        setOpenInterestHistory(payload.openInterestHistory.map((point) => ({ time: point.time, value: point.valueUsd })))
+        setFundingRate(payload.fundingRate.rate)
+        setFundingRateHistory(payload.fundingRateHistory)
+        setLongShortAccountRatioHistory(payload.longShortAccountRatioHistory)
+        setContractLongShortRatioHistory(payload.contractLongShortRatioHistory)
+        setLiquidations([])
+        setDataError(null)
+        setConnectionStatus("live")
+      } catch (error) {
+        if (!isActive) return
+
+        setDataError(error instanceof Error ? error.message : "Failed to load BTC derivatives data")
+        setConnectionStatus("offline")
       }
     }
 
-    fetchOpenInterest()
-    const interval = setInterval(fetchOpenInterest, OPEN_INTEREST_POLL_MS)
+    loadDerivativesData()
+    const interval = setInterval(loadDerivativesData, DERIVATIVES_POLL_MS)
 
     return () => {
       isActive = false
@@ -765,10 +623,24 @@ export function BtcVolatilitySystem() {
     volume: kline.volume,
   }))
 
-  const oiChartData = openInterestHistory.map((point) => ({
+  const oiChartData = openInterestHistory.slice(-180).map((point) => ({
     time: new Date(point.time).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
     value: point.value,
   }))
+  const fundingChartData = fundingRateHistory.map((point) => ({
+    time: new Date(point.time).toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" }),
+    rate: point.rate,
+  }))
+  const accountRatioChartData = longShortAccountRatioHistory.slice(-180).map((point) => ({
+    time: new Date(point.time).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
+    ratio: point.ratio,
+  }))
+  const contractRatioChartData = contractLongShortRatioHistory.slice(-180).map((point) => ({
+    time: new Date(point.time).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
+    ratio: point.ratio,
+  }))
+  const latestAccountRatio = longShortAccountRatioHistory.at(-1)?.ratio ?? 0
+  const latestContractRatio = contractLongShortRatioHistory.at(-1)?.ratio ?? 0
 
   const orderBookRows = [
     ...orderBook.asks
@@ -780,33 +652,34 @@ export function BtcVolatilitySystem() {
   const maxDepth = Math.max(...orderBookRows.map((row) => row.notional), 1)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <section className="overflow-hidden rounded-2xl border bg-card">
         <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-6 p-6">
+          <div className="space-y-4 p-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-2 flex items-center gap-2">
                   <Badge variant={connectionStatus === "live" ? "default" : "secondary"}>
                     {connectionStatus === "live" ? "Live" : connectionStatus}
                   </Badge>
-                  <span className="text-sm text-muted-foreground">Binance Futures BTCUSDT</span>
+                  <span className="text-sm text-muted-foreground">{dataSource} BTC-USDT-SWAP</span>
                 </div>
-                <h2 className="text-3xl font-bold tracking-tight md:text-4xl">BTC 极端波动可视化系统</h2>
-                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                  实时监控暴涨、暴跌、上下影线、爆仓、OI 清洗和订单簿失衡，并输出可观察机会与风险提示。
+                <h2 className="text-2xl font-bold tracking-tight md:text-3xl">BTC 极端波动可视化系统</h2>
+                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                  通过 OKX 公开接口监控价格、K 线、OI 历史、资金费率历史、多空比和订单簿失衡。
                 </p>
+                {dataError && <p className="mt-2 text-xs text-destructive">{dataError}</p>}
               </div>
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">BTC Price</p>
-                <p className="text-3xl font-semibold tabular-nums">{price ? formatUsd(price, 2) : "..."}</p>
+                <p className="text-2xl font-semibold tabular-nums">{price ? formatUsd(price, 2) : "..."}</p>
                 <p className={priceChange24h >= 0 ? "text-sm text-green-600" : "text-sm text-red-600"}>
                   24h {formatPercent(priceChange24h)}
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="5m 涨跌 Z-Score"
                 value={fiveMinuteReturnZScore.toFixed(2)}
@@ -828,17 +701,17 @@ export function BtcVolatilitySystem() {
               <MetricCard
                 label="OI / Funding"
                 value={`${formatPercent(oiChangeRate)} / ${fundingRate.toFixed(4)}%`}
-                helper={`Open Interest ${openInterest.toLocaleString("en-US", { maximumFractionDigits: 0 })} BTC`}
+                helper={`OI ${formatCompactUsd(openInterestUsd)} / ${openInterest.toLocaleString("en-US", { maximumFractionDigits: 0 })} BTC`}
                 tone={oiChangeRate < -2 ? "green" : oiChangeRate > 0.2 ? "red" : "default"}
               />
             </div>
           </div>
 
-          <div className="border-t bg-muted/30 p-6 lg:border-l lg:border-t-0">
-            <div className="mb-4 flex items-center justify-between">
+          <div className="border-t bg-muted/30 p-4 lg:border-l lg:border-t-0">
+            <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Current Signal</p>
-                <h3 className="text-2xl font-semibold">{currentSignal.headline}</h3>
+                <h3 className="text-xl font-semibold">{currentSignal.headline}</h3>
               </div>
               <SignalBadge direction={currentSignal.direction} />
             </div>
@@ -847,7 +720,7 @@ export function BtcVolatilitySystem() {
               <ScoreBar label="Sell Score" value={currentSignal.sellScore} />
               <ScoreBar label={`Risk Score (${currentSignal.riskLevel})`} value={currentSignal.riskScore} />
             </div>
-            <div className="mt-5 grid gap-4 text-sm md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <div className="mt-4 grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               <div>
                 <p className="mb-2 font-medium">触发原因</p>
                 <ul className="space-y-1 text-muted-foreground">
@@ -869,8 +742,8 @@ export function BtcVolatilitySystem() {
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
-        <div className="space-y-6">
+      <div className="grid gap-4 xl:grid-cols-[1.4fr_0.6fr]">
+        <div className="space-y-4">
           <Card>
             <CardHeader className="pb-0">
               <div className="flex items-center gap-2">
@@ -878,17 +751,17 @@ export function BtcVolatilitySystem() {
                 <CardTitle>实时 K 线与成交量</CardTitle>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 lg:grid-cols-2">
+            <CardContent className="space-y-3">
+              <div className="grid gap-3 lg:grid-cols-2">
                 <MiniKlineChart title="1m K 线" data={oneMinuteKlines} />
                 <MiniKlineChart title="5m K 线" data={fiveMinuteKlines} />
               </div>
-              <div className="rounded-xl border bg-background/80 p-4">
+              <div className="rounded-xl border bg-background/80 p-3">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="font-medium">成交量图</h3>
                   <span className="text-xs text-muted-foreground">Volume Z {volumeZScore.toFixed(2)}</span>
                 </div>
-                <div className="h-56">
+                <div className="h-44">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={volumeChartData}>
                       <XAxis dataKey="time" tickLine={false} axisLine={false} minTickGap={24} fontSize={12} />
@@ -905,39 +778,83 @@ export function BtcVolatilitySystem() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="h-5 w-5" />
-                  <CardTitle>爆仓与杠杆清洗</CardTitle>
+                  <CardTitle>OI / Funding / 多空比</CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3">
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <MetricCard label="多头爆仓" value={formatCompactUsd(longLiquidations)} helper="过去 5 分钟" tone="red" />
-                  <MetricCard label="空头爆仓" value={formatCompactUsd(shortLiquidations)} helper="过去 5 分钟" tone="green" />
+                  <MetricCard label="Open Interest" value={formatCompactUsd(openInterestUsd)} helper="OKX BTC-USDT-SWAP" tone="default" />
+                  <MetricCard label="资金费率" value={`${fundingRate.toFixed(4)}%`} helper="当前预测/结算费率" tone={fundingRate >= 0 ? "green" : "red"} />
                   <MetricCard
-                    label="总爆仓"
-                    value={formatCompactUsd(longLiquidations + shortLiquidations)}
-                    helper={`${recentLiquidations.length} events`}
+                    label="多空账户比"
+                    value={latestAccountRatio ? latestAccountRatio.toFixed(2) : "..."}
+                    helper={`合约账户 ${latestContractRatio ? latestContractRatio.toFixed(2) : "..."}`}
                     tone="amber"
                   />
                 </div>
-                <div className="rounded-xl border bg-background/80 p-4">
+                <div className="rounded-xl border bg-background/80 p-3">
                   <div className="mb-3 flex items-center justify-between">
-                    <h3 className="font-medium">Open Interest</h3>
+                    <h3 className="font-medium">Open Interest 历史</h3>
                     <span className="text-xs text-muted-foreground">5m {formatPercent(oiChangeRate)}</span>
                   </div>
-                  <div className="h-48">
+                  <div className="h-36">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={oiChartData}>
                         <XAxis dataKey="time" tickLine={false} axisLine={false} minTickGap={24} fontSize={12} />
                         <YAxis hide domain={["dataMin", "dataMax"]} />
-                        <Tooltip formatter={(value: number) => [Number(value).toFixed(0), "OI BTC"]} />
+                        <Tooltip formatter={(value: number) => [formatCompactUsd(Number(value)), "OI USD"]} />
                         <Area dataKey="value" stroke="rgb(99 102 241)" fill="rgb(99 102 241 / 0.18)" strokeWidth={2} />
                       </AreaChart>
                     </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="rounded-xl border bg-background/80 p-3">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="font-medium">资金费率历史</h3>
+                    <span className="text-xs text-muted-foreground">8h funding</span>
+                  </div>
+                  <div className="h-36">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={fundingChartData}>
+                        <XAxis dataKey="time" tickLine={false} axisLine={false} minTickGap={24} fontSize={12} />
+                        <YAxis hide domain={["dataMin", "dataMax"]} />
+                        <Tooltip formatter={(value: number) => [`${Number(value).toFixed(4)}%`, "Funding"]} />
+                        <Area dataKey="rate" stroke="rgb(245 158 11)" fill="rgb(245 158 11 / 0.16)" strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="rounded-xl border bg-background/80 p-3">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="font-medium">多空比历史</h3>
+                    <span className="text-xs text-muted-foreground">account / contract</span>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="h-32">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={accountRatioChartData}>
+                          <XAxis dataKey="time" tickLine={false} axisLine={false} minTickGap={24} fontSize={12} />
+                          <YAxis hide domain={["dataMin", "dataMax"]} />
+                          <Tooltip formatter={(value: number) => [Number(value).toFixed(2), "Account L/S"]} />
+                          <Area dataKey="ratio" stroke="rgb(20 184 166)" fill="rgb(20 184 166 / 0.16)" strokeWidth={2} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="h-32">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={contractRatioChartData}>
+                          <XAxis dataKey="time" tickLine={false} axisLine={false} minTickGap={24} fontSize={12} />
+                          <YAxis hide domain={["dataMin", "dataMax"]} />
+                          <Tooltip formatter={(value: number) => [Number(value).toFixed(2), "Contract L/S"]} />
+                          <Area dataKey="ratio" stroke="rgb(59 130 246)" fill="rgb(59 130 246 / 0.14)" strokeWidth={2} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -950,7 +867,7 @@ export function BtcVolatilitySystem() {
                   <CardTitle>订单簿状态</CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <MetricCard label="买盘深度" value={formatCompactUsd(orderBook.bidDepth)} helper="Top 20 bids" tone="green" />
                   <MetricCard label="卖盘深度" value={formatCompactUsd(orderBook.askDepth)} helper="Top 20 asks" tone="red" />
@@ -985,7 +902,7 @@ export function BtcVolatilitySystem() {
           </div>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -1026,7 +943,7 @@ export function BtcVolatilitySystem() {
             </CardHeader>
             <CardContent>
               {historySignals.length === 0 ? (
-                <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                <div className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">
                   暂无 Buy Watch、Sell Watch 或 High Risk 信号。
                 </div>
               ) : (

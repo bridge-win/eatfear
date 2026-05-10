@@ -78,7 +78,7 @@ export const HK_TOP_20 = [
   { symbol: "1810.HK", name: "小米集团" },
   { symbol: "0388.HK", name: "香港交易所" },
   { symbol: "2628.HK", name: "中国人寿" },
-  { symbol: "0011.HK", name: "恒生银行" },
+  { symbol: "2388.HK", name: "中银香港" },
   { symbol: "0016.HK", name: "新鸿基地产" },
   { symbol: "0027.HK", name: "银河娱乐" },
   { symbol: "0001.HK", name: "长江实业" },
