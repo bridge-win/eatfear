@@ -39,6 +39,16 @@ CRON_SECRET=your_random_secret_string
 
 # Optional: Development OAuth redirect
 NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL=http://localhost:3000
+
+# ====== Crypto Data Sources ======
+# CoinGecko API (optional - for higher rate limits and more features)
+# Free tier: 10-50 calls/min, Pro tier: 500 calls/min
+# Get your API key at: https://www.coingecko.com/en/api/pricing
+COINGECKO_API_KEY=CG-xxxxxxxxxxxx
+
+# FRED API (required for macro indicators)
+# Get your free API key at: https://fred.stlouisfed.org/docs/api/api_key.html
+FRED_API_KEY=your_fred_api_key
 ```
 
 ### 3. Configure Resend (Required)
