@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react"
 import { ExternalLink, Newspaper, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { InfoTooltip } from "@/components/info-tooltip"
 import { SiteHeader } from "@/components/site-header"
+import { cn } from "@/lib/utils"
 import type { MarketNewsArticle } from "@/lib/types"
 
 interface NewsApiResponse {
@@ -95,53 +97,59 @@ export function NewsDashboard() {
   return (
     <div className="min-h-svh bg-background">
       <SiteHeader />
-      <main className="container mx-auto px-4 py-4">
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+      <main className="container mx-auto px-4 py-3">
+        <div className="space-y-3">
+          <header className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Market News</h1>
-              <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
+              <h1 className="text-xl font-bold tracking-tight">Market News</h1>
+              <p className="mt-0.5 max-w-4xl text-[11px] text-muted-foreground">
                 聚合公开 RSS：Yahoo Finance、CNBC、MarketWatch、Investing、Fed、CoinDesk、Cointelegraph、Decrypt、CryptoSlate。
               </p>
             </div>
-            <div className="rounded-full border px-4 py-2 text-sm text-muted-foreground">
+            <div className="rounded-full border px-3 py-1 text-[11px] text-muted-foreground">
               {updatedAt ? `Updated ${new Date(updatedAt).toLocaleString("zh-CN")}` : "Loading news"}
             </div>
-          </div>
+          </header>
 
           {error && (
             <Card className="border-destructive/40">
-              <CardContent className="pt-6 text-sm text-destructive">{error}</CardContent>
+              <CardContent className="pt-4 text-xs text-destructive">{error}</CardContent>
             </Card>
           )}
 
           {isLoading && articles.length === 0 ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <RefreshCw className="h-4 w-4 animate-spin" />
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
               Loading market news...
             </div>
           ) : (
-            <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
-              <div className="space-y-3">
+            <div className="grid gap-3 lg:grid-cols-[1fr_280px]">
+              <div className="space-y-2">
                 {articles.length === 0 ? (
                   <Card>
-                    <CardContent className="pt-6 text-sm text-muted-foreground">No market news available.</CardContent>
+                    <CardContent className="pt-4 text-xs text-muted-foreground">No market news available.</CardContent>
                   </Card>
                 ) : (
                   articles.map((article) => (
                     <a key={article.url} href={article.url} target="_blank" rel="noreferrer" className="block">
-                      <Card className="transition-shadow hover:shadow-md">
-                        <CardContent className="p-4">
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <Badge variant={getToneVariant(article.tone)}>{getToneLabel(article.tone)}</Badge>
-                            {isCryptoArticle(article) && <Badge variant="outline">Crypto</Badge>}
+                      <Card className="py-2.5 transition-shadow hover:shadow-md">
+                        <CardContent className="p-3">
+                          <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                            <Badge variant={getToneVariant(article.tone)} className="h-4 px-1.5 text-[9px]">
+                              {getToneLabel(article.tone)}
+                            </Badge>
+                            {isCryptoArticle(article) && (
+                              <Badge variant="outline" className="h-4 px-1.5 text-[9px]">
+                                Crypto
+                              </Badge>
+                            )}
                             <span>{article.domain}</span>
                             <span>{article.sourceCountry}</span>
                             <span>{new Date(article.publishedAt).toLocaleString("zh-CN")}</span>
                           </div>
-                          <div className="mt-3 flex items-start justify-between gap-4">
-                            <h2 className="text-base font-semibold leading-snug">{article.title}</h2>
-                            <ExternalLink className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
+                          <div className="mt-1.5 flex items-start justify-between gap-3">
+                            <h2 className="text-sm font-semibold leading-snug">{article.title}</h2>
+                            <ExternalLink className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                           </div>
                         </CardContent>
                       </Card>
@@ -150,46 +158,45 @@ export function NewsDashboard() {
                 )}
               </div>
 
-              <aside className="space-y-3">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Newspaper className="h-5 w-5" />
+              <aside className="space-y-2">
+                <Card className="py-2.5">
+                  <CardHeader className="px-3 pb-1">
+                    <CardTitle className="flex items-center gap-1.5 text-xs">
+                      <Newspaper className="h-3.5 w-3.5" />
                       Feed Summary
+                      <InfoTooltip
+                        title="Tone 含义"
+                        description={
+                          "Tone 估值（如有）：> 2 偏 Risk-on；< -2 偏 Risk-off；其余 Neutral。\n本页聚合 Yahoo Finance、CNBC、MarketWatch、Investing、Fed、CoinDesk、Cointelegraph、Decrypt、CryptoSlate 等公开 RSS 源。"
+                        }
+                      />
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4 text-sm">
-                    <div className="flex justify-between gap-4 border-b pb-3">
-                      <span className="text-muted-foreground">Source</span>
-                      <span className="font-medium">{source}</span>
-                    </div>
-                    <div className="flex justify-between gap-4 border-b pb-3">
-                      <span className="text-muted-foreground">Articles</span>
-                      <span className="font-medium">{articles.length}</span>
-                    </div>
-                    <div className="flex justify-between gap-4 border-b pb-3">
-                      <span className="text-muted-foreground">Crypto News</span>
-                      <span className="font-medium">{cryptoArticleCount}</span>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">Refresh</span>
-                      <span className="font-medium">5 min</span>
-                    </div>
+                  <CardContent className="space-y-2 px-3 text-xs">
+                    <SummaryRow label="Source" value={source} />
+                    <SummaryRow label="Articles" value={articles.length} />
+                    <SummaryRow label="Crypto News" value={cryptoArticleCount} />
+                    <SummaryRow label="Refresh" value="5 min" border={false} />
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Top Sources</CardTitle>
+                <Card className="py-2.5">
+                  <CardHeader className="px-3 pb-1">
+                    <CardTitle className="text-xs">Top Sources</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
+                  <CardContent className="space-y-1.5 px-3 text-xs">
                     {topDomains.length === 0 ? (
                       <p className="text-muted-foreground">No source data yet.</p>
                     ) : (
                       topDomains.map(([domain, count]) => (
-                        <div key={domain} className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                        <div
+                          key={domain}
+                          className="flex items-center justify-between gap-3 rounded-md border px-2.5 py-1.5"
+                        >
                           <span className="truncate">{domain}</span>
-                          <Badge variant="secondary">{count}</Badge>
+                          <Badge variant="secondary" className="h-4 px-1.5 text-[9px]">
+                            {count}
+                          </Badge>
                         </div>
                       ))
                     )}
@@ -200,6 +207,23 @@ export function NewsDashboard() {
           )}
         </div>
       </main>
+    </div>
+  )
+}
+
+function SummaryRow({
+  label,
+  value,
+  border = true,
+}: {
+  label: string
+  value: string | number
+  border?: boolean
+}) {
+  return (
+    <div className={cn("flex justify-between gap-3", border && "border-b pb-1.5")}>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium truncate">{value}</span>
     </div>
   )
 }

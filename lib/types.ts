@@ -60,17 +60,59 @@ export interface MacroSeriesPoint {
   value: number
 }
 
+export type MacroGroup =
+  | "Rates"
+  | "Inflation"
+  | "Employment"
+  | "Liquidity"
+  | "Credit"
+  | "Equity"
+  | "Volatility"
+  | "FX"
+  | "Commodity"
+  | "Growth"
+  | "RealEstate"
+  | "Crypto"
+  | "OnChain"
+  | "Sentiment"
+  | "CrossAsset"
+
+export type MacroUnit = "index" | "percent" | "usd" | "ratio" | "count"
+
+export type MacroDataSource =
+  | "Yahoo Finance"
+  | "FRED"
+  | "CoinGecko"
+  | "DefiLlama"
+  | "Blockchain.com"
+  | "Alternative.me"
+  | "OKX"
+  | "Computed"
+
 export interface MacroIndicator {
   symbol: string
   name: string
-  group: "Equity" | "Rates" | "Volatility" | "Dollar" | "Commodity" | "FX" | "Credit" | "Crypto"
-  unit: "index" | "percent" | "usd" | "ratio"
-  source: string
+  group: MacroGroup
+  unit: MacroUnit
+  source: MacroDataSource
   value: number
   change: number
   changePercent: number
   lastUpdate: number
   history: MacroSeriesPoint[]
+  description?: string
+  audience?: string[]
+  /** Lower number = more important. Used for sorting on the Macro dashboard. */
+  priority?: number
+  /** Refresh frequency hint shown to users */
+  frequency?: string
+}
+
+export interface CryptoInstrument {
+  instId: string
+  base: string
+  quote: string
+  label: string
 }
 
 export interface MarketNewsArticle {

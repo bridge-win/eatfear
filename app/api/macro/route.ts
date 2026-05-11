@@ -1,143 +1,119 @@
 import { NextResponse } from "next/server"
-import type { MacroIndicator } from "@/lib/types"
+
+import { fetchFearGreedHistory } from "@/lib/data-sources/alternative"
+import { fetchBlockchainSeries } from "@/lib/data-sources/blockchain"
+import { fetchDefiTvl, fetchStablecoinMarketCap } from "@/lib/data-sources/defillama"
+import { fetchFredSeries } from "@/lib/data-sources/fred"
+import { fetchYahooSeries } from "@/lib/data-sources/yahoo"
+import { MACRO_INDICATORS, type MacroIndicatorMeta } from "@/lib/macro-metadata"
+import { DEFAULT_TIME_RANGE, getTimeRange, type TimeRangeOption } from "@/lib/time-range"
+import type { MacroIndicator, MacroSeriesPoint } from "@/lib/types"
 
 export const revalidate = 300
 
-interface MacroSource {
-  symbol: string
-  name: string
-  group: MacroIndicator["group"]
-  unit: MacroIndicator["unit"]
-  transform?: (value: number) => number
+interface FetchOutcome {
+  history: MacroSeriesPoint[]
+  currentValue?: number
+  previousValue?: number
+  lastUpdate: number
 }
 
-interface YahooChartResponse {
-  chart?: {
-    result?: YahooChartResult[]
-    error?: {
-      description?: string
-    } | null
-  }
+const applyTransform = (value: number, meta: MacroIndicatorMeta) => meta.transform?.(value) ?? value
+
+const applyTransformToHistory = (history: MacroSeriesPoint[], meta: MacroIndicatorMeta): MacroSeriesPoint[] => {
+  if (!meta.transform) return history
+  return history.map((point) => ({ ...point, value: meta.transform!(point.value) }))
 }
 
-interface YahooChartResult {
-  meta?: {
-    regularMarketPrice?: number
-    chartPreviousClose?: number
-    previousClose?: number
-    regularMarketTime?: number
-  }
-  timestamp?: number[]
-  indicators?: {
-    quote?: Array<{
-      close?: Array<number | null>
-    }>
-  }
-}
+async function fetchByMeta(meta: MacroIndicatorMeta, range: TimeRangeOption): Promise<FetchOutcome | null> {
+  const symbol = meta.providerSymbol ?? meta.symbol
 
-const macroSources: MacroSource[] = [
-  { symbol: "^GSPC", name: "S&P 500", group: "Equity", unit: "index" },
-  { symbol: "^IXIC", name: "Nasdaq Composite", group: "Equity", unit: "index" },
-  { symbol: "^DJI", name: "Dow Jones Industrial Average", group: "Equity", unit: "index" },
-  { symbol: "^RUT", name: "Russell 2000", group: "Equity", unit: "index" },
-  { symbol: "^HSI", name: "Hang Seng Index", group: "Equity", unit: "index" },
-  { symbol: "^N225", name: "Nikkei 225", group: "Equity", unit: "index" },
-  { symbol: "^VIX", name: "CBOE VIX", group: "Volatility", unit: "index" },
-  { symbol: "^VXN", name: "Nasdaq 100 Volatility", group: "Volatility", unit: "index" },
-  { symbol: "^IRX", name: "U.S. 3M Treasury Yield", group: "Rates", unit: "percent", transform: (value) => value / 10 },
-  { symbol: "^FVX", name: "U.S. 5Y Treasury Yield", group: "Rates", unit: "percent", transform: (value) => value / 10 },
-  { symbol: "^TNX", name: "U.S. 10Y Treasury Yield", group: "Rates", unit: "percent", transform: (value) => value / 10 },
-  { symbol: "^TYX", name: "U.S. 30Y Treasury Yield", group: "Rates", unit: "percent", transform: (value) => value / 10 },
-  { symbol: "DX-Y.NYB", name: "U.S. Dollar Index", group: "Dollar", unit: "index" },
-  { symbol: "TLT", name: "20+ Year Treasury Bond ETF", group: "Rates", unit: "usd" },
-  { symbol: "HYG", name: "High Yield Credit ETF", group: "Credit", unit: "usd" },
-  { symbol: "LQD", name: "Investment Grade Credit ETF", group: "Credit", unit: "usd" },
-  { symbol: "GC=F", name: "Gold Futures", group: "Commodity", unit: "usd" },
-  { symbol: "SI=F", name: "Silver Futures", group: "Commodity", unit: "usd" },
-  { symbol: "CL=F", name: "WTI Crude Oil", group: "Commodity", unit: "usd" },
-  { symbol: "BZ=F", name: "Brent Crude Oil", group: "Commodity", unit: "usd" },
-  { symbol: "HG=F", name: "Copper Futures", group: "Commodity", unit: "usd" },
-  { symbol: "EURUSD=X", name: "EUR/USD", group: "FX", unit: "ratio" },
-  { symbol: "USDJPY=X", name: "USD/JPY", group: "FX", unit: "ratio" },
-  { symbol: "USDCNH=X", name: "USD/CNH", group: "FX", unit: "ratio" },
-  { symbol: "GBPUSD=X", name: "GBP/USD", group: "FX", unit: "ratio" },
-  { symbol: "BTC-USD", name: "Bitcoin Spot", group: "Crypto", unit: "usd" },
-  { symbol: "ETH-USD", name: "Ethereum Spot", group: "Crypto", unit: "usd" },
-]
-
-const applyTransform = (value: number, source: MacroSource) => source.transform?.(value) ?? value
-
-async function fetchIndicator(source: MacroSource): Promise<MacroIndicator | null> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-    source.symbol,
-  )}?interval=1d&range=6mo`
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-      },
-      next: { revalidate },
-    })
-
-    if (!response.ok) return null
-
-    const payload = (await response.json()) as YahooChartResponse
-    const result = payload.chart?.result?.[0]
-    const timestamps = result?.timestamp ?? []
-    const closes = result?.indicators?.quote?.[0]?.close ?? []
-
-    const history = timestamps
-      .map((timestamp, index) => {
-        const rawValue = closes[index]
-        if (rawValue === null || rawValue === undefined || !Number.isFinite(rawValue)) return null
-
-        const date = new Date(timestamp * 1000).toISOString().slice(0, 10)
-        return {
-          timestamp: timestamp * 1000,
-          date,
-          value: applyTransform(rawValue, source),
-        }
-      })
-      .filter((point): point is MacroIndicator["history"][number] => point !== null)
-
-    const latestHistoryPoint = history.at(-1)
-    const previousHistoryPoint = history.at(-2)
-    const rawCurrentValue = result?.meta?.regularMarketPrice
-    const rawPreviousValue = result?.meta?.previousClose ?? result?.meta?.chartPreviousClose
-
-    const value = rawCurrentValue === undefined ? latestHistoryPoint?.value ?? 0 : applyTransform(rawCurrentValue, source)
-    const previousValue =
-      rawPreviousValue === undefined ? previousHistoryPoint?.value ?? value : applyTransform(rawPreviousValue, source)
-    const change = value - previousValue
-    const changePercent = previousValue === 0 ? 0 : (change / previousValue) * 100
-
-    if (!latestHistoryPoint && value === 0) return null
-
-    return {
-      symbol: source.symbol,
-      name: source.name,
-      group: source.group,
-      unit: source.unit,
-      source: "Yahoo Finance",
-      value,
-      change,
-      changePercent,
-      lastUpdate: (result?.meta?.regularMarketTime ?? Math.floor(Date.now() / 1000)) * 1000,
-      history,
+  switch (meta.source) {
+    case "Yahoo Finance": {
+      return fetchYahooSeries(symbol, range)
     }
-  } catch {
-    return null
+    case "FRED": {
+      return fetchFredSeries(symbol, range)
+    }
+    case "Blockchain.com": {
+      return fetchBlockchainSeries(symbol, range)
+    }
+    case "DefiLlama": {
+      if (symbol === "stablecoins-total") return fetchStablecoinMarketCap(range)
+      if (symbol === "tvl-defi") return fetchDefiTvl(range)
+      return null
+    }
+    case "Alternative.me": {
+      if (symbol === "fng") return fetchFearGreedHistory(range)
+      return null
+    }
+    default:
+      return null
   }
 }
 
-export async function GET() {
-  const indicators = (await Promise.all(macroSources.map(fetchIndicator))).filter(
-    (indicator): indicator is MacroIndicator => indicator !== null,
-  )
+async function buildIndicator(
+  meta: MacroIndicatorMeta,
+  range: TimeRangeOption,
+): Promise<MacroIndicator | null> {
+  const outcome = await fetchByMeta(meta, range)
+  if (!outcome) return null
+
+  const history = applyTransformToHistory(outcome.history, meta)
+  const latestPoint = history.at(-1)
+  const previousPoint = history.at(-2)
+
+  const rawCurrent = outcome.currentValue
+  const rawPrevious = outcome.previousValue
+  const value = rawCurrent === undefined ? latestPoint?.value ?? 0 : applyTransform(rawCurrent, meta)
+  const previousValue =
+    rawPrevious === undefined ? previousPoint?.value ?? value : applyTransform(rawPrevious, meta)
+  const change = value - previousValue
+  const changePercent = previousValue === 0 ? 0 : (change / previousValue) * 100
+
+  if (history.length === 0 && value === 0) return null
+
+  return {
+    symbol: meta.symbol,
+    name: meta.name,
+    group: meta.group,
+    unit: meta.unit,
+    source: meta.source,
+    value,
+    change,
+    changePercent,
+    lastUpdate: outcome.lastUpdate,
+    history,
+    description: meta.description,
+    audience: meta.audience,
+    priority: meta.priority,
+    frequency: meta.frequency,
+  }
+}
+
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const rangeParam = url.searchParams.get("range") ?? DEFAULT_TIME_RANGE
+  const range = getTimeRange(rangeParam)
+
+  const results = await Promise.allSettled(MACRO_INDICATORS.map((meta) => buildIndicator(meta, range)))
+
+  const indicators: MacroIndicator[] = []
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value) {
+      indicators.push(result.value)
+    }
+  }
+
+  indicators.sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999))
 
   return NextResponse.json({
     updatedAt: Date.now(),
+    range: range.id,
+    interval: range.yahooInterval,
+    fredEnabled: Boolean(process.env.FRED_API_KEY ?? process.env.NEXT_PUBLIC_FRED_API_KEY),
     indicators,
+    requested: MACRO_INDICATORS.length,
+    returned: indicators.length,
   })
 }
