@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { DEFAULT_TIME_RANGE, getTimeRange } from "@/lib/time-range"
 
 export const revalidate = 10
 
@@ -29,12 +30,6 @@ interface OkxFundingRate {
   fundingTime: string
 }
 
-interface DepthLevel {
-  price: number
-  quantity: number
-  notional: number
-}
-
 interface OkxOrderBook {
   bids?: string[][]
   asks?: string[][]
@@ -42,7 +37,8 @@ interface OkxOrderBook {
 }
 
 const OKX_BASE_URL = "https://www.okx.com"
-const INST_ID = "BTC-USDT-SWAP"
+const DEFAULT_INST_ID = "BTC-USDT-SWAP"
+const RUBIK_PERIODS = new Set(["5m", "15m", "30m", "1H", "4H", "1D"])
 
 const okxFetch = async <T>(path: string) => {
   const response = await fetch(`${OKX_BASE_URL}${path}`, {
@@ -66,7 +62,16 @@ const okxFetch = async <T>(path: string) => {
   return payload.data ?? []
 }
 
-const formatTimeLabel = (time: number) => new Date(time).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
+const okxFetchSafe = async <T>(path: string): Promise<T[]> => {
+  try {
+    return await okxFetch<T>(path)
+  } catch {
+    return []
+  }
+}
+
+const formatTimeLabel = (time: number) =>
+  new Date(time).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
 
 const normalizeCandles = (rows: string[][]) =>
   rows
@@ -145,12 +150,43 @@ const normalizeTwoColumnHistory = (rows: string[][], valueKey: "valueUsd" | "rat
     .filter((point) => Number.isFinite(point[valueKey]))
     .reverse()
 
-export async function GET() {
+const sanitizeInstId = (raw: string | null) => {
+  if (!raw) return DEFAULT_INST_ID
+  const cleaned = raw.toUpperCase().trim()
+  if (!/^[A-Z0-9-]+$/.test(cleaned)) return DEFAULT_INST_ID
+  return cleaned
+}
+
+const extractCcy = (instId: string) => instId.split("-")[0] ?? "BTC"
+
+const sanitizeBar = (raw: string | null, fallback: string) => {
+  if (!raw) return fallback
+  const allowed = ["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D", "1W", "1M"]
+  return allowed.includes(raw) ? raw : fallback
+}
+
+const sanitizeLimit = (raw: string | null, fallback: number) => {
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value <= 0) return fallback
+  return Math.max(50, Math.min(300, Math.round(value)))
+}
+
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url)
+    const instId = sanitizeInstId(url.searchParams.get("instId"))
+    const ccy = extractCcy(instId)
+
+    const range = getTimeRange(url.searchParams.get("range") ?? DEFAULT_TIME_RANGE)
+    const bar = sanitizeBar(url.searchParams.get("bar"), range.okxBar)
+    const limit = sanitizeLimit(url.searchParams.get("limit"), range.okxLimit)
+    const rubikPeriod = RUBIK_PERIODS.has(bar) ? bar : "1H"
+
     const [
       tickerRows,
       oneMinuteCandles,
       fiveMinuteCandles,
+      rangeCandles,
       bookRows,
       openInterestRows,
       fundingRows,
@@ -159,17 +195,18 @@ export async function GET() {
       longShortRatioRows,
       contractLongShortRatioRows,
     ] = await Promise.all([
-      okxFetch<OkxTicker>(`/api/v5/market/ticker?instId=${INST_ID}`),
-      okxFetch<string[]>(`/api/v5/market/candles?instId=${INST_ID}&bar=1m&limit=120`),
-      okxFetch<string[]>(`/api/v5/market/candles?instId=${INST_ID}&bar=5m&limit=120`),
-      okxFetch<OkxOrderBook>(`/api/v5/market/books?instId=${INST_ID}&sz=20`),
-      okxFetch<OkxOpenInterest>(`/api/v5/public/open-interest?instType=SWAP&instId=${INST_ID}`),
-      okxFetch<OkxFundingRate>(`/api/v5/public/funding-rate?instId=${INST_ID}`),
-      okxFetch<OkxFundingRate>(`/api/v5/public/funding-rate-history?instId=${INST_ID}&limit=100`),
-      okxFetch<string[]>(`/api/v5/rubik/stat/contracts/open-interest-volume?ccy=BTC&period=5m`),
-      okxFetch<string[]>(`/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=BTC&period=5m`),
-      okxFetch<string[]>(
-        `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract?instId=${INST_ID}&period=5m`,
+      okxFetch<OkxTicker>(`/api/v5/market/ticker?instId=${instId}`),
+      okxFetchSafe<string[]>(`/api/v5/market/candles?instId=${instId}&bar=1m&limit=120`),
+      okxFetchSafe<string[]>(`/api/v5/market/candles?instId=${instId}&bar=5m&limit=120`),
+      okxFetchSafe<string[]>(`/api/v5/market/candles?instId=${instId}&bar=${bar}&limit=${limit}`),
+      okxFetchSafe<OkxOrderBook>(`/api/v5/market/books?instId=${instId}&sz=20`),
+      okxFetchSafe<OkxOpenInterest>(`/api/v5/public/open-interest?instType=SWAP&instId=${instId}`),
+      okxFetchSafe<OkxFundingRate>(`/api/v5/public/funding-rate?instId=${instId}`),
+      okxFetchSafe<OkxFundingRate>(`/api/v5/public/funding-rate-history?instId=${instId}&limit=100`),
+      okxFetchSafe<string[]>(`/api/v5/rubik/stat/contracts/open-interest-volume?ccy=${ccy}&period=${rubikPeriod}`),
+      okxFetchSafe<string[]>(`/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=${ccy}&period=${rubikPeriod}`),
+      okxFetchSafe<string[]>(
+        `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract?instId=${instId}&period=${rubikPeriod}`,
       ),
     ])
 
@@ -181,8 +218,12 @@ export async function GET() {
 
     return NextResponse.json({
       source: "OKX Public API",
-      symbol: "BTCUSDT",
-      instrumentId: INST_ID,
+      symbol: instId.replace(/-/g, ""),
+      instrumentId: instId,
+      base: ccy,
+      bar,
+      limit,
+      range: range.id,
       updatedAt: Date.now(),
       ticker: {
         price,
@@ -195,6 +236,7 @@ export async function GET() {
       },
       oneMinuteKlines: normalizeCandles(oneMinuteCandles),
       fiveMinuteKlines: normalizeCandles(fiveMinuteCandles),
+      rangeKlines: normalizeCandles(rangeCandles),
       orderBook: calculateOrderBook(bookRows[0]),
       openInterest: {
         contracts: Number(openInterest?.oi ?? 0),
@@ -214,7 +256,7 @@ export async function GET() {
   } catch (error) {
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "Failed to fetch BTC derivatives data",
+        error: error instanceof Error ? error.message : "Failed to fetch crypto derivatives data",
       },
       { status: 502 },
     )

@@ -1,39 +1,67 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { RefreshCw, TrendingDown, TrendingUp } from "lucide-react"
+
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { InfoTooltip } from "@/components/info-tooltip"
+import { KpiStrip, type KpiTile } from "@/components/kpi-strip"
+import { SeriesChart, formatValue as formatSeriesValue, type SeriesChartUnit } from "@/components/series-chart"
 import { SiteHeader } from "@/components/site-header"
+import { TimeRangeSelector } from "@/components/time-range-selector"
+import {
+  buildIndicatorInfo,
+  buildInfoSource,
+  formatChangeWithPercent,
+  formatPercentDelta,
+  getDeltaTone,
+  stripSymbolPrefix,
+  type MacroApiResponse,
+} from "@/lib/dashboard-shared"
+import { DEFAULT_TIME_RANGE, type TimeRangeId } from "@/lib/time-range"
+import type { MacroGroup, MacroIndicator } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import type { MacroIndicator } from "@/lib/types"
 
-interface MacroApiResponse {
-  updatedAt: number
-  indicators: MacroIndicator[]
-  error?: string
-}
+const KPI_PRIORITY_LIMIT = 12
+const KPI_SPARK_POINTS = 40
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
-const formatValue = (value: number, unit: MacroIndicator["unit"]) => {
-  if (unit === "percent") return `${value.toFixed(2)}%`
-  if (unit === "usd") {
-    return value.toLocaleString("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: value > 100 ? 0 : 2,
-    })
-  }
-  if (unit === "ratio") return value.toFixed(4)
+const GROUP_ORDER: MacroGroup[] = [
+  "Rates",
+  "Inflation",
+  "Employment",
+  "Liquidity",
+  "Credit",
+  "Equity",
+  "Volatility",
+  "FX",
+  "Commodity",
+  "Growth",
+  "RealEstate",
+  "Crypto",
+  "OnChain",
+  "Sentiment",
+  "CrossAsset",
+]
 
-  return value.toLocaleString("en-US", {
-    maximumFractionDigits: 2,
-  })
-}
-
-const formatChange = (indicator: MacroIndicator) => {
-  const sign = indicator.change >= 0 ? "+" : ""
-  return `${sign}${formatValue(indicator.change, indicator.unit)} (${sign}${indicator.changePercent.toFixed(2)}%)`
+const GROUP_LABEL: Record<MacroGroup, string> = {
+  Rates: "利率 / Rates & Treasury",
+  Inflation: "通胀 / Inflation",
+  Employment: "就业 / Employment",
+  Liquidity: "流动性 / Liquidity & Money",
+  Credit: "信用 / Credit Spreads",
+  Equity: "股指 / Equity",
+  Volatility: "波动率 / Volatility",
+  FX: "外汇 / FX",
+  Commodity: "商品 / Commodities & Ag",
+  Growth: "增长 / Growth & Activity",
+  RealEstate: "房地产 / Real Estate",
+  Crypto: "加密 / Crypto",
+  OnChain: "链上 / On-chain",
+  Sentiment: "情绪 / Sentiment",
+  CrossAsset: "跨资产 / Cross-Asset",
 }
 
 export function MacroDashboard() {
@@ -41,169 +69,147 @@ export function MacroDashboard() {
   const [updatedAt, setUpdatedAt] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [fredEnabled, setFredEnabled] = useState<boolean | null>(null)
+  const [range, setRange] = useState<TimeRangeId>(DEFAULT_TIME_RANGE)
+  const [meta, setMeta] = useState<{ requested: number; returned: number } | null>(null)
 
   useEffect(() => {
     let isActive = true
+    const controller = new AbortController()
+    setIsLoading(true)
 
     async function loadMacroData() {
       try {
-        const response = await fetch("/api/macro")
-        const payload = (await response.json()) as MacroApiResponse
-
+        const response = await fetch(`/api/macro?range=${range}`, { signal: controller.signal })
         if (!response.ok) {
-          throw new Error(payload.error ?? "Failed to load macro data")
+          throw new Error(`Macro API returned ${response.status}`)
         }
-
+        const payload = (await response.json()) as MacroApiResponse
         if (!isActive) return
 
         setIndicators(payload.indicators)
         setUpdatedAt(payload.updatedAt)
+        setFredEnabled(payload.fredEnabled ?? null)
+        setMeta({ requested: payload.requested ?? 0, returned: payload.returned ?? 0 })
         setError(null)
       } catch (requestError) {
-        if (isActive) {
+        if (isActive && (requestError as Error).name !== "AbortError") {
           setError(requestError instanceof Error ? requestError.message : "Failed to load macro data")
         }
       } finally {
-        if (isActive) {
-          setIsLoading(false)
-        }
+        if (isActive) setIsLoading(false)
       }
     }
 
     loadMacroData()
-    const interval = setInterval(loadMacroData, 5 * 60 * 1000)
+    const interval = setInterval(loadMacroData, REFRESH_INTERVAL_MS)
 
     return () => {
       isActive = false
+      controller.abort()
       clearInterval(interval)
     }
-  }, [])
+  }, [range])
 
-  const groupedIndicators = useMemo(
+  const groupedIndicators = useMemo(() => {
+    const grouped = new Map<MacroGroup, MacroIndicator[]>()
+    for (const indicator of indicators) {
+      const bucket = grouped.get(indicator.group)
+      if (bucket) {
+        bucket.push(indicator)
+      } else {
+        grouped.set(indicator.group, [indicator])
+      }
+    }
+    return grouped
+  }, [indicators])
+
+  const kpiTiles: KpiTile[] = useMemo(
     () =>
-      indicators.reduce<Record<MacroIndicator["group"], MacroIndicator[]>>(
-        (groups, indicator) => {
-          groups[indicator.group].push(indicator)
-          return groups
-        },
-        {
-          Equity: [],
-          Rates: [],
-          Volatility: [],
-          Dollar: [],
-          Commodity: [],
-          FX: [],
-          Credit: [],
-          Crypto: [],
-        },
-      ),
+      indicators
+        .filter((indicator) => (indicator.priority ?? 999) <= KPI_PRIORITY_LIMIT)
+        .slice(0, KPI_PRIORITY_LIMIT)
+        .map((indicator) => ({
+          id: indicator.symbol,
+          label: indicator.name,
+          value: formatSeriesValue(indicator.value, indicator.unit as SeriesChartUnit, true),
+          delta: formatPercentDelta(indicator.changePercent),
+          deltaTone: getDeltaTone(indicator.change),
+          helper: `${indicator.source} · #${indicator.priority ?? "-"}`,
+          sparkline: indicator.history.slice(-KPI_SPARK_POINTS).map((point) => point.value),
+          info: buildIndicatorInfo(indicator),
+        })),
     [indicators],
   )
 
   return (
     <div className="min-h-svh bg-background">
       <SiteHeader />
-      <main className="container mx-auto px-4 py-4">
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+      <main className="container mx-auto px-4 py-3">
+        <div className="space-y-3">
+          <header className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Macro Dashboard</h1>
-              <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
-                跨资产宏观代理指标：全球股指、波动率、收益率曲线、美元、信用、商品、外汇和 BTC/ETH。
+              <h1 className="text-xl font-bold tracking-tight">Macro Dashboard</h1>
+              <p className="mt-0.5 max-w-3xl text-[11px] text-muted-foreground">
+                跨资产宏观指标，按业内重要性（利率 → 通胀 → 就业 → 流动性 → 信用 → 股指 → 波动率 → 商品 → 加密 → 链上）排序。
+                每条指标右上角提供来源 + 含义解释。
               </p>
             </div>
-            <div className="rounded-full border px-4 py-2 text-sm text-muted-foreground">
-              {updatedAt ? `Updated ${new Date(updatedAt).toLocaleString("zh-CN")}` : "Loading live data"}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <TimeRangeSelector value={range} onChange={setRange} />
+              <span className="rounded-full border px-2.5 py-0.5 text-[10px] text-muted-foreground">
+                {meta ? `${meta.returned}/${meta.requested} indicators` : "Loading"}
+              </span>
+              <span className="rounded-full border px-2.5 py-0.5 text-[10px] text-muted-foreground">
+                {updatedAt ? `Updated ${new Date(updatedAt).toLocaleTimeString("zh-CN")}` : "—"}
+              </span>
             </div>
-          </div>
+          </header>
+
+          {fredEnabled === false && <FredHint />}
+
+          <KpiStrip tiles={kpiTiles} />
 
           {error && (
             <Card className="border-destructive/40">
-              <CardContent className="pt-6 text-sm text-destructive">{error}</CardContent>
+              <CardContent className="text-xs text-destructive">{error}</CardContent>
             </Card>
           )}
 
           {isLoading && indicators.length === 0 ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <RefreshCw className="h-4 w-4 animate-spin" />
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
               Loading macro indicators...
             </div>
           ) : (
-            <>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
-                {indicators.map((indicator) => (
-                  <MacroCard key={indicator.symbol} indicator={indicator} />
-                ))}
-              </div>
+            <Tabs defaultValue="realtime" className="w-full">
+              <TabsList className="grid h-auto w-full max-w-xs grid-cols-2">
+                <TabsTrigger value="realtime" className="text-xs">
+                  实时
+                </TabsTrigger>
+                <TabsTrigger value="history" className="text-xs">
+                  历史曲线
+                </TabsTrigger>
+              </TabsList>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Macro Table</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[760px] text-xs">
-                      <thead>
-                        <tr className="border-b text-left text-muted-foreground">
-                          <th className="py-3 pr-4 font-medium">Indicator</th>
-                          <th className="py-3 pr-4 font-medium">Group</th>
-                          <th className="py-3 pr-4 text-right font-medium">Latest</th>
-                          <th className="py-3 pr-4 text-right font-medium">Daily Change</th>
-                          <th className="py-3 pr-4 font-medium">Source</th>
-                          <th className="py-3 text-right font-medium">Last Update</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {indicators.map((indicator) => (
-                          <tr key={indicator.symbol} className="border-b last:border-0">
-                            <td className="py-3 pr-4">
-                              <p className="font-medium">{indicator.name}</p>
-                              <p className="text-xs text-muted-foreground">{indicator.symbol}</p>
-                            </td>
-                            <td className="py-3 pr-4">
-                              <Badge variant="secondary">{indicator.group}</Badge>
-                            </td>
-                            <td className="py-3 pr-4 text-right font-medium">
-                              {formatValue(indicator.value, indicator.unit)}
-                            </td>
-                            <td
-                              className={cn(
-                                "py-3 pr-4 text-right font-medium",
-                                indicator.change >= 0 ? "text-green-600" : "text-red-600",
-                              )}
-                            >
-                              {formatChange(indicator)}
-                            </td>
-                            <td className="py-3 pr-4 text-muted-foreground">{indicator.source}</td>
-                            <td className="py-3 text-right text-muted-foreground">
-                              {new Date(indicator.lastUpdate).toLocaleString("zh-CN")}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
+              <TabsContent value="realtime" className="mt-3">
+                <IndicatorSections
+                  groupedIndicators={groupedIndicators}
+                  renderIndicator={(indicator) => <RealtimeTile key={indicator.symbol} indicator={indicator} />}
+                  gridClassName="grid gap-1.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6"
+                />
+              </TabsContent>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Coverage</CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-3 text-sm md:grid-cols-4">
-                  {Object.entries(groupedIndicators)
-                    .filter(([, groupIndicators]) => groupIndicators.length > 0)
-                    .map(([group, groupIndicators]) => (
-                      <div key={group} className="rounded-xl border p-3">
-                        <p className="font-medium">{group}</p>
-                        <p className="mt-1 text-muted-foreground">
-                          {groupIndicators.map((indicator) => indicator.name).join(", ")}
-                        </p>
-                      </div>
-                    ))}
-                </CardContent>
-              </Card>
-            </>
+              <TabsContent value="history" className="mt-3">
+                <IndicatorSections
+                  groupedIndicators={groupedIndicators}
+                  renderIndicator={(indicator) => (
+                    <HistoryCard key={indicator.symbol} indicator={indicator} rangeLabel={range} />
+                  )}
+                  gridClassName="grid gap-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
+                />
+              </TabsContent>
+            </Tabs>
           )}
         </div>
       </main>
@@ -211,53 +217,148 @@ export function MacroDashboard() {
   )
 }
 
-function MacroCard({ indicator }: { indicator: MacroIndicator }) {
+function FredHint() {
+  return (
+    <Card className="border-amber-300 bg-amber-50/60 py-2 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+      <CardContent className="px-3 text-[11px]">
+        <p className="font-medium">FRED 数据未启用</p>
+        <p className="mt-0.5 leading-relaxed">
+          美联储利率 / 通胀 / 就业 / 流动性 / 信用 等约 30 项指标需要 FRED 免费 API key。到{" "}
+          <code>fred.stlouisfed.org</code> 注册后在 <code>.env.local</code> 添加{" "}
+          <code className="rounded bg-amber-100 px-1 py-0.5 dark:bg-amber-900/50">FRED_API_KEY=YOUR_KEY</code>{" "}
+          ，重启服务即可生效。
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+interface IndicatorSectionsProps {
+  groupedIndicators: Map<MacroGroup, MacroIndicator[]>
+  renderIndicator: (indicator: MacroIndicator) => React.ReactNode
+  gridClassName: string
+}
+
+function IndicatorSections({ groupedIndicators, renderIndicator, gridClassName }: IndicatorSectionsProps) {
+  return (
+    <div className="space-y-3">
+      {GROUP_ORDER.map((groupId) => {
+        const group = groupedIndicators.get(groupId)
+        if (!group || group.length === 0) return null
+        return (
+          <section key={groupId} className="space-y-1.5">
+            <header className="flex items-center justify-between">
+              <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {GROUP_LABEL[groupId]}
+              </h2>
+              <Badge variant="secondary" className="h-4 px-1.5 text-[9px] font-normal">
+                {group.length}
+              </Badge>
+            </header>
+            <div className={gridClassName}>{group.map(renderIndicator)}</div>
+          </section>
+        )
+      })}
+    </div>
+  )
+}
+
+function RealtimeTile({ indicator }: { indicator: MacroIndicator }) {
   const isPositive = indicator.change >= 0
-  const chartColor = isPositive ? "rgb(22 163 74)" : "rgb(220 38 38)"
-  const chartData = indicator.history.slice(-90)
+  return (
+    <div className="rounded-md border bg-card/80 px-2.5 py-1.5 shadow-sm">
+      <div className="flex items-start justify-between gap-1.5">
+        <div className="min-w-0">
+          <p className="truncate text-[11px] font-medium text-foreground">{indicator.name}</p>
+          <p className="truncate text-[9px] text-muted-foreground">
+            {stripSymbolPrefix(indicator.symbol)} · <span className="opacity-80">{indicator.source}</span>
+          </p>
+        </div>
+        {indicator.description && (
+          <InfoTooltip
+            title={indicator.name}
+            description={indicator.description}
+            source={buildInfoSource(indicator)}
+          />
+        )}
+      </div>
+      <div className="mt-1 flex items-baseline justify-between gap-2">
+        <span className="truncate text-sm font-semibold tabular-nums">
+          {formatSeriesValue(indicator.value, indicator.unit as SeriesChartUnit, true)}
+        </span>
+        <span
+          className={cn(
+            "flex shrink-0 items-center gap-0.5 text-[10px] font-medium tabular-nums",
+            isPositive ? "text-green-600" : "text-red-600",
+          )}
+        >
+          {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+          {formatPercentDelta(indicator.changePercent)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function HistoryCard({ indicator, rangeLabel }: { indicator: MacroIndicator; rangeLabel: TimeRangeId }) {
+  const isPositive = indicator.change >= 0
+  const chartData = useMemo(
+    () =>
+      indicator.history
+        .filter((point) => Number.isFinite(point.value))
+        .map((point) => ({ timestamp: point.timestamp, value: point.value })),
+    [indicator.history],
+  )
 
   return (
-    <Card>
-      <CardHeader className="space-y-1">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-sm">{indicator.name}</CardTitle>
-            <p className="text-xs text-muted-foreground">{indicator.symbol}</p>
-          </div>
-          <Badge variant="outline">{indicator.group}</Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <div>
-            <p className="text-xl font-bold">{formatValue(indicator.value, indicator.unit)}</p>
-            <p className={cn("mt-1 flex items-center gap-1 text-xs", isPositive ? "text-green-600" : "text-red-600")}>
-              {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {formatChange(indicator)}
+    <Card className="gap-1.5 py-2.5">
+      <CardHeader className="px-3 pb-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <CardTitle className="flex items-center gap-1 text-xs">
+              <span className="truncate">{indicator.name}</span>
+              {indicator.description && (
+                <InfoTooltip
+                  title={indicator.name}
+                  description={indicator.description}
+                  source={buildInfoSource(indicator)}
+                />
+              )}
+            </CardTitle>
+            <p className="text-[10px] text-muted-foreground">
+              {stripSymbolPrefix(indicator.symbol)} · <span className="opacity-80">{indicator.source}</span>
             </p>
           </div>
-          <p className="text-right text-xs text-muted-foreground">6M history</p>
+          <Badge variant="outline" className="h-4 px-1.5 text-[9px]">
+            #{indicator.priority ?? "-"}
+          </Badge>
         </div>
-        <div className="h-24">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-              <XAxis dataKey="date" tickLine={false} axisLine={false} minTickGap={28} fontSize={10} />
-              <YAxis hide domain={["dataMin", "dataMax"]} />
-              <Tooltip
-                formatter={(value: unknown) => [formatValue(Number(value), indicator.unit), indicator.name]}
-                labelFormatter={(label) => String(label)}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke={chartColor}
-                fill={chartColor}
-                fillOpacity={0.12}
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+      </CardHeader>
+      <CardContent className="space-y-1.5 px-3">
+        <div className="flex items-end justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold tabular-nums">
+              {formatSeriesValue(indicator.value, indicator.unit as SeriesChartUnit)}
+            </p>
+            <p
+              className={cn(
+                "mt-0.5 flex items-center gap-1 text-[10px] tabular-nums",
+                isPositive ? "text-green-600" : "text-red-600",
+              )}
+            >
+              {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              {formatChangeWithPercent(indicator)}
+            </p>
+          </div>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{rangeLabel}</span>
         </div>
+        <SeriesChart
+          data={chartData}
+          unit={indicator.unit as SeriesChartUnit}
+          height={110}
+          compact
+          label={indicator.name}
+        />
       </CardContent>
     </Card>
   )
