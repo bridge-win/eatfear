@@ -206,10 +206,139 @@ curl -X GET https://your-domain.vercel.app/api/check-alerts \
 - **Authentication**: Supabase Auth (Email/Password + Google OAuth)
 - **Email**: Resend
 - **Real-time Data**: 
-  - Binance WebSocket API (crypto prices)
-  - Yahoo Finance API (stock prices)
+  - OKX Public API (crypto derivatives, K-lines, order book, funding, OI)
+  - Yahoo Finance API (stock prices, indices, FX, commodities)
+  - FRED API (macro indicators - requires API key)
   - Alternative.me API (Fear & Greed Index)
   - CoinGecko API (market statistics)
+  - Blockchain.com API (BTC on-chain data)
+  - DefiLlama API (stablecoin market cap, DeFi TVL)
+
+## Investment Indicators
+
+### Macro Indicators (30+)
+
+| Category | Indicator | Source | Correlation to BTC |
+|----------|-----------|--------|-------------------|
+| **Rates** | Fed Funds Rate | FRED | High (inverse) |
+| **Rates** | 10Y Treasury Yield | FRED | High (inverse) |
+| **Rates** | 2Y Treasury Yield | FRED | Medium |
+| **Rates** | 10Y TIPS Real Yield | FRED | High (inverse) |
+| **Rates** | 10Y-2Y Spread | FRED | Medium |
+| **Rates** | 10Y-3M Spread | FRED | Medium |
+| **FX** | DXY (Dollar Index) | Yahoo | High (inverse) |
+| **Inflation** | CPI (Headline) | FRED | Medium |
+| **Inflation** | Core CPI | FRED | Medium |
+| **Inflation** | PCE Price Index | FRED | Medium |
+| **Inflation** | Core PCE | FRED | Medium |
+| **Inflation** | 5Y Breakeven | FRED | Medium |
+| **Inflation** | 10Y Breakeven | FRED | Medium |
+| **Employment** | Unemployment Rate | FRED | Low |
+| **Employment** | Nonfarm Payrolls | FRED | Low |
+| **Employment** | Initial Jobless Claims | FRED | Low |
+| **Liquidity** | Fed Balance Sheet | FRED | High |
+| **Liquidity** | Bank Reserves | FRED | Medium |
+| **Liquidity** | Reverse Repo (RRP) | FRED | High |
+| **Liquidity** | Treasury TGA | FRED | High |
+| **Liquidity** | M2 Money Supply | FRED | High |
+| **Credit** | HY Credit Spread | FRED | High (inverse) |
+| **Credit** | IG Credit Spread | FRED | Medium |
+| **Credit** | Chicago Fed NFCI | FRED | High (inverse) |
+| **Equity** | Nasdaq 100 | Yahoo | Very High |
+| **Equity** | S&P 500 | Yahoo | High |
+| **Equity** | SOX (Semiconductors) | Yahoo | High |
+| **Volatility** | VIX | Yahoo | High (inverse) |
+| **Growth** | GDPNow | FRED | Low |
+| **Growth** | Retail Sales | FRED | Low |
+
+### US Stock Indices
+
+| Indicator | Source | Description |
+|-----------|--------|-------------|
+| Nasdaq Composite | Yahoo | Tech-heavy, high BTC correlation |
+| Nasdaq 100 | Yahoo | Top 100 non-financial growth stocks |
+| S&P 500 | Yahoo | Broad market benchmark |
+| Dow Jones | Yahoo | 30 blue-chip value stocks |
+| Russell 2000 | Yahoo | Small caps, rate sensitive |
+| SOX (Semiconductors) | Yahoo | AI/tech cycle leader |
+
+### China/HK Stock Indices
+
+| Indicator | Source | Description |
+|-----------|--------|-------------|
+| Hang Seng Index | Yahoo | Hong Kong benchmark |
+| H-Shares (HSCE) | Yahoo | HK-listed China enterprises |
+| CSI 300 | Yahoo | A-share large caps |
+| Shanghai Composite | Yahoo | A-share broad market |
+| ChiNext | Yahoo | A-share growth stocks |
+| KWEB ETF | Yahoo | China internet ADRs |
+
+### BTC Derivatives Indicators (20)
+
+| Category | Indicator | Source | Description |
+|----------|-----------|--------|-------------|
+| **Price** | BTC Spot Price | OKX | Real-time perpetual contract price |
+| **Price** | Spot Price | OKX | Spot market price for basis calc |
+| **Volatility** | 5m Return Z-Score | Calculated | Standardized 5-min price change |
+| **Volatility** | Wick Ratio | Calculated | Upper/lower shadow percentage |
+| **Volatility** | Volume Z-Score | Calculated | Standardized 1-min volume |
+| **Derivatives** | Funding Rate | OKX | 8-hour funding payment rate |
+| **Derivatives** | Open Interest | OKX | Total outstanding contracts |
+| **Derivatives** | OI Change Rate | Calculated | 5-min OI change percentage |
+| **Derivatives** | Perp Premium/Basis | Calculated | (Perp - Spot) / Spot |
+| **Sentiment** | Long/Short Ratio (Account) | OKX | Account count ratio |
+| **Sentiment** | Long/Short Ratio (Contract) | OKX | Position size ratio |
+| **Sentiment** | Top Trader Account Ratio | OKX | Whale account L/S ratio |
+| **Sentiment** | Top Trader Position Ratio | OKX | Whale position L/S ratio |
+| **Order Book** | Bid/Ask Depth | OKX | Top 20 level depth |
+| **Order Book** | Bid/Ask Ratio | Calculated | Bid depth / Ask depth |
+| **Order Book** | Orderbook Imbalance | Calculated | (Bid - Ask) / Total |
+| **Flow** | CVD (Cumulative Volume Delta) | OKX | Buy volume - Sell volume |
+| **Flow** | Taker Buy/Sell Volume | OKX | Aggressive order flow |
+
+### On-Chain Indicators
+
+| Indicator | Source | Description |
+|-----------|--------|-------------|
+| BTC Hash Rate | Blockchain.com | Network security metric |
+| Mining Difficulty | Blockchain.com | Bi-weekly adjustment |
+| Active Addresses | Blockchain.com | Daily unique addresses |
+| Transaction Count | Blockchain.com | Daily on-chain txs |
+| On-chain Volume (USD) | Blockchain.com | Estimated transfer value |
+| BTC Market Cap | Blockchain.com | Historical market cap |
+| Stablecoin Market Cap | DefiLlama | Crypto "dry powder" |
+| DeFi TVL | DefiLlama | On-chain capital locked |
+| Fear & Greed Index | Alternative.me | Sentiment composite (0-100) |
+
+### Indicator Priority Groups
+
+**Daily Must-Watch (Priority 1-15)**
+- Fed Funds Rate, 10Y/2Y Yields, Real Yield, DXY
+- Nasdaq/S&P/VIX
+- CPI, Core CPI, PCE
+
+**Liquidity & Credit (Priority 16-30)**
+- Fed Balance Sheet, RRP, TGA, M2
+- HY/IG Credit Spreads, NFCI
+- Yield Curve Spreads
+
+**BTC Leverage Signals**
+- Funding Rate, OI, OI Change Rate
+- Long/Short Ratio, Top Trader Ratio
+- Liquidations (when available)
+
+**BTC Spike Detection**
+- Return Z-Score, Wick Ratio, Volume Z-Score
+- ATR, VWAP Deviation
+
+**BTC Order Flow**
+- Bid/Ask Ratio, Orderbook Imbalance
+- Spread, CVD
+
+**BTC Capital Flow**
+- ETF Net Flow (paid API)
+- Exchange Net Flow (paid API)
+- Stablecoin Inflow
 
 ## API Endpoints
 
