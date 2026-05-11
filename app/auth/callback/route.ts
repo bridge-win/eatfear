@@ -18,12 +18,6 @@ export async function GET(request: Request) {
   if (code) {
     const supabase = await createClient()
 
-    if (!supabase) {
-      return NextResponse.redirect(
-        `${origin}/auth/auth-error?error=service_unavailable&message=${encodeURIComponent("Authentication service not configured")}`,
-      )
-    }
-
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!exchangeError && data.session) {

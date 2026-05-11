@@ -12,17 +12,14 @@ export async function GET(request: Request) {
 
   try {
     // Use Yahoo Finance API via query1.finance.yahoo.com
-    const response = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`,
-      {
-        headers: {
-          "User-Agent": "Mozilla/5.0",
-        },
+    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2d`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0",
       },
-    )
+    })
 
     if (!response.ok) {
-      return NextResponse.json({ error: "Stock data unavailable" }, { status: response.status === 404 ? 404 : 502 })
+      throw new Error("Failed to fetch stock data")
     }
 
     const data = await response.json()
@@ -54,7 +51,8 @@ export async function GET(request: Request) {
       volume: volume,
       lastUpdate: Date.now(),
     })
-  } catch {
-    return NextResponse.json({ error: "Failed to fetch stock data" }, { status: 502 })
+  } catch (error) {
+    console.error(`Error fetching stock ${symbol}:`, error)
+    return NextResponse.json({ error: "Failed to fetch stock data" }, { status: 500 })
   }
 }

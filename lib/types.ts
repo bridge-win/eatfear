@@ -4,7 +4,6 @@ export interface CryptoAsset {
   price: number
   change24h: number
   changePercent24h: number
-  volume24h?: number
   lastUpdate: number
 }
 
@@ -18,12 +17,10 @@ export interface StockAsset {
   lastUpdate: number
 }
 
-export type AssetType = "crypto" | "stock" | "hk_stock" | "vietnam_stock"
-
 export interface CrashAlert {
   symbol: string
   name: string
-  assetType: AssetType
+  assetType: "crypto" | "stock"
   dropPercentage: number
   timeframe: string
   currentPrice: number
@@ -47,81 +44,9 @@ export interface Subscription {
   id: string
   user_id: string
   asset_symbol: string
-  asset_type: AssetType
+  asset_type: "crypto" | "stock"
   threshold_percentage: number
   is_active: boolean
   created_at: string
   updated_at: string
-}
-
-export interface MacroSeriesPoint {
-  timestamp: number
-  date: string
-  value: number
-}
-
-export type MacroGroup =
-  | "Rates"
-  | "Inflation"
-  | "Employment"
-  | "Liquidity"
-  | "Credit"
-  | "Equity"
-  | "Volatility"
-  | "FX"
-  | "Commodity"
-  | "Growth"
-  | "RealEstate"
-  | "Crypto"
-  | "OnChain"
-  | "Sentiment"
-  | "CrossAsset"
-
-export type MacroUnit = "index" | "percent" | "usd" | "ratio" | "count"
-
-export type MacroDataSource =
-  | "Yahoo Finance"
-  | "FRED"
-  | "CoinGecko"
-  | "DefiLlama"
-  | "Blockchain.com"
-  | "Alternative.me"
-  | "OKX"
-  | "Computed"
-
-export interface MacroIndicator {
-  symbol: string
-  name: string
-  group: MacroGroup
-  unit: MacroUnit
-  source: MacroDataSource
-  value: number
-  change: number
-  changePercent: number
-  lastUpdate: number
-  history: MacroSeriesPoint[]
-  description?: string
-  audience?: string[]
-  /** Lower number = more important. Used for sorting on the Macro dashboard. */
-  priority?: number
-  /** Refresh frequency hint shown to users */
-  frequency?: string
-}
-
-export interface CryptoInstrument {
-  instId: string
-  base: string
-  quote: string
-  label: string
-}
-
-export interface MarketNewsArticle {
-  title: string
-  url: string
-  domain: string
-  sourceCountry: string
-  language: string
-  publishedAt: string
-  imageUrl?: string
-  tone?: number
 }

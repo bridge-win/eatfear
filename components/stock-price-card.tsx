@@ -32,7 +32,7 @@ export function StockPriceCard({ asset, isSubscribed = false, onSubscribeToggle 
     <Card className="relative hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div className="space-y-1">
-          <h3 className="text-base font-semibold">{asset.name}</h3>
+          <h3 className="font-semibold text-lg">{asset.name}</h3>
           <p className="text-sm text-muted-foreground">{asset.symbol}</p>
         </div>
         {onSubscribeToggle && (
@@ -48,7 +48,7 @@ export function StockPriceCard({ asset, isSubscribed = false, onSubscribeToggle 
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          <p className="text-xl font-bold">{formattedPrice}</p>
+          <p className="text-2xl font-bold">{formattedPrice}</p>
           <div className="flex items-center gap-2">
             <Badge variant={isPositive ? "default" : "destructive"} className="gap-1">
               {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}

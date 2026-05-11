@@ -6,10 +6,6 @@ export async function POST(request: Request) {
   try {
     const supabase = await createClient()
 
-    if (!supabase) {
-      return NextResponse.json({ error: "Authentication service not configured" }, { status: 500 })
-    }
-
     // Check authentication
     const {
       data: { user },
