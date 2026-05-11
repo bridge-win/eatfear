@@ -12,6 +12,8 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { type ApiKeyStatus } from "@/components/api-key-warning"
+import { type DataSourceId, getDataSourceEndpoint } from "@/components/data-source-selector"
 import { InfoTooltip } from "@/components/info-tooltip"
 import { SeriesChart } from "@/components/series-chart"
 import { getTimeRange, type TimeRangeId } from "@/lib/time-range"
@@ -506,16 +508,23 @@ function SignalBadge({ direction }: { direction: SignalDirection }) {
 interface BtcVolatilitySystemProps {
   instId?: string
   range?: TimeRangeId
+  dataSource?: DataSourceId
+  onApiKeyStatusChange?: (status: ApiKeyStatus | null) => void
 }
 
-export function BtcVolatilitySystem({ instId = "BTC-USDT-SWAP", range = "1mo" }: BtcVolatilitySystemProps) {
+export function BtcVolatilitySystem({
+  instId = "BTC-USDT-SWAP",
+  range = "1mo",
+  dataSource: sourceId = "okx",
+  onApiKeyStatusChange,
+}: BtcVolatilitySystemProps) {
   const base = instId.split("-")[0] ?? "BTC"
   const rangeOption = getTimeRange(range)
 
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "live" | "reconnecting" | "offline">(
     "connecting",
   )
-  const [dataSource, setDataSource] = useState("OKX Public API")
+  const [dataSourceLabel, setDataSourceLabel] = useState("OKX Public API")
   const [dataError, setDataError] = useState<string | null>(null)
   const [price, setPrice] = useState(0)
   const [priceChange24h, setPriceChange24h] = useState(0)
@@ -543,37 +552,49 @@ export function BtcVolatilitySystem({ instId = "BTC-USDT-SWAP", range = "1mo" }:
     lastSignalKeyRef.current = ""
     setHistorySignals([])
 
+    const apiEndpoint = getDataSourceEndpoint(sourceId)
+
     async function loadDerivativesData() {
       try {
         setConnectionStatus((status) => (status === "live" ? "live" : "connecting"))
         const response = await fetch(
-          `/api/crypto/btc-derivatives?instId=${encodeURIComponent(instId)}&range=${range}`,
+          `${apiEndpoint}?instId=${encodeURIComponent(instId)}&range=${range}`,
           { cache: "no-store" },
         )
-        const payload = (await response.json()) as DerivativesResponse & { error?: string }
-
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Failed to load derivatives data")
+        const payload = (await response.json()) as DerivativesResponse & {
+          error?: string
+          apiKeyStatus?: ApiKeyStatus
         }
 
         if (!isActive) return
 
-        setDataSource(payload.source)
-        setPrice(payload.ticker.price)
-        setPriceChange24h(payload.ticker.changePercent24h)
-        setOneMinuteKlines(payload.oneMinuteKlines.slice(-MAX_KLINES))
-        setFiveMinuteKlines(payload.fiveMinuteKlines.slice(-MAX_KLINES))
+        // Handle API key status
+        if (payload.apiKeyStatus) {
+          onApiKeyStatusChange?.(payload.apiKeyStatus)
+        } else {
+          onApiKeyStatusChange?.(null)
+        }
+
+        if (!response.ok && !payload.ticker) {
+          throw new Error(payload.error ?? "Failed to load derivatives data")
+        }
+
+        setDataSourceLabel(payload.source)
+        setPrice(payload.ticker?.price ?? 0)
+        setPriceChange24h(payload.ticker?.changePercent24h ?? 0)
+        setOneMinuteKlines((payload.oneMinuteKlines ?? []).slice(-MAX_KLINES))
+        setFiveMinuteKlines((payload.fiveMinuteKlines ?? []).slice(-MAX_KLINES))
         setRangeKlines(payload.rangeKlines ?? [])
-        setOrderBook(payload.orderBook)
-        setOpenInterest(payload.openInterest.btc)
-        setOpenInterestUsd(payload.openInterest.usd)
+        setOrderBook(payload.orderBook ?? emptyOrderBook)
+        setOpenInterest(payload.openInterest?.btc ?? 0)
+        setOpenInterestUsd(payload.openInterest?.usd ?? 0)
         setOpenInterestHistory(
-          payload.openInterestHistory.map((point) => ({ time: point.time, value: point.valueUsd })),
+          (payload.openInterestHistory ?? []).map((point) => ({ time: point.time, value: point.valueUsd })),
         )
-        setFundingRate(payload.fundingRate.rate)
-        setFundingRateHistory(payload.fundingRateHistory)
-        setLongShortAccountRatioHistory(payload.longShortAccountRatioHistory)
-        setContractLongShortRatioHistory(payload.contractLongShortRatioHistory)
+        setFundingRate(payload.fundingRate?.rate ?? 0)
+        setFundingRateHistory(payload.fundingRateHistory ?? [])
+        setLongShortAccountRatioHistory(payload.longShortAccountRatioHistory ?? [])
+        setContractLongShortRatioHistory(payload.contractLongShortRatioHistory ?? [])
         setTopTraderPositionHistory(payload.topTraderPositionHistory ?? [])
         setTakerVolumeHistory(payload.takerVolumeHistory ?? [])
         setSpotPrice(payload.spotPrice ?? 0)
@@ -594,7 +615,7 @@ export function BtcVolatilitySystem({ instId = "BTC-USDT-SWAP", range = "1mo" }:
       isActive = false
       clearInterval(interval)
     }
-  }, [instId, range])
+  }, [instId, range, sourceId, onApiKeyStatusChange])
 
   const now = Date.now()
   const recentLiquidations = useMemo(
@@ -699,7 +720,7 @@ export function BtcVolatilitySystem({ instId = "BTC-USDT-SWAP", range = "1mo" }:
                     {connectionStatus === "live" ? "Live" : connectionStatus}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
-                    {dataSource} · {instId} · {rangeOption.label} ({rangeOption.yahooInterval || rangeOption.okxBar})
+                    {dataSourceLabel} · {instId} · {rangeOption.label} ({rangeOption.yahooInterval || rangeOption.okxBar})
                   </span>
                 </div>
                 <h2 className="text-xl font-bold tracking-tight md:text-2xl">{base} 极端波动监控</h2>
