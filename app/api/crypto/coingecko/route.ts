@@ -3,8 +3,10 @@ import { DEFAULT_TIME_RANGE, getTimeRange } from "@/lib/time-range"
 
 export const revalidate = 30
 
-// CoinGecko API requires API key for higher rate limits
-// Free tier: 10-50 calls/min, Pro tier: 500 calls/min
+// CoinGecko Free API: 10-30 calls/min (no key needed)
+// CoinGecko Demo API: 30 calls/min (free key from dashboard)
+// CoinGecko Pro API: 500 calls/min (paid)
+// Note: CoinGecko only provides aggregated market data, NOT derivatives data
 const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY
 const COINGECKO_BASE = COINGECKO_API_KEY
   ? "https://pro-api.coingecko.com/api/v3"
