@@ -691,7 +691,7 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     priority: 56,
     frequency: "Monthly",
     audience: ["宏观"],
-    description: "密歇根大学 1 年通胀预期。Fed 对"通胀预期是否锚定"的关键参考。",
+    description: "密歇根大学 1 年通胀预期。Fed 对通胀预期是否锚定的关键参考。",
   },
   {
     symbol: "FRED:T5YIE",
@@ -739,7 +739,7 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     priority: 58,
     frequency: "Monthly",
     audience: ["宏观", "消费"],
-    description: "美国零售销售（百万美元，季调）。消费韧性的核心月度数据。",
+    description: "美国零售销售（百万美元，季调）。消费韧性的核心月度��据。",
     transform: (value) => value * 1_000_000,
   },
   {
@@ -1013,7 +1013,7 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "usd",
     priority: 79,
     frequency: "Realtime",
-    audience: ["农产品"],
+    audience: ["���产品"],
     description: "CBOT 玉米期货，受气候、乙醇需求、饲料驱动。",
   },
   {
