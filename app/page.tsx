@@ -1,5 +1,5 @@
-import { CryptoDashboard } from "@/components/crypto-dashboard"
+import { redirect } from "next/navigation"
 
 export default function HomePage() {
-  return <CryptoDashboard />
+  redirect("/crypto")
 }
