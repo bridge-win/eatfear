@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react"
 
+import { ApiKeyWarning, type ApiKeyStatus } from "@/components/api-key-warning"
 import { BtcVolatilitySystem } from "@/components/btc-volatility-system"
 import { CrashAlertBanner } from "@/components/crash-alert-banner"
 import { CryptoPriceCard } from "@/components/crypto-price-card"
+import { DataSourceSelector, type DataSourceId, getDataSource } from "@/components/data-source-selector"
 import { KpiStrip, type KpiTile } from "@/components/kpi-strip"
 import { formatValue as formatSeriesValue } from "@/components/series-chart"
 import { SiteHeader } from "@/components/site-header"
@@ -40,6 +42,8 @@ export function CryptoDashboard() {
   const [instruments, setInstruments] = useState<CryptoInstrument[]>(FALLBACK_INSTRUMENTS)
   const [instId, setInstId] = useState<string>("BTC-USDT-SWAP")
   const [range, setRange] = useState<TimeRangeId>(DEFAULT_TIME_RANGE)
+  const [dataSource, setDataSource] = useState<DataSourceId>("okx")
+  const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus | null>(null)
 
   useEffect(() => {
     const crashDetector = new CrashDetector()
@@ -101,14 +105,16 @@ export function CryptoDashboard() {
     }
   }, [])
 
+  const currentSource = getDataSource(dataSource)
+
   const symbolOptions: SymbolOption[] = useMemo(
     () =>
       instruments.map((instrument) => ({
         id: instrument.instId,
         label: instrument.label,
-        hint: `${instrument.base} 永续合约 · OKX`,
+        hint: `${instrument.base} 永续合约 · ${currentSource.name}`,
       })),
-    [instruments],
+    [instruments, currentSource.name],
   )
 
   const cryptoArray = Array.from(cryptoAssets.values())
@@ -190,14 +196,23 @@ export function CryptoDashboard() {
             <div>
               <h1 className="text-xl font-bold tracking-tight">Crypto Dashboard</h1>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                现货 + 永续衍生品（OKX 公开接口）。右上角支持 symbol 检索切换 · 时间周期默认 1M / 1H 线。
+                现货 + 永续衍生品（{currentSource.name}）。右上角支持数据源、symbol、时间周期切换。
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
+              <DataSourceSelector value={dataSource} onChange={setDataSource} />
               <SymbolSelector value={instId} options={symbolOptions} onChange={setInstId} />
               <TimeRangeSelector value={range} onChange={setRange} />
             </div>
           </header>
+
+          {apiKeyStatus && (apiKeyStatus.missing || apiKeyStatus.invalid || apiKeyStatus.rateLimited) && (
+            <ApiKeyWarning
+              source={currentSource.name}
+              status={apiKeyStatus}
+              onDismiss={() => setApiKeyStatus(null)}
+            />
+          )}
 
           <KpiStrip tiles={kpiTiles} />
 
@@ -209,7 +224,12 @@ export function CryptoDashboard() {
               <TabsTrigger value="markets" className="text-xs">现货行情</TabsTrigger>
             </TabsList>
             <TabsContent value="volatility" className="mt-3">
-              <BtcVolatilitySystem instId={instId} range={range} />
+              <BtcVolatilitySystem
+                instId={instId}
+                range={range}
+                dataSource={dataSource}
+                onApiKeyStatusChange={setApiKeyStatus}
+              />
             </TabsContent>
             <TabsContent value="markets" className="mt-3">
               <h2 className="mb-2 text-sm font-semibold">Top Cryptocurrencies (OKX Spot)</h2>

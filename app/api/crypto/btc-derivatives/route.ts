@@ -150,6 +150,16 @@ const normalizeTwoColumnHistory = (rows: string[][], valueKey: "valueUsd" | "rat
     .filter((point) => Number.isFinite(point[valueKey]))
     .reverse()
 
+const normalizeTopTraderRatioHistory = (rows: string[][]) =>
+  rows
+    .map((row) => ({
+      time: Number(row[0]),
+      longShortAccountRatio: Number(row[1]),
+      longShortPositionRatio: Number(row[2]),
+    }))
+    .filter((point) => Number.isFinite(point.longShortAccountRatio))
+    .reverse()
+
 const sanitizeInstId = (raw: string | null) => {
   if (!raw) return DEFAULT_INST_ID
   const cleaned = raw.toUpperCase().trim()
@@ -194,6 +204,9 @@ export async function GET(request: Request) {
       openInterestVolumeRows,
       longShortRatioRows,
       contractLongShortRatioRows,
+      topTraderPositionRows,
+      takerVolumeRows,
+      spotTickerRows,
     ] = await Promise.all([
       okxFetch<OkxTicker>(`/api/v5/market/ticker?instId=${instId}`),
       okxFetchSafe<string[]>(`/api/v5/market/candles?instId=${instId}&bar=1m&limit=120`),
@@ -208,6 +221,14 @@ export async function GET(request: Request) {
       okxFetchSafe<string[]>(
         `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract?instId=${instId}&period=${rubikPeriod}`,
       ),
+      // Top trader position ratio (account + position)
+      okxFetchSafe<string[]>(
+        `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader?instId=${instId}&period=${rubikPeriod}`,
+      ),
+      // Taker buy/sell volume (for CVD calculation)
+      okxFetchSafe<string[]>(`/api/v5/rubik/stat/taker-volume?ccy=${ccy}&instType=SWAP&period=${rubikPeriod}`),
+      // Spot ticker for basis calculation
+      okxFetchSafe<OkxTicker>(`/api/v5/market/ticker?instId=${ccy}-USDT`),
     ])
 
     const ticker = tickerRows[0]
@@ -215,6 +236,36 @@ export async function GET(request: Request) {
     const open24h = Number(ticker?.open24h ?? price)
     const openInterest = openInterestRows[0]
     const funding = fundingRows[0]
+    const spotTicker = spotTickerRows[0]
+    const spotPrice = Number(spotTicker?.last ?? 0)
+
+    // Calculate perpetual premium (basis) = (perp price - spot price) / spot price * 100
+    const perpPremium = spotPrice > 0 ? ((price - spotPrice) / spotPrice) * 100 : 0
+
+    // Process taker volume for CVD calculation
+    // takerVolumeRows format: [ts, sellVol, buyVol]
+    const takerVolumeHistory = takerVolumeRows
+      .map((row) => {
+        const time = Number(row[0])
+        const sellVol = Number(row[1])
+        const buyVol = Number(row[2])
+        return {
+          time,
+          sellVolume: sellVol,
+          buyVolume: buyVol,
+          netVolume: buyVol - sellVol,
+          cvd: buyVol - sellVol, // Cumulative will be calculated client-side
+        }
+      })
+      .filter((point) => Number.isFinite(point.netVolume))
+      .reverse()
+
+    // Calculate cumulative CVD
+    let cumulativeCvd = 0
+    for (const point of takerVolumeHistory) {
+      cumulativeCvd += point.netVolume
+      point.cvd = cumulativeCvd
+    }
 
     return NextResponse.json({
       source: "OKX Public API",
@@ -234,6 +285,8 @@ export async function GET(request: Request) {
         volume24hUsd: Number(ticker?.volCcy24h ?? 0),
         timestamp: Number(ticker?.ts) || Date.now(),
       },
+      spotPrice,
+      perpPremium,
       oneMinuteKlines: normalizeCandles(oneMinuteCandles),
       fiveMinuteKlines: normalizeCandles(fiveMinuteCandles),
       rangeKlines: normalizeCandles(rangeCandles),
@@ -252,6 +305,8 @@ export async function GET(request: Request) {
       fundingRateHistory: normalizeFundingHistory(fundingHistoryRows),
       longShortAccountRatioHistory: normalizeTwoColumnHistory(longShortRatioRows, "ratio"),
       contractLongShortRatioHistory: normalizeTwoColumnHistory(contractLongShortRatioRows, "ratio"),
+      topTraderPositionHistory: normalizeTopTraderRatioHistory(topTraderPositionRows),
+      takerVolumeHistory,
     })
   } catch (error) {
     return NextResponse.json(

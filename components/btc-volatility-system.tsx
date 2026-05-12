@@ -12,6 +12,8 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { type ApiKeyStatus } from "@/components/api-key-warning"
+import { type DataSourceId, getDataSourceEndpoint } from "@/components/data-source-selector"
 import { InfoTooltip } from "@/components/info-tooltip"
 import { SeriesChart } from "@/components/series-chart"
 import { getTimeRange, type TimeRangeId } from "@/lib/time-range"
@@ -86,6 +88,20 @@ interface HistorySignal extends VolatilitySignal {
   price: number
 }
 
+interface TopTraderRatioPoint {
+  time: number
+  longShortAccountRatio: number
+  longShortPositionRatio: number
+}
+
+interface TakerVolumePoint {
+  time: number
+  sellVolume: number
+  buyVolume: number
+  netVolume: number
+  cvd: number
+}
+
 interface DerivativesResponse {
   source: string
   instrumentId: string
@@ -100,6 +116,8 @@ interface DerivativesResponse {
     low24h: number
     volume24hUsd: number
   }
+  spotPrice: number
+  perpPremium: number
   oneMinuteKlines: KlinePoint[]
   fiveMinuteKlines: KlinePoint[]
   rangeKlines: KlinePoint[]
@@ -119,6 +137,8 @@ interface DerivativesResponse {
   fundingRateHistory: FundingRatePoint[]
   longShortAccountRatioHistory: LongShortRatioPoint[]
   contractLongShortRatioHistory: LongShortRatioPoint[]
+  topTraderPositionHistory: TopTraderRatioPoint[]
+  takerVolumeHistory: TakerVolumePoint[]
 }
 
 const MAX_KLINES = 80
@@ -488,16 +508,23 @@ function SignalBadge({ direction }: { direction: SignalDirection }) {
 interface BtcVolatilitySystemProps {
   instId?: string
   range?: TimeRangeId
+  dataSource?: DataSourceId
+  onApiKeyStatusChange?: (status: ApiKeyStatus | null) => void
 }
 
-export function BtcVolatilitySystem({ instId = "BTC-USDT-SWAP", range = "1mo" }: BtcVolatilitySystemProps) {
+export function BtcVolatilitySystem({
+  instId = "BTC-USDT-SWAP",
+  range = "1mo",
+  dataSource: sourceId = "okx",
+  onApiKeyStatusChange,
+}: BtcVolatilitySystemProps) {
   const base = instId.split("-")[0] ?? "BTC"
   const rangeOption = getTimeRange(range)
 
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "live" | "reconnecting" | "offline">(
     "connecting",
   )
-  const [dataSource, setDataSource] = useState("OKX Public API")
+  const [dataSourceLabel, setDataSourceLabel] = useState("OKX Public API")
   const [dataError, setDataError] = useState<string | null>(null)
   const [price, setPrice] = useState(0)
   const [priceChange24h, setPriceChange24h] = useState(0)
@@ -513,6 +540,10 @@ export function BtcVolatilitySystem({ instId = "BTC-USDT-SWAP", range = "1mo" }:
   const [fundingRateHistory, setFundingRateHistory] = useState<FundingRatePoint[]>([])
   const [longShortAccountRatioHistory, setLongShortAccountRatioHistory] = useState<LongShortRatioPoint[]>([])
   const [contractLongShortRatioHistory, setContractLongShortRatioHistory] = useState<LongShortRatioPoint[]>([])
+  const [topTraderPositionHistory, setTopTraderPositionHistory] = useState<TopTraderRatioPoint[]>([])
+  const [takerVolumeHistory, setTakerVolumeHistory] = useState<TakerVolumePoint[]>([])
+  const [spotPrice, setSpotPrice] = useState(0)
+  const [perpPremium, setPerpPremium] = useState(0)
   const [historySignals, setHistorySignals] = useState<HistorySignal[]>([])
   const lastSignalKeyRef = useRef("")
 
@@ -521,37 +552,53 @@ export function BtcVolatilitySystem({ instId = "BTC-USDT-SWAP", range = "1mo" }:
     lastSignalKeyRef.current = ""
     setHistorySignals([])
 
+    const apiEndpoint = getDataSourceEndpoint(sourceId)
+
     async function loadDerivativesData() {
       try {
         setConnectionStatus((status) => (status === "live" ? "live" : "connecting"))
         const response = await fetch(
-          `/api/crypto/btc-derivatives?instId=${encodeURIComponent(instId)}&range=${range}`,
+          `${apiEndpoint}?instId=${encodeURIComponent(instId)}&range=${range}`,
           { cache: "no-store" },
         )
-        const payload = (await response.json()) as DerivativesResponse & { error?: string }
-
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Failed to load derivatives data")
+        const payload = (await response.json()) as DerivativesResponse & {
+          error?: string
+          apiKeyStatus?: ApiKeyStatus
         }
 
         if (!isActive) return
 
-        setDataSource(payload.source)
-        setPrice(payload.ticker.price)
-        setPriceChange24h(payload.ticker.changePercent24h)
-        setOneMinuteKlines(payload.oneMinuteKlines.slice(-MAX_KLINES))
-        setFiveMinuteKlines(payload.fiveMinuteKlines.slice(-MAX_KLINES))
+        // Handle API key status
+        if (payload.apiKeyStatus) {
+          onApiKeyStatusChange?.(payload.apiKeyStatus)
+        } else {
+          onApiKeyStatusChange?.(null)
+        }
+
+        if (!response.ok && !payload.ticker) {
+          throw new Error(payload.error ?? "Failed to load derivatives data")
+        }
+
+        setDataSourceLabel(payload.source)
+        setPrice(payload.ticker?.price ?? 0)
+        setPriceChange24h(payload.ticker?.changePercent24h ?? 0)
+        setOneMinuteKlines((payload.oneMinuteKlines ?? []).slice(-MAX_KLINES))
+        setFiveMinuteKlines((payload.fiveMinuteKlines ?? []).slice(-MAX_KLINES))
         setRangeKlines(payload.rangeKlines ?? [])
-        setOrderBook(payload.orderBook)
-        setOpenInterest(payload.openInterest.btc)
-        setOpenInterestUsd(payload.openInterest.usd)
+        setOrderBook(payload.orderBook ?? emptyOrderBook)
+        setOpenInterest(payload.openInterest?.btc ?? 0)
+        setOpenInterestUsd(payload.openInterest?.usd ?? 0)
         setOpenInterestHistory(
-          payload.openInterestHistory.map((point) => ({ time: point.time, value: point.valueUsd })),
+          (payload.openInterestHistory ?? []).map((point) => ({ time: point.time, value: point.valueUsd })),
         )
-        setFundingRate(payload.fundingRate.rate)
-        setFundingRateHistory(payload.fundingRateHistory)
-        setLongShortAccountRatioHistory(payload.longShortAccountRatioHistory)
-        setContractLongShortRatioHistory(payload.contractLongShortRatioHistory)
+        setFundingRate(payload.fundingRate?.rate ?? 0)
+        setFundingRateHistory(payload.fundingRateHistory ?? [])
+        setLongShortAccountRatioHistory(payload.longShortAccountRatioHistory ?? [])
+        setContractLongShortRatioHistory(payload.contractLongShortRatioHistory ?? [])
+        setTopTraderPositionHistory(payload.topTraderPositionHistory ?? [])
+        setTakerVolumeHistory(payload.takerVolumeHistory ?? [])
+        setSpotPrice(payload.spotPrice ?? 0)
+        setPerpPremium(payload.perpPremium ?? 0)
         setDataError(null)
         setConnectionStatus("live")
       } catch (error) {
@@ -568,7 +615,7 @@ export function BtcVolatilitySystem({ instId = "BTC-USDT-SWAP", range = "1mo" }:
       isActive = false
       clearInterval(interval)
     }
-  }, [instId, range])
+  }, [instId, range, sourceId, onApiKeyStatusChange])
 
   const now = Date.now()
   const recentLiquidations = useMemo(
@@ -644,6 +691,16 @@ export function BtcVolatilitySystem({ instId = "BTC-USDT-SWAP", range = "1mo" }:
     .map((point) => ({ timestamp: point.time, value: point.ratio }))
   const latestAccountRatio = longShortAccountRatioHistory.at(-1)?.ratio ?? 0
   const latestContractRatio = contractLongShortRatioHistory.at(-1)?.ratio ?? 0
+  const topTraderAccountRatioChartData = topTraderPositionHistory
+    .slice(-180)
+    .map((point) => ({ timestamp: point.time, value: point.longShortAccountRatio }))
+  const topTraderPositionRatioChartData = topTraderPositionHistory
+    .slice(-180)
+    .map((point) => ({ timestamp: point.time, value: point.longShortPositionRatio }))
+  const latestTopTraderAccountRatio = topTraderPositionHistory.at(-1)?.longShortAccountRatio ?? 0
+  const latestTopTraderPositionRatio = topTraderPositionHistory.at(-1)?.longShortPositionRatio ?? 0
+  const cvdChartData = takerVolumeHistory.slice(-180).map((point) => ({ timestamp: point.time, value: point.cvd }))
+  const latestCvd = takerVolumeHistory.at(-1)?.cvd ?? 0
 
   const orderBookRows = [
     ...orderBook.asks.slice(0, 6).reverse().map((level) => ({ ...level, side: "ask" as const })),
@@ -663,7 +720,7 @@ export function BtcVolatilitySystem({ instId = "BTC-USDT-SWAP", range = "1mo" }:
                     {connectionStatus === "live" ? "Live" : connectionStatus}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
-                    {dataSource} · {instId} · {rangeOption.label} ({rangeOption.yahooInterval || rangeOption.okxBar})
+                    {dataSourceLabel} · {instId} · {rangeOption.label} ({rangeOption.yahooInterval || rangeOption.okxBar})
                   </span>
                 </div>
                 <h2 className="text-xl font-bold tracking-tight md:text-2xl">{base} 极端波动监控</h2>
@@ -719,6 +776,50 @@ export function BtcVolatilitySystem({ instId = "BTC-USDT-SWAP", range = "1mo" }:
                 info={{
                   description:
                     "OI（未平仓合约）短期变化率 + 当前永续资金费率。\nOI 急降配合价格止跌 = 杠杆清洗；资金费率高且持续为正 = 多头拥挤。",
+                }}
+              />
+            </div>
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="永续溢价"
+                value={`${perpPremium >= 0 ? "+" : ""}${perpPremium.toFixed(4)}%`}
+                helper={`现货 ${spotPrice > 0 ? formatUsd(spotPrice, 2) : "..."}`}
+                tone={perpPremium > 0.05 ? "green" : perpPremium < -0.05 ? "red" : "default"}
+                info={{
+                  title: "Perp Premium / Basis",
+                  description:
+                    "永续合约价格相对现货的溢价率 = (永续 - 现货) / 现货 × 100%。\n正溢价 = 多头情绪占优；负溢价 = 恐慌或套利机会。",
+                }}
+              />
+              <MetricCard
+                label="大户账户比"
+                value={latestTopTraderAccountRatio ? latestTopTraderAccountRatio.toFixed(2) : "..."}
+                helper="Top Trader Account L/S"
+                tone={latestTopTraderAccountRatio > 1.5 ? "green" : latestTopTraderAccountRatio < 0.7 ? "red" : "default"}
+                info={{
+                  description:
+                    "OKX 大户账户多空比。> 1 = 大户偏多；< 1 = 大户偏空。\n大户与散户方向分歧时常有反向行情。",
+                }}
+              />
+              <MetricCard
+                label="大户持仓比"
+                value={latestTopTraderPositionRatio ? latestTopTraderPositionRatio.toFixed(2) : "..."}
+                helper="Top Trader Position L/S"
+                tone={latestTopTraderPositionRatio > 1.5 ? "green" : latestTopTraderPositionRatio < 0.7 ? "red" : "default"}
+                info={{
+                  description:
+                    "OKX 大户持仓量多空比。反映大户实际持仓规模的多空分布，比账户数更能体现资金方向。",
+                }}
+              />
+              <MetricCard
+                label="CVD"
+                value={latestCvd ? formatCompactUsd(latestCvd) : "..."}
+                helper="累计成交量差"
+                tone={latestCvd > 0 ? "green" : latestCvd < 0 ? "red" : "default"}
+                info={{
+                  title: "Cumulative Volume Delta",
+                  description:
+                    "主动买入量 - 主动卖出量的累计值。\nCVD 上升 = 买方主导；CVD 下降 = 卖方主导。\n价格新低但 CVD 不新低 = 可能有吸收；价格新高但 CVD 背离 = 上涨乏力。",
                 }}
               />
             </div>
@@ -909,6 +1010,54 @@ export function BtcVolatilitySystem({ instId = "BTC-USDT-SWAP", range = "1mo" }:
                     />
                   </div>
                 </div>
+                {topTraderAccountRatioChartData.length > 0 && (
+                  <div className="rounded-lg border bg-background/80 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <h3 className="text-sm font-medium">大户多空比历史</h3>
+                        <InfoTooltip description="OKX Top Trader 的账户数多空比和持仓量多空比。大户方向与散户分歧时常有反向行情。" />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">top trader</span>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <SeriesChart
+                        data={topTraderAccountRatioChartData}
+                        unit="ratio"
+                        height={110}
+                        color="rgb(168 85 247)"
+                        label="Top Account L/S"
+                        compact
+                      />
+                      <SeriesChart
+                        data={topTraderPositionRatioChartData}
+                        unit="ratio"
+                        height={110}
+                        color="rgb(236 72 153)"
+                        label="Top Position L/S"
+                        compact
+                      />
+                    </div>
+                  </div>
+                )}
+                {cvdChartData.length > 0 && (
+                  <div className="rounded-lg border bg-background/80 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <h3 className="text-sm font-medium">CVD 累计成交量差</h3>
+                        <InfoTooltip description="Cumulative Volume Delta = 主动买入量 - 主动卖出量的累计值。CVD 与价格背离时需要警惕反向。" />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">{formatCompactUsd(latestCvd)}</span>
+                    </div>
+                    <SeriesChart
+                      data={cvdChartData}
+                      unit="usd"
+                      height={120}
+                      color="rgb(34 197 94)"
+                      label="CVD"
+                      compact
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
 
