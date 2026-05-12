@@ -4,7 +4,6 @@ import { useState } from "react"
 import { Check, ChevronDown, Database } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 export type DataSourceId = "okx" | "binance" | "coingecko"
@@ -44,7 +43,7 @@ export const DATA_SOURCES: DataSource[] = [
     description: "聚合市场数据（仅价格/市值），无衍生品数据",
     apiEndpoint: "/api/crypto/coingecko",
     features: ["价格", "市值", "成交量", "ATH/ATL"],
-    requiresApiKey: false, // Free API works, just lower rate limit
+    requiresApiKey: false,
     apiKeyEnvVar: "COINGECKO_API_KEY",
   },
 ]
@@ -75,55 +74,57 @@ export function DataSourceSelector({ value, onChange, className }: DataSourceSel
           <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[280px] p-0" align="end">
-        <Command>
-          <CommandList>
-            <CommandGroup heading="Data Sources">
-              {DATA_SOURCES.map((source) => (
-                <CommandItem
-                  key={source.id}
-                  value={source.id}
-                  onSelect={() => {
-                    onChange(source.id)
-                    setOpen(false)
-                  }}
-                  className="flex flex-col items-start gap-1 py-2"
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{source.name}</span>
-                      {source.id === "coingecko" && (
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                          基础
-                        </span>
-                      )}
-                      {(source.id === "okx" || source.id === "binance") && (
-                        <span className="rounded bg-green-500/10 px-1.5 py-0.5 text-[10px] text-green-600 dark:text-green-400">
-                          完整
-                        </span>
-                      )}
-                    </div>
-                    {value === source.id && <Check className="h-4 w-4 text-primary" />}
-                  </div>
-                  <span className="text-[11px] text-muted-foreground">{source.description}</span>
-                  <div className="flex flex-wrap gap-1">
-                    {source.features.slice(0, 5).map((feature) => (
-                      <span
-                        key={feature}
-                        className="rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground"
-                      >
-                        {feature}
-                      </span>
-                    ))}
-                    {source.features.length > 5 && (
-                      <span className="text-[9px] text-muted-foreground">+{source.features.length - 5}</span>
-                    )}
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+      <PopoverContent className="w-[280px] p-1" align="end">
+        <div className="text-xs font-medium text-muted-foreground px-2 py-1.5">
+          数据源
+        </div>
+        <div className="space-y-0.5">
+          {DATA_SOURCES.map((source) => (
+            <button
+              key={source.id}
+              onClick={() => {
+                onChange(source.id)
+                setOpen(false)
+              }}
+              className={cn(
+                "flex w-full flex-col items-start gap-1 rounded-md px-2 py-2 text-left transition-colors",
+                "hover:bg-accent hover:text-accent-foreground",
+                value === source.id && "bg-accent"
+              )}
+            >
+              <div className="flex w-full items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{source.name}</span>
+                  {source.id === "coingecko" && (
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      基础
+                    </span>
+                  )}
+                  {(source.id === "okx" || source.id === "binance") && (
+                    <span className="rounded bg-green-500/10 px-1.5 py-0.5 text-[10px] text-green-600 dark:text-green-400">
+                      完整
+                    </span>
+                  )}
+                </div>
+                {value === source.id && <Check className="h-4 w-4 text-primary" />}
+              </div>
+              <span className="text-[11px] text-muted-foreground">{source.description}</span>
+              <div className="flex flex-wrap gap-1">
+                {source.features.slice(0, 5).map((feature) => (
+                  <span
+                    key={feature}
+                    className="rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground"
+                  >
+                    {feature}
+                  </span>
+                ))}
+                {source.features.length > 5 && (
+                  <span className="text-[9px] text-muted-foreground">+{source.features.length - 5}</span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
       </PopoverContent>
     </Popover>
   )
