@@ -40,15 +40,20 @@ CRON_SECRET=your_random_secret_string
 # Optional: Development OAuth redirect
 NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL=http://localhost:3000
 
-# ====== Crypto Data Sources ======
-# CoinGecko API (optional - for higher rate limits and more features)
-# Free tier: 10-50 calls/min, Pro tier: 500 calls/min
-# Get your API key at: https://www.coingecko.com/en/api/pricing
-COINGECKO_API_KEY=CG-xxxxxxxxxxxx
+# ====== Data Source API Keys ======
 
-# FRED API (required for macro indicators)
+# FRED API (Required for macro indicators)
+# Free unlimited usage, just need to register
 # Get your free API key at: https://fred.stlouisfed.org/docs/api/api_key.html
 FRED_API_KEY=your_fred_api_key
+
+# ====== Crypto Data Sources (all optional) ======
+# OKX: No API key needed - full public data access
+# Binance: No API key needed - full public data access
+# CoinGecko: No API key needed for basic data (10-30 calls/min)
+#            Optional key for higher rate limits (500 calls/min)
+# Get your optional key at: https://www.coingecko.com/en/api/pricing
+COINGECKO_API_KEY=CG-xxxxxxxxxxxx
 ```
 
 ### 3. Configure Resend (Required)
@@ -216,12 +221,24 @@ curl -X GET https://your-domain.vercel.app/api/check-alerts \
 - **Authentication**: Supabase Auth (Email/Password + Google OAuth)
 - **Email**: Resend
 - **Real-time Data**: 
-  - OKX Public API (crypto derivatives, K-lines, order book, funding, OI)
-  - Yahoo Finance API (stock prices, indices, FX, commodities)
-  - FRED API (macro indicators - requires API key)
-  - Alternative.me API (Fear & Greed Index)
-  - CoinGecko API (market statistics)
-  - Blockchain.com API (BTC on-chain data)
+  - OKX Public API (crypto derivatives - no key needed)
+  - Binance Public API (crypto derivatives - no key needed)
+  - Yahoo Finance API (stock prices, indices, FX, commodities - no key needed)
+  - FRED API (macro indicators - free key required)
+  - CoinGecko API (market data - no key needed, optional for higher limits)
+  - Alternative.me API (Fear & Greed Index - no key needed)
+  - Blockchain.com API (BTC on-chain data - no key needed)
+  - DefiLlama API (stablecoin market cap, DeFi TVL - no key needed)
+
+## Crypto Data Sources
+
+| Source | API Key | Features | Rate Limit |
+|--------|---------|----------|------------|
+| **OKX** | Not needed | K线, 订单簿, Funding, OI, 多空比, CVD, 大户仓位 | 20 req/2s |
+| **Binance** | Not needed | K线, Funding, OI, 多空比, 大户仓位, Taker Volume | 2400 req/min |
+| **CoinGecko** | Optional | 价格, 市值, 成交量, ATH/ATL (无衍生品数据) | 10-30 req/min (free), 500 req/min (pro) |
+
+**Recommended**: Use OKX or Binance for complete derivatives data. CoinGecko is only useful for market cap and ATH/ATL data.
   - DefiLlama API (stablecoin market cap, DeFi TVL)
 
 ## Investment Indicators

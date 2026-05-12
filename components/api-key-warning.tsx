@@ -44,21 +44,29 @@ export function ApiKeyWarning({ status, source, className, onDismiss, onRetry }:
 
   if (invalid) {
     variant = "error"
-    title = `${source} API Key Invalid`
-    message = "The API key is invalid or expired. Please check and update your API key."
+    title = `${source} API Key 无效`
+    message = "API Key 已过期或无效，请检查并更新。"
     showEnvVar = true
   } else if (rateLimited) {
     variant = "warning"
-    title = `${source} Rate Limited`
+    title = `${source} 请求频率受限`
     message = missing
-      ? "Rate limit exceeded. Add an API key for higher limits."
-      : "Rate limit exceeded. Please wait a moment before retrying."
+      ? "已达到免费 API 速率限制。添加 API Key 可获得更高的请求配额。"
+      : "已达到 API 速率限制，请稍后重试。"
     showEnvVar = missing
   } else if (missing) {
-    variant = "info"
-    title = `${source} API Key Not Set`
-    message = "Some features may be limited without an API key. Add one to unlock full functionality."
-    showEnvVar = true
+    // For CoinGecko, this is just informational since it works without key
+    if (source === "CoinGecko") {
+      variant = "info"
+      title = `${source} 使用免费 API`
+      message = "当前使用免费 API（10-30 次/分钟）。如需更高频率，可添加 API Key。"
+      showEnvVar = true
+    } else {
+      variant = "info"
+      title = `${source} API Key 未设置`
+      message = "某些功能可能受限。添加 API Key 可解锁完整功能。"
+      showEnvVar = true
+    }
   }
 
   const bgColor = {

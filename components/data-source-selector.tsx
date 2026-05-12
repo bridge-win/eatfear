@@ -25,26 +25,26 @@ export const DATA_SOURCES: DataSource[] = [
     id: "okx",
     name: "OKX",
     label: "OKX",
-    description: "Full derivatives data, order book, funding rates",
+    description: "完整衍生品数据，订单簿深度，无需 API Key",
     apiEndpoint: "/api/crypto/btc-derivatives",
-    features: ["Klines", "Order Book", "Funding Rate", "OI", "Long/Short Ratio", "CVD", "Top Trader"],
+    features: ["K线", "订单簿", "Funding", "OI", "多空比", "CVD", "大户仓位"],
   },
   {
     id: "binance",
     name: "Binance",
     label: "Binance",
-    description: "Global largest exchange, full futures data",
+    description: "全球最大交易所，完整期货数据，无需 API Key",
     apiEndpoint: "/api/crypto/binance",
-    features: ["Klines", "Funding Rate", "OI", "Long/Short Ratio", "Top Trader", "Taker Volume"],
+    features: ["K线", "Funding", "OI", "多空比", "大户仓位", "Taker Volume"],
   },
   {
     id: "coingecko",
     name: "CoinGecko",
     label: "CoinGecko",
-    description: "Aggregated market data, requires API key for full access",
+    description: "聚合市场数据（仅价格/市值），无衍生品数据",
     apiEndpoint: "/api/crypto/coingecko",
-    features: ["Price", "Market Cap", "Volume", "ATH/ATL"],
-    requiresApiKey: true,
+    features: ["价格", "市值", "成交量", "ATH/ATL"],
+    requiresApiKey: false, // Free API works, just lower rate limit
     apiKeyEnvVar: "COINGECKO_API_KEY",
   },
 ]
@@ -92,9 +92,14 @@ export function DataSourceSelector({ value, onChange, className }: DataSourceSel
                   <div className="flex w-full items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{source.name}</span>
-                      {source.requiresApiKey && (
-                        <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-400">
-                          API Key
+                      {source.id === "coingecko" && (
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          基础
+                        </span>
+                      )}
+                      {(source.id === "okx" || source.id === "binance") && (
+                        <span className="rounded bg-green-500/10 px-1.5 py-0.5 text-[10px] text-green-600 dark:text-green-400">
+                          完整
                         </span>
                       )}
                     </div>
@@ -102,7 +107,7 @@ export function DataSourceSelector({ value, onChange, className }: DataSourceSel
                   </div>
                   <span className="text-[11px] text-muted-foreground">{source.description}</span>
                   <div className="flex flex-wrap gap-1">
-                    {source.features.slice(0, 4).map((feature) => (
+                    {source.features.slice(0, 5).map((feature) => (
                       <span
                         key={feature}
                         className="rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground"
@@ -110,8 +115,8 @@ export function DataSourceSelector({ value, onChange, className }: DataSourceSel
                         {feature}
                       </span>
                     ))}
-                    {source.features.length > 4 && (
-                      <span className="text-[9px] text-muted-foreground">+{source.features.length - 4}</span>
+                    {source.features.length > 5 && (
+                      <span className="text-[9px] text-muted-foreground">+{source.features.length - 5}</span>
                     )}
                   </div>
                 </CommandItem>
