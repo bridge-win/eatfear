@@ -25,7 +25,10 @@ export function SiteHeader() {
         </Link>
         <nav className="flex flex-wrap items-center gap-2">
           {navItems.map((item) => {
-            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
+            const isActive =
+              item.href === "/"
+                ? pathname === "/" || pathname === "/home"
+                : pathname === item.href || pathname.startsWith(`${item.href}/`)
 
             return (
               <Link

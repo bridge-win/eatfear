@@ -6,6 +6,8 @@ import { ApiKeyWarning, type ApiKeyStatus } from "@/components/api-key-warning"
 import { BtcVolatilitySystem } from "@/components/btc-volatility-system"
 import { CrashAlertBanner } from "@/components/crash-alert-banner"
 import { CryptoPriceCard } from "@/components/crypto-price-card"
+import { CryptoRegimeScoreCard } from "@/components/crypto-regime-score-card"
+import { CryptoWatchlistPanel } from "@/components/crypto-watchlist-panel"
 import { DataSourceSelector, type DataSourceId, getDataSource } from "@/components/data-source-selector"
 import { KpiStrip, type KpiTile } from "@/components/kpi-strip"
 import { formatValue as formatSeriesValue } from "@/components/series-chart"
@@ -125,7 +127,13 @@ export function CryptoDashboard() {
     const spotTileSpecs: Array<{ id: string; key: string; label: string; helper: string; description?: string }> = [
       { id: "btc", key: "BTCUSDT", label: "BTC Spot", helper: "OKX BTC-USDT", description: "Bitcoin 现货报价（OKX）。加密市场总市值的核心锚。" },
       { id: "eth", key: "ETHUSDT", label: "ETH Spot", helper: "OKX ETH-USDT", description: "Ethereum 现货。DeFi/L2 生态主导链。" },
-      { id: "sol", key: "SOLUSDT", label: "SOL Spot", helper: "OKX SOL-USDT" },
+      {
+        id: "sol",
+        key: "SOLUSDT",
+        label: "SOL Spot",
+        helper: "OKX SOL-USDT",
+        description: "Solana 现货。高吞吐公链，风险偏好高时与 BTC 同向波动常放大。",
+      },
     ]
     for (const spec of spotTileSpecs) {
       const asset = cryptoAssets.get(spec.key)
@@ -166,6 +174,11 @@ export function CryptoDashboard() {
         label: "24h Volume",
         value: formatUsd(marketStats.volume24h),
         helper: "全市场成交额",
+        info: {
+          description:
+            "全市场 24h 成交总额。用途：衡量换手与投机热度。\n与 BTC：放量上涨/下跌通常强化趋势可信度；缩量盘整则等待方向选择。",
+          source: "CoinGecko",
+        },
       })
     }
 
@@ -196,13 +209,14 @@ export function CryptoDashboard() {
             <div>
               <h1 className="text-xl font-bold tracking-tight">Crypto Dashboard</h1>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                现货 + 永续衍生品（{currentSource.name}）。右上角支持数据源、symbol、时间周期切换。
+                现货 + 永续衍生品（{currentSource.name}）。右侧为宏观多因子评分；数据源与时间周期在中间切换。
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-start justify-end gap-1.5">
               <DataSourceSelector value={dataSource} onChange={setDataSource} />
               <SymbolSelector value={instId} options={symbolOptions} onChange={setInstId} />
               <TimeRangeSelector value={range} onChange={setRange} />
+              <CryptoRegimeScoreCard />
             </div>
           </header>
 
@@ -213,6 +227,12 @@ export function CryptoDashboard() {
               onDismiss={() => setApiKeyStatus(null)}
             />
           )}
+
+          <CryptoWatchlistPanel
+            fearGreedSnippet={
+              fearGreed ? `${fearGreed.value}（${fearGreed.classification}）` : null
+            }
+          />
 
           <KpiStrip tiles={kpiTiles} />
 

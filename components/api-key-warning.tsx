@@ -53,7 +53,7 @@ export function ApiKeyWarning({ status, source, className, onDismiss, onRetry }:
     message = missing
       ? "已达到免费 API 速率限制。添加 API Key 可获得更高的请求配额。"
       : "已达到 API 速率限制，请稍后重试。"
-    showEnvVar = missing
+    showEnvVar = Boolean(missing)
   } else if (missing) {
     // For CoinGecko, this is just informational since it works without key
     if (source === "CoinGecko") {
