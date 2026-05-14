@@ -7,7 +7,10 @@
  *   gracefully skip the indicator instead of throwing.
  */
 
-const DEFAULT_TIMEOUT_MS = 8000
+// Tightened from 8s → 5s: macro fan-out blocks on the slowest upstream, so a
+// lower ceiling caps cold-cache latency. Indicators that genuinely need >5s
+// upstream simply get dropped from this page-load (allSettled handles it).
+const DEFAULT_TIMEOUT_MS = 5000
 
 export interface FetchJsonOptions {
   revalidate?: number

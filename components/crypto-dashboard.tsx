@@ -5,11 +5,15 @@ import { useEffect, useMemo, useState } from "react"
 import { ApiKeyWarning, type ApiKeyStatus } from "@/components/api-key-warning"
 import { BtcVolatilitySystem } from "@/components/btc-volatility-system"
 import { CrashAlertBanner } from "@/components/crash-alert-banner"
+import { CryptoHistoryCompare } from "@/components/crypto-history-compare"
 import { CryptoPriceCard } from "@/components/crypto-price-card"
 import { CryptoRegimeScoreCard } from "@/components/crypto-regime-score-card"
 import { CryptoWatchlistPanel } from "@/components/crypto-watchlist-panel"
 import { DataSourceSelector, type DataSourceId, getDataSource } from "@/components/data-source-selector"
+import { FearGreedScoreCard } from "@/components/fear-greed-score-card"
 import { KpiStrip, type KpiTile } from "@/components/kpi-strip"
+import { MiningCostCard } from "@/components/mining-cost-card"
+import { SmartMoneyTracker } from "@/components/smart-money-tracker"
 import { formatValue as formatSeriesValue } from "@/components/series-chart"
 import { SiteHeader } from "@/components/site-header"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
@@ -18,8 +22,13 @@ import { TimeRangeSelector } from "@/components/time-range-selector"
 import { formatPercentDelta, getDeltaTone } from "@/lib/dashboard-shared"
 import { fetchCryptoMarketSnapshot, fetchFearGreedIndex, fetchMarketStats } from "@/lib/crypto-service"
 import { CrashDetector } from "@/lib/crash-detector"
-import { DEFAULT_TIME_RANGE, type TimeRangeId } from "@/lib/time-range"
+import { useT } from "@/lib/i18n"
+import { type TimeRangeId } from "@/lib/time-range"
 import type { CrashAlert, CryptoAsset, CryptoInstrument, FearGreedIndex, MarketStats } from "@/lib/types"
+
+const CRYPTO_DEFAULT_RANGE: TimeRangeId = "1y"
+
+/* Mount Smart Money / Mining-Cost cards beneath the volatility tab so they share the global range. */
 
 const FALLBACK_INSTRUMENTS: CryptoInstrument[] = [
   { instId: "BTC-USDT-SWAP", base: "BTC", quote: "USDT", label: "BTC-USDT-PERP" },
@@ -35,17 +44,30 @@ const STATS_REFRESH_MS = 5 * 60 * 1000
 
 const formatUsd = (value: number) => formatSeriesValue(value, "usd", true)
 
-export function CryptoDashboard() {
+export interface CryptoDashboardProps {
+  initialFearGreed?: FearGreedIndex | null
+  initialMarketStats?: MarketStats | null
+  initialInstruments?: CryptoInstrument[]
+}
+
+export function CryptoDashboard({
+  initialFearGreed = null,
+  initialMarketStats = null,
+  initialInstruments,
+}: CryptoDashboardProps = {}) {
   const [cryptoAssets, setCryptoAssets] = useState<Map<string, CryptoAsset>>(new Map())
-  const [fearGreed, setFearGreed] = useState<FearGreedIndex | null>(null)
-  const [marketStats, setMarketStats] = useState<MarketStats | null>(null)
+  const [fearGreed, setFearGreed] = useState<FearGreedIndex | null>(initialFearGreed)
+  const [marketStats, setMarketStats] = useState<MarketStats | null>(initialMarketStats)
   const [crashes, setCrashes] = useState<CrashAlert[]>([])
   const [isLoadingMarkets, setIsLoadingMarkets] = useState(true)
-  const [instruments, setInstruments] = useState<CryptoInstrument[]>(FALLBACK_INSTRUMENTS)
+  const [instruments, setInstruments] = useState<CryptoInstrument[]>(
+    initialInstruments && initialInstruments.length > 0 ? initialInstruments : FALLBACK_INSTRUMENTS,
+  )
   const [instId, setInstId] = useState<string>("BTC-USDT-SWAP")
-  const [range, setRange] = useState<TimeRangeId>(DEFAULT_TIME_RANGE)
+  const [range, setRange] = useState<TimeRangeId>(CRYPTO_DEFAULT_RANGE)
   const [dataSource, setDataSource] = useState<DataSourceId>("okx")
   const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus | null>(null)
+  const t = useT()
 
   useEffect(() => {
     const crashDetector = new CrashDetector()
@@ -114,9 +136,9 @@ export function CryptoDashboard() {
       instruments.map((instrument) => ({
         id: instrument.instId,
         label: instrument.label,
-        hint: `${instrument.base} 永续合约 · ${currentSource.name}`,
+        hint: t("symbol.perpHint", { base: instrument.base, source: currentSource.name }),
       })),
-    [instruments, currentSource.name],
+    [instruments, currentSource.name, t],
   )
 
   const cryptoArray = Array.from(cryptoAssets.values())
@@ -125,14 +147,14 @@ export function CryptoDashboard() {
     const tiles: KpiTile[] = []
 
     const spotTileSpecs: Array<{ id: string; key: string; label: string; helper: string; description?: string }> = [
-      { id: "btc", key: "BTCUSDT", label: "BTC Spot", helper: "OKX BTC-USDT", description: "Bitcoin 现货报价（OKX）。加密市场总市值的核心锚。" },
-      { id: "eth", key: "ETHUSDT", label: "ETH Spot", helper: "OKX ETH-USDT", description: "Ethereum 现货。DeFi/L2 生态主导链。" },
+      { id: "btc", key: "BTCUSDT", label: t("kpi.btc"), helper: "OKX BTC-USDT", description: t("kpi.btc.info") },
+      { id: "eth", key: "ETHUSDT", label: t("kpi.eth"), helper: "OKX ETH-USDT", description: t("kpi.eth.info") },
       {
         id: "sol",
         key: "SOLUSDT",
-        label: "SOL Spot",
+        label: t("kpi.sol"),
         helper: "OKX SOL-USDT",
-        description: "Solana 现货。高吞吐公链，风险偏好高时与 BTC 同向波动常放大。",
+        description: t("kpi.sol.info"),
       },
     ]
     for (const spec of spotTileSpecs) {
@@ -152,31 +174,30 @@ export function CryptoDashboard() {
     if (marketStats) {
       tiles.push({
         id: "mcap",
-        label: "Total Market Cap",
+        label: t("kpi.mcap"),
         value: formatUsd(marketStats.totalMarketCap),
         delta: formatPercentDelta(marketStats.marketCapChange24h),
         deltaTone: getDeltaTone(marketStats.marketCapChange24h),
         helper: "CoinGecko 24h",
-        info: { description: "全部加密货币 24h 总市值。", source: "CoinGecko" },
+        info: { description: t("kpi.mcap.info"), source: "CoinGecko" },
       })
       tiles.push({
         id: "btcd",
-        label: "BTC Dominance",
+        label: t("kpi.btcd"),
         value: `${marketStats.btcDominance.toFixed(2)}%`,
-        helper: "BTC 占总市值",
+        helper: t("kpi.btcd.helper"),
         info: {
-          description: "BTC 市值 / 加密总市值。下降 = 山寨季；上升 = 资金回归 BTC。",
+          description: t("kpi.btcd.info"),
           source: "CoinGecko",
         },
       })
       tiles.push({
         id: "vol",
-        label: "24h Volume",
+        label: t("kpi.vol"),
         value: formatUsd(marketStats.volume24h),
-        helper: "全市场成交额",
+        helper: t("kpi.vol.helper"),
         info: {
-          description:
-            "全市场 24h 成交总额。用途：衡量换手与投机热度。\n与 BTC：放量上涨/下跌通常强化趋势可信度；缩量盘整则等待方向选择。",
+          description: t("kpi.vol.info"),
           source: "CoinGecko",
         },
       })
@@ -185,20 +206,19 @@ export function CryptoDashboard() {
     if (fearGreed) {
       tiles.push({
         id: "fgi",
-        label: "Fear & Greed",
+        label: t("kpi.fgi"),
         value: `${fearGreed.value}`,
         helper: fearGreed.classification,
         deltaTone: fearGreed.value < 30 ? "down" : fearGreed.value > 70 ? "up" : "neutral",
         info: {
-          description:
-            "Alternative.me 综合波动率、动量、社交、调查等多维度的恐慌贪婪指数（0-100）。\n< 25 极度恐慌；> 75 极度贪婪。",
+          description: t("kpi.fgi.info"),
           source: "Alternative.me",
         },
       })
     }
 
     return tiles
-  }, [cryptoAssets, marketStats, fearGreed])
+  }, [cryptoAssets, marketStats, fearGreed, t])
 
   return (
     <div className="min-h-svh bg-background">
@@ -207,18 +227,22 @@ export function CryptoDashboard() {
         <div className="space-y-3">
           <header className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Crypto Dashboard</h1>
+              <h1 className="text-xl font-bold tracking-tight">{t("crypto.title")}</h1>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                现货 + 永续衍生品（{currentSource.name}）。右侧为宏观多因子评分；数据源与时间周期在中间切换。
+                {t("crypto.subtitle", { source: currentSource.name })}
               </p>
             </div>
             <div className="flex flex-wrap items-start justify-end gap-1.5">
               <DataSourceSelector value={dataSource} onChange={setDataSource} />
               <SymbolSelector value={instId} options={symbolOptions} onChange={setInstId} />
               <TimeRangeSelector value={range} onChange={setRange} />
-              <CryptoRegimeScoreCard />
             </div>
           </header>
+
+          <div className="flex flex-wrap gap-2">
+            <FearGreedScoreCard index={fearGreed} />
+            <CryptoRegimeScoreCard />
+          </div>
 
           {apiKeyStatus && (apiKeyStatus.missing || apiKeyStatus.invalid || apiKeyStatus.rateLimited) && (
             <ApiKeyWarning
@@ -228,34 +252,35 @@ export function CryptoDashboard() {
             />
           )}
 
-          <CryptoWatchlistPanel
-            fearGreedSnippet={
-              fearGreed ? `${fearGreed.value}（${fearGreed.classification}）` : null
-            }
-          />
+          {/* Relevance order: urgent alerts → headline KPIs → deep-dive tabs → research checklist last. */}
+          <CrashAlertBanner crashes={crashes} />
 
           <KpiStrip tiles={kpiTiles} />
 
-          <CrashAlertBanner crashes={crashes} />
-
           <Tabs defaultValue="volatility" className="w-full">
-            <TabsList className="grid h-auto w-full max-w-md grid-cols-2">
-              <TabsTrigger value="volatility" className="text-xs">极端波动监控</TabsTrigger>
-              <TabsTrigger value="markets" className="text-xs">现货行情</TabsTrigger>
+            <TabsList className="grid h-auto w-full max-w-xl grid-cols-3">
+              <TabsTrigger value="volatility" className="text-xs">{t("crypto.tab.volatility")}</TabsTrigger>
+              <TabsTrigger value="markets" className="text-xs">{t("crypto.tab.markets")}</TabsTrigger>
+              <TabsTrigger value="compare" className="text-xs">{t("crypto.tab.compare")}</TabsTrigger>
             </TabsList>
-            <TabsContent value="volatility" className="mt-3">
+            <TabsContent value="volatility" className="mt-3 space-y-3">
               <BtcVolatilitySystem
                 instId={instId}
                 range={range}
                 dataSource={dataSource}
                 onApiKeyStatusChange={setApiKeyStatus}
               />
+              <SmartMoneyTracker ccy={instId.split("-")[0] ?? "BTC"} range={range} />
+              <MiningCostCard range={range} />
+            </TabsContent>
+            <TabsContent value="compare" className="mt-3">
+              <CryptoHistoryCompare instId={instId} range={range} />
             </TabsContent>
             <TabsContent value="markets" className="mt-3">
-              <h2 className="mb-2 text-sm font-semibold">Top Cryptocurrencies (OKX Spot)</h2>
+              <h2 className="mb-2 text-sm font-semibold">{t("crypto.markets.heading")}</h2>
               {cryptoArray.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  {isLoadingMarkets ? "Loading OKX spot market snapshot..." : "No crypto market data available."}
+                  {isLoadingMarkets ? t("crypto.markets.loading") : t("crypto.markets.empty")}
                 </p>
               ) : (
                 <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -266,6 +291,14 @@ export function CryptoDashboard() {
               )}
             </TabsContent>
           </Tabs>
+
+          <CryptoWatchlistPanel
+            fearGreedSnippet={
+              fearGreed
+                ? `${fearGreed.value} (${fearGreed.classification})`
+                : null
+            }
+          />
         </div>
       </main>
     </div>

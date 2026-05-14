@@ -20,9 +20,12 @@ import {
   stripSymbolPrefix,
   type MacroApiResponse,
 } from "@/lib/dashboard-shared"
-import { DEFAULT_TIME_RANGE, type TimeRangeId } from "@/lib/time-range"
+import { useT } from "@/lib/i18n"
+import { type TimeRangeId } from "@/lib/time-range"
 import type { MacroGroup, MacroIndicator } from "@/lib/types"
 import { cn } from "@/lib/utils"
+
+const MACRO_DEFAULT_RANGE: TimeRangeId = "10y"
 
 const KPI_PRIORITY_LIMIT = 12
 const KPI_SPARK_POINTS = 40
@@ -46,32 +49,45 @@ const GROUP_ORDER: MacroGroup[] = [
   "CrossAsset",
 ]
 
-const GROUP_LABEL: Record<MacroGroup, string> = {
-  Rates: "利率 / Rates & Treasury",
-  Inflation: "通胀 / Inflation",
-  Employment: "就业 / Employment",
-  Liquidity: "流动性 / Liquidity & Money",
-  Credit: "信用 / Credit Spreads",
-  Equity: "股指 / Equity",
-  Volatility: "波动率 / Volatility",
-  FX: "外汇 / FX",
-  Commodity: "商品 / Commodities & Ag",
-  Growth: "增长 / Growth & Activity",
-  RealEstate: "房地产 / Real Estate",
-  Crypto: "加密 / Crypto",
-  OnChain: "链上 / On-chain",
-  Sentiment: "情绪 / Sentiment",
-  CrossAsset: "跨资产 / Cross-Asset",
+const GROUP_KEY: Record<MacroGroup, string> = {
+  Rates: "macro.group.Rates",
+  Inflation: "macro.group.Inflation",
+  Employment: "macro.group.Employment",
+  Liquidity: "macro.group.Liquidity",
+  Credit: "macro.group.Credit",
+  Equity: "macro.group.Equity",
+  Volatility: "macro.group.Volatility",
+  FX: "macro.group.FX",
+  Commodity: "macro.group.Commodity",
+  Growth: "macro.group.Growth",
+  RealEstate: "macro.group.RealEstate",
+  Crypto: "macro.group.Crypto",
+  OnChain: "macro.group.OnChain",
+  Sentiment: "macro.group.Sentiment",
+  CrossAsset: "macro.group.CrossAsset",
 }
 
-export function MacroDashboard() {
-  const [indicators, setIndicators] = useState<MacroIndicator[]>([])
-  const [updatedAt, setUpdatedAt] = useState<number | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+export interface MacroDashboardProps {
+  initialIndicators?: MacroIndicator[]
+  initialUpdatedAt?: number | null
+  initialFredEnabled?: boolean | null
+  initialMeta?: { requested: number; returned: number } | null
+}
+
+export function MacroDashboard({
+  initialIndicators,
+  initialUpdatedAt = null,
+  initialFredEnabled = null,
+  initialMeta = null,
+}: MacroDashboardProps = {}) {
+  const [indicators, setIndicators] = useState<MacroIndicator[]>(initialIndicators ?? [])
+  const [updatedAt, setUpdatedAt] = useState<number | null>(initialUpdatedAt)
+  const [isLoading, setIsLoading] = useState(!(initialIndicators && initialIndicators.length > 0))
   const [error, setError] = useState<string | null>(null)
-  const [fredEnabled, setFredEnabled] = useState<boolean | null>(null)
-  const [range, setRange] = useState<TimeRangeId>(DEFAULT_TIME_RANGE)
-  const [meta, setMeta] = useState<{ requested: number; returned: number } | null>(null)
+  const [fredEnabled, setFredEnabled] = useState<boolean | null>(initialFredEnabled)
+  const [range, setRange] = useState<TimeRangeId>(MACRO_DEFAULT_RANGE)
+  const [meta, setMeta] = useState<{ requested: number; returned: number } | null>(initialMeta)
+  const t = useT()
 
   useEffect(() => {
     let isActive = true
@@ -149,19 +165,20 @@ export function MacroDashboard() {
         <div className="space-y-3">
           <header className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Macro Dashboard</h1>
-              <p className="mt-0.5 max-w-3xl text-[11px] text-muted-foreground">
-                跨资产宏观指标，按业内重要性（利率 → 通胀 → 就业 → 流动性 → 信用 → 股指 → 波动率 → 商品 → 加密 → 链上）排序。
-                每条指标右上角提供来源 + 含义解释。
-              </p>
+              <h1 className="text-xl font-bold tracking-tight">{t("macro.title")}</h1>
+              <p className="mt-0.5 max-w-3xl text-[11px] text-muted-foreground">{t("macro.subtitle")}</p>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <TimeRangeSelector value={range} onChange={setRange} />
               <span className="rounded-full border px-2.5 py-0.5 text-[10px] text-muted-foreground">
-                {meta ? `${meta.returned}/${meta.requested} indicators` : "Loading"}
+                {meta
+                  ? t("macro.indicators", { returned: meta.returned, requested: meta.requested })
+                  : t("regime.hover.loading")}
               </span>
               <span className="rounded-full border px-2.5 py-0.5 text-[10px] text-muted-foreground">
-                {updatedAt ? `Updated ${new Date(updatedAt).toLocaleTimeString("zh-CN")}` : "—"}
+                {updatedAt
+                  ? t("macro.updated", { time: new Date(updatedAt).toLocaleTimeString() })
+                  : "—"}
               </span>
             </div>
           </header>
@@ -179,16 +196,16 @@ export function MacroDashboard() {
           {isLoading && indicators.length === 0 ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-              Loading macro indicators...
+              {t("macro.loading")}
             </div>
           ) : (
-            <Tabs defaultValue="realtime" className="w-full">
+            <Tabs defaultValue="history" className="w-full">
               <TabsList className="grid h-auto w-full max-w-xs grid-cols-2">
                 <TabsTrigger value="realtime" className="text-xs">
-                  实时
+                  {t("macro.tab.realtime")}
                 </TabsTrigger>
                 <TabsTrigger value="history" className="text-xs">
-                  历史曲线
+                  {t("macro.tab.history")}
                 </TabsTrigger>
               </TabsList>
 
@@ -218,16 +235,12 @@ export function MacroDashboard() {
 }
 
 function FredHint() {
+  const t = useT()
   return (
     <Card className="border-amber-300 bg-amber-50/60 py-2 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
       <CardContent className="px-3 text-[11px]">
-        <p className="font-medium">FRED 数据未启用</p>
-        <p className="mt-0.5 leading-relaxed">
-          美联储利率 / 通胀 / 就业 / 流动性 / 信用 等约 30 项指标需要 FRED 免费 API key。到{" "}
-          <code>fred.stlouisfed.org</code> 注册后在 <code>.env.local</code> 添加{" "}
-          <code className="rounded bg-amber-100 px-1 py-0.5 dark:bg-amber-900/50">FRED_API_KEY=YOUR_KEY</code>{" "}
-          ，重启服务即可生效。
-        </p>
+        <p className="font-medium">{t("macro.fredHint.title")}</p>
+        <p className="mt-0.5 leading-relaxed">{t("macro.fredHint.body")}</p>
       </CardContent>
     </Card>
   )
@@ -240,6 +253,7 @@ interface IndicatorSectionsProps {
 }
 
 function IndicatorSections({ groupedIndicators, renderIndicator, gridClassName }: IndicatorSectionsProps) {
+  const t = useT()
   return (
     <div className="space-y-3">
       {GROUP_ORDER.map((groupId) => {
@@ -249,7 +263,7 @@ function IndicatorSections({ groupedIndicators, renderIndicator, gridClassName }
           <section key={groupId} className="space-y-1.5">
             <header className="flex items-center justify-between">
               <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {GROUP_LABEL[groupId]}
+                {t(GROUP_KEY[groupId])}
               </h2>
               <Badge variant="secondary" className="h-4 px-1.5 text-[9px] font-normal">
                 {group.length}

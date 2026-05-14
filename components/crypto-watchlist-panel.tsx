@@ -3,20 +3,24 @@
 import Link from "next/link"
 
 import { InfoTooltip } from "@/components/info-tooltip"
+import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import {
   CRYPTO_WATCHLIST_METRICS,
   type CryptoWatchlistIntegration,
 } from "@/lib/crypto-watchlist-metrics"
 
-function integrationBadge(integration: CryptoWatchlistIntegration): { label: string; className: string } {
+function integrationBadge(
+  integration: CryptoWatchlistIntegration,
+  t: (key: string) => string,
+): { label: string; className: string } {
   switch (integration) {
     case "dashboard":
-      return { label: "本页已接入", className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" }
+      return { label: t("watchlist.badge.dashboard"), className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" }
     case "partial":
-      return { label: "部分覆盖", className: "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300" }
+      return { label: t("watchlist.badge.partial"), className: "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300" }
     default:
-      return { label: "待数据源", className: "border-muted-foreground/25 bg-muted/40 text-muted-foreground" }
+      return { label: t("watchlist.badge.pending"), className: "border-muted-foreground/25 bg-muted/40 text-muted-foreground" }
   }
 }
 
@@ -27,24 +31,19 @@ export interface CryptoWatchlistPanelProps {
 }
 
 export function CryptoWatchlistPanel({ className, fearGreedSnippet }: CryptoWatchlistPanelProps) {
+  const t = useT()
   return (
     <section className={cn("mb-3 space-y-2 rounded-lg border bg-card/40 p-3 shadow-sm", className)}>
       <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold tracking-tight">核心指标清单（30）</h2>
-          <p className="mt-0.5 max-w-3xl text-[11px] text-muted-foreground">
-            衍生品、链上、情绪与宏观监视项。右上角{" "}
-            <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-muted-foreground/40 text-[9px]">
-              i
-            </span>{" "}
-            查看定义、用途及与 BTC 价格关系的解读。未接 API 的条目保留为投研检查表。
-          </p>
+          <h2 className="text-sm font-semibold tracking-tight">{t("watchlist.heading")}</h2>
+          <p className="mt-0.5 max-w-3xl text-[11px] text-muted-foreground">{t("watchlist.subtitle")}</p>
         </div>
       </div>
       <div className="max-h-[min(70vh,520px)] overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin">
         <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {CRYPTO_WATCHLIST_METRICS.map((metric) => {
-            const badge = integrationBadge(metric.integration)
+            const badge = integrationBadge(metric.integration, t)
             const live = metric.id === "fear-greed" && fearGreedSnippet ? fearGreedSnippet : null
 
             return (
@@ -84,7 +83,7 @@ export function CryptoWatchlistPanel({ className, fearGreedSnippet }: CryptoWatc
                     href="/macro"
                     className="text-[9px] font-medium text-primary underline-offset-2 hover:underline"
                   >
-                    在宏观页查看 DXY / 美债 / 利率
+                    {t("watchlist.cta.macro")}
                   </Link>
                 )}
               </article>

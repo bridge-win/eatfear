@@ -17,8 +17,11 @@ import {
   type MacroApiResponse,
 } from "@/lib/dashboard-shared"
 import { CrashDetector } from "@/lib/crash-detector"
+import { useT } from "@/lib/i18n"
 import { calculateCrashLeaderboard, fetchStockData, STOCK_CATEGORIES } from "@/lib/stock-service"
-import { DEFAULT_TIME_RANGE, type TimeRangeId } from "@/lib/time-range"
+import { type TimeRangeId } from "@/lib/time-range"
+
+const STOCK_DEFAULT_RANGE: TimeRangeId = "1y"
 import type { CrashAlert, MacroIndicator, StockAsset } from "@/lib/types"
 
 const STOCK_KPI_SYMBOLS = [
@@ -38,14 +41,35 @@ const KPI_SPARK_POINTS = 30
 const STOCK_REFRESH_MS = 60 * 1000
 const MACRO_REFRESH_MS = 5 * 60 * 1000
 
-export function StockDashboard() {
-  const [usStockAssets, setUsStockAssets] = useState<Map<string, StockAsset>>(new Map())
-  const [hkStockAssets, setHkStockAssets] = useState<Map<string, StockAsset>>(new Map())
-  const [vietnamStockAssets, setVietnamStockAssets] = useState<Map<string, StockAsset>>(new Map())
+export interface StockDashboardProps {
+  initialUsStocks?: StockAsset[]
+  initialHkStocks?: StockAsset[]
+  initialVietnamStocks?: StockAsset[]
+  initialMacroIndicators?: MacroIndicator[]
+}
+
+export function StockDashboard({
+  initialUsStocks,
+  initialHkStocks,
+  initialVietnamStocks,
+  initialMacroIndicators,
+}: StockDashboardProps = {}) {
+  const [usStockAssets, setUsStockAssets] = useState<Map<string, StockAsset>>(
+    () => new Map((initialUsStocks ?? []).map((s) => [s.symbol, s])),
+  )
+  const [hkStockAssets, setHkStockAssets] = useState<Map<string, StockAsset>>(
+    () => new Map((initialHkStocks ?? []).map((s) => [s.symbol, s])),
+  )
+  const [vietnamStockAssets, setVietnamStockAssets] = useState<Map<string, StockAsset>>(
+    () => new Map((initialVietnamStocks ?? []).map((s) => [s.symbol, s])),
+  )
   const [crashes, setCrashes] = useState<CrashAlert[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [macroIndicators, setMacroIndicators] = useState<MacroIndicator[]>([])
-  const [range, setRange] = useState<TimeRangeId>(DEFAULT_TIME_RANGE)
+  const [isLoading, setIsLoading] = useState(
+    !(initialUsStocks && initialHkStocks && initialVietnamStocks),
+  )
+  const [macroIndicators, setMacroIndicators] = useState<MacroIndicator[]>(initialMacroIndicators ?? [])
+  const [range, setRange] = useState<TimeRangeId>(STOCK_DEFAULT_RANGE)
+  const t = useT()
 
   useEffect(() => {
     const crashDetector = new CrashDetector()
@@ -141,10 +165,8 @@ export function StockDashboard() {
         <div className="space-y-3">
           <header className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Stock Dashboard</h1>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                美股、港股和越南概念股公开行情；顶部 KPI 取自宏观核心指标（Yahoo Finance，延迟 15-30 分钟）。
-              </p>
+              <h1 className="text-xl font-bold tracking-tight">{t("stock.title")}</h1>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">{t("stock.subtitle")}</p>
             </div>
             <TimeRangeSelector value={range} onChange={setRange} />
           </header>
@@ -156,32 +178,38 @@ export function StockDashboard() {
 
           <Tabs defaultValue="us-stocks" className="w-full">
             <TabsList className="grid h-auto w-full max-w-2xl grid-cols-1 sm:grid-cols-3">
-              <TabsTrigger value="us-stocks" className="text-xs">美股 Top 50</TabsTrigger>
-              <TabsTrigger value="hk-stocks" className="text-xs">港股 Top 20</TabsTrigger>
-              <TabsTrigger value="vietnam" className="text-xs">越南概念股</TabsTrigger>
+              <TabsTrigger value="us-stocks" className="text-xs">{t("stock.tab.us")}</TabsTrigger>
+              <TabsTrigger value="hk-stocks" className="text-xs">{t("stock.tab.hk")}</TabsTrigger>
+              <TabsTrigger value="vietnam" className="text-xs">{t("stock.tab.vietnam")}</TabsTrigger>
             </TabsList>
             <TabsContent value="us-stocks" className="mt-3">
               <StockGrid
-                title="美股 Top 50"
-                description="包含 S&P 500、NASDAQ 100、Dow Jones ETF 与主流大市值公司。"
+                title={t("stock.tab.us")}
+                description={t("stock.us.desc")}
                 stocks={usStockArray}
                 isLoading={isLoading}
+                loadingLabel={t("stock.loading")}
+                emptyLabel={t("stock.empty")}
               />
             </TabsContent>
             <TabsContent value="hk-stocks" className="mt-3">
               <StockGrid
-                title="港股 Top 20"
-                description="覆盖港股核心权重和大型互联网、金融、能源公司。"
+                title={t("stock.tab.hk")}
+                description={t("stock.hk.desc")}
                 stocks={hkStockArray}
                 isLoading={isLoading}
+                loadingLabel={t("stock.loading")}
+                emptyLabel={t("stock.empty")}
               />
             </TabsContent>
             <TabsContent value="vietnam" className="mt-3">
               <StockGrid
-                title="越南概念股"
-                description="包含 VNM ETF 及具备亚洲成长资产暴露的相关股票。"
+                title={t("stock.tab.vietnam")}
+                description={t("stock.vietnam.desc")}
                 stocks={vietnamStockArray}
                 isLoading={isLoading}
+                loadingLabel={t("stock.loading")}
+                emptyLabel={t("stock.empty")}
               />
             </TabsContent>
           </Tabs>
@@ -196,20 +224,22 @@ function StockGrid({
   description,
   stocks,
   isLoading,
+  loadingLabel,
+  emptyLabel,
 }: {
   title: string
   description: string
   stocks: StockAsset[]
   isLoading: boolean
+  loadingLabel: string
+  emptyLabel: string
 }) {
   return (
     <div>
       <h2 className="mb-0.5 text-base font-semibold">{title}</h2>
       <p className="mb-2 text-[11px] text-muted-foreground">{description}</p>
       {stocks.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          {isLoading ? "Loading stock data..." : "No stock data available."}
-        </p>
+        <p className="text-xs text-muted-foreground">{isLoading ? loadingLabel : emptyLabel}</p>
       ) : (
         <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {stocks.map((asset) => (

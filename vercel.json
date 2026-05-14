@@ -3,6 +3,10 @@
     {
       "path": "/api/check-alerts",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/macro?range=10y",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

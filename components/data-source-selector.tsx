@@ -5,6 +5,7 @@ import { Check, ChevronDown, Database } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useT } from "@/lib/i18n"
 
 export type DataSourceId = "okx" | "binance" | "coingecko"
 
@@ -12,9 +13,11 @@ export interface DataSource {
   id: DataSourceId
   name: string
   label: string
-  description: string
+  /** i18n key for the source description */
+  descriptionKey: string
   apiEndpoint: string
-  features: string[]
+  /** i18n keys for feature labels */
+  featureKeys: string[]
   requiresApiKey?: boolean
   apiKeyEnvVar?: string
 }
@@ -24,25 +27,45 @@ export const DATA_SOURCES: DataSource[] = [
     id: "okx",
     name: "OKX",
     label: "OKX",
-    description: "完整衍生品数据，订单簿深度，无需 API Key",
+    descriptionKey: "dataSource.okx.desc",
     apiEndpoint: "/api/crypto/btc-derivatives",
-    features: ["K线", "订单簿", "Funding", "OI", "多空比", "CVD", "大户仓位"],
+    featureKeys: [
+      "dataSource.feature.kline",
+      "dataSource.feature.book",
+      "dataSource.feature.funding",
+      "dataSource.feature.oi",
+      "dataSource.feature.longshort",
+      "dataSource.feature.cvd",
+      "dataSource.feature.toptraders",
+    ],
   },
   {
     id: "binance",
     name: "Binance",
     label: "Binance",
-    description: "全球最大交易所，完整期货数据，无需 API Key",
+    descriptionKey: "dataSource.binance.desc",
     apiEndpoint: "/api/crypto/binance",
-    features: ["K线", "Funding", "OI", "多空比", "大户仓位", "Taker Volume"],
+    featureKeys: [
+      "dataSource.feature.kline",
+      "dataSource.feature.funding",
+      "dataSource.feature.oi",
+      "dataSource.feature.longshort",
+      "dataSource.feature.toptraders",
+      "dataSource.feature.taker",
+    ],
   },
   {
     id: "coingecko",
     name: "CoinGecko",
     label: "CoinGecko",
-    description: "聚合市场数据（仅价格/市值），无衍生品数据",
+    descriptionKey: "dataSource.coingecko.desc",
     apiEndpoint: "/api/crypto/coingecko",
-    features: ["价格", "市值", "成交量", "ATH/ATL"],
+    featureKeys: [
+      "dataSource.feature.price",
+      "dataSource.feature.mcap",
+      "dataSource.feature.volume",
+      "dataSource.feature.ath",
+    ],
     requiresApiKey: false,
     apiKeyEnvVar: "COINGECKO_API_KEY",
   },
@@ -56,6 +79,7 @@ interface DataSourceSelectorProps {
 
 export function DataSourceSelector({ value, onChange, className }: DataSourceSelectorProps) {
   const [open, setOpen] = useState(false)
+  const t = useT()
 
   const selectedSource = DATA_SOURCES.find((s) => s.id === value) ?? DATA_SOURCES[0]
 
@@ -76,7 +100,7 @@ export function DataSourceSelector({ value, onChange, className }: DataSourceSel
       </PopoverTrigger>
       <PopoverContent className="w-[280px] p-1" align="end">
         <div className="text-xs font-medium text-muted-foreground px-2 py-1.5">
-          数据源
+          {t("dataSource.title")}
         </div>
         <div className="space-y-0.5">
           {DATA_SOURCES.map((source) => (
@@ -97,29 +121,29 @@ export function DataSourceSelector({ value, onChange, className }: DataSourceSel
                   <span className="text-sm font-medium">{source.name}</span>
                   {source.id === "coingecko" && (
                     <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      基础
+                      {t("dataSource.tier.basic")}
                     </span>
                   )}
                   {(source.id === "okx" || source.id === "binance") && (
                     <span className="rounded bg-green-500/10 px-1.5 py-0.5 text-[10px] text-green-600 dark:text-green-400">
-                      完整
+                      {t("dataSource.tier.full")}
                     </span>
                   )}
                 </div>
                 {value === source.id && <Check className="h-4 w-4 text-primary" />}
               </div>
-              <span className="text-[11px] text-muted-foreground">{source.description}</span>
+              <span className="text-[11px] text-muted-foreground">{t(source.descriptionKey)}</span>
               <div className="flex flex-wrap gap-1">
-                {source.features.slice(0, 5).map((feature) => (
+                {source.featureKeys.slice(0, 5).map((featureKey) => (
                   <span
-                    key={feature}
+                    key={featureKey}
                     className="rounded bg-muted px-1 py-0.5 text-[9px] text-muted-foreground"
                   >
-                    {feature}
+                    {t(featureKey)}
                   </span>
                 ))}
-                {source.features.length > 5 && (
-                  <span className="text-[9px] text-muted-foreground">+{source.features.length - 5}</span>
+                {source.featureKeys.length > 5 && (
+                  <span className="text-[9px] text-muted-foreground">+{source.featureKeys.length - 5}</span>
                 )}
               </div>
             </button>

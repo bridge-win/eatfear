@@ -16,6 +16,7 @@ import { type ApiKeyStatus } from "@/components/api-key-warning"
 import { type DataSourceId, getDataSourceEndpoint } from "@/components/data-source-selector"
 import { InfoTooltip } from "@/components/info-tooltip"
 import { SeriesChart } from "@/components/series-chart"
+import { useT } from "@/lib/i18n"
 import { getTimeRange, type TimeRangeId } from "@/lib/time-range"
 
 type SignalDirection = "Buy Watch" | "Sell Watch" | "Neutral" | "High Risk"
@@ -164,20 +165,27 @@ const emptyOrderBook: OrderBookState = {
   asks: [],
 }
 
-const formatUsd = (value: number, maximumFractionDigits = 0) =>
-  value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits,
-  })
+/* Deterministic formatters — purposely avoid Intl compact notation because
+   Node's ICU and browser Intl disagree about whether `$0` renders with or
+   without trailing zeros, which trips React hydration. */
+const formatUsd = (value: number, maximumFractionDigits = 0) => {
+  const sign = value < 0 ? "-" : ""
+  const abs = Math.abs(value)
+  const fixed = abs.toFixed(maximumFractionDigits)
+  const [whole, frac] = fixed.split(".")
+  const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  return `${sign}$${frac ? `${withCommas}.${frac}` : withCommas}`
+}
 
-const formatCompactUsd = (value: number) =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-    maximumFractionDigits: 2,
-  }).format(value)
+const formatCompactUsd = (value: number) => {
+  const sign = value < 0 ? "-" : ""
+  const abs = Math.abs(value)
+  if (abs >= 1e12) return `${sign}$${(abs / 1e12).toFixed(2)}T`
+  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(2)}B`
+  if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(2)}M`
+  if (abs >= 1e3) return `${sign}$${(abs / 1e3).toFixed(2)}K`
+  return `${sign}$${abs.toFixed(2)}`
+}
 
 const formatPercent = (value: number, digits = 2) => `${value >= 0 ? "+" : ""}${value.toFixed(digits)}%`
 
@@ -203,6 +211,8 @@ const calculateOiChangeRate = (history: OpenInterestPoint[]) => {
   return ((latest.value - prior.value) / prior.value) * 100
 }
 
+type TFn = (key: string, vars?: Record<string, string | number>) => string
+
 const getCurrentSignal = ({
   latest1m,
   latest5m,
@@ -214,6 +224,7 @@ const getCurrentSignal = ({
   oiChangeRate,
   orderBook,
   base,
+  t,
 }: {
   latest1m?: KlinePoint
   latest5m?: KlinePoint
@@ -225,6 +236,7 @@ const getCurrentSignal = ({
   oiChangeRate: number
   orderBook: OrderBookState
   base: string
+  t: TFn
 }): VolatilitySignal => {
   const previousFiveMinuteKlines = fiveMinuteKlines.slice(0, -1)
   const latestPrice = latest5m?.close ?? latest1m?.close ?? 0
@@ -289,20 +301,26 @@ const getCurrentSignal = ({
   if (highRiskBuyTrap || highRiskSellTrap) {
     return {
       direction: "High Risk",
-      headline: highRiskBuyTrap ? "下跌延续且 OI 回升，暂不接针" : "上涨延续且 OI 回升，暂不追空",
+      headline: highRiskBuyTrap
+        ? t("vol.sig.highRisk.headline.down")
+        : t("vol.sig.highRisk.headline.up"),
       buyScore,
       sellScore,
       riskScore,
       riskLevel: "High",
       triggerReasons: [
-        highRiskBuyTrap ? "价格继续刷新 5m 新低" : "价格继续刷新 5m 新高",
-        `OI 5m 变化率 ${formatPercent(oiChangeRate)}，杠杆仓位仍在增加`,
-        highRiskBuyTrap ? "价格下跌与 OI 上升同步，存在继续踩踏风险" : "价格上涨与 OI 上升同步，存在继续逼空风险",
+        highRiskBuyTrap
+          ? t("vol.sig.highRisk.trigger.newLow")
+          : t("vol.sig.highRisk.trigger.newHigh"),
+        t("vol.sig.highRisk.trigger.oiRate", { pct: formatPercent(oiChangeRate) }),
+        highRiskBuyTrap
+          ? t("vol.sig.highRisk.trigger.downSync")
+          : t("vol.sig.highRisk.trigger.upSync"),
       ],
       invalidationRules: [
-        "OI 5m 变化率转为下降并低于 -2%",
-        "价格重新站回上一根 5m K 线实体区间",
-        "订单簿 Bid / Ask Ratio 回到 0.9 - 1.1 的均衡区间",
+        t("vol.sig.highRisk.invalid.oiTurn"),
+        t("vol.sig.highRisk.invalid.priceReclaim"),
+        t("vol.sig.highRisk.invalid.bookEq"),
       ],
     }
   }
@@ -323,25 +341,25 @@ const getCurrentSignal = ({
   if (hasCoreBuySetup) {
     return {
       direction: "Buy Watch",
-      headline: `${base} 暴跌插针后的反弹观察`,
+      headline: t("vol.sig.buy.headline", { base }),
       buyScore,
       sellScore,
       riskScore,
       riskLevel,
       triggerReasons: [
-        `5m 跌幅 z-score ${fiveMinuteReturnZScore.toFixed(2)} < -${THRESHOLDS.priceZ}`,
-        `下影线比例 ${((latest5m?.lowerWickRatio ?? 0) * 100).toFixed(0)}% > 55%`,
-        `成交量 z-score ${volumeZScore.toFixed(2)} > ${THRESHOLDS.volumeZ}`,
+        t("vol.sig.buy.trigger.priceZ", { z: fiveMinuteReturnZScore.toFixed(2), th: THRESHOLDS.priceZ }),
+        t("vol.sig.buy.trigger.lowerWick", { pct: ((latest5m?.lowerWickRatio ?? 0) * 100).toFixed(0) }),
+        t("vol.sig.buy.trigger.volZ", { z: volumeZScore.toFixed(2), th: THRESHOLDS.volumeZ }),
         longLiquidations > 0
-          ? `5m 多头爆仓 ${formatCompactUsd(longLiquidations)} 明显放大`
-          : "公开源未返回逐笔爆仓，信号以 OI 清洗、盘口恢复和放量确认",
-        `OI 5m 变化率 ${formatPercent(oiChangeRate)} < -2%`,
-        `Bid / Ask Ratio ${orderBook.bidAskRatio.toFixed(2)} > 1.20，买盘深度恢复`,
+          ? t("vol.sig.buy.trigger.longLiq", { usd: formatCompactUsd(longLiquidations) })
+          : t("vol.sig.buy.trigger.noLiq"),
+        t("vol.sig.buy.trigger.oiFlush", { pct: formatPercent(oiChangeRate) }),
+        t("vol.sig.buy.trigger.bidRecovery", { r: orderBook.bidAskRatio.toFixed(2) }),
       ],
       invalidationRules: [
-        "价格跌破插针低点并持续创新低",
-        "OI 转为上升且价格继续下跌",
-        "Bid / Ask Ratio 跌回 1.0 以下或成交量扩张消失",
+        t("vol.sig.buy.invalid.newLow"),
+        t("vol.sig.buy.invalid.oiUp"),
+        t("vol.sig.buy.invalid.bidFail"),
       ],
     }
   }
@@ -349,49 +367,53 @@ const getCurrentSignal = ({
   if (hasCoreSellSetup) {
     return {
       direction: "Sell Watch",
-      headline: `${base} 暴涨插针后的回落观察`,
+      headline: t("vol.sig.sell.headline", { base }),
       buyScore,
       sellScore,
       riskScore,
       riskLevel,
       triggerReasons: [
-        `5m 涨幅 z-score ${fiveMinuteReturnZScore.toFixed(2)} > ${THRESHOLDS.priceZ}`,
-        `上影线比例 ${((latest5m?.upperWickRatio ?? 0) * 100).toFixed(0)}% > 55%`,
-        `成交量 z-score ${volumeZScore.toFixed(2)} > ${THRESHOLDS.volumeZ}`,
+        t("vol.sig.sell.trigger.priceZ", { z: fiveMinuteReturnZScore.toFixed(2), th: THRESHOLDS.priceZ }),
+        t("vol.sig.sell.trigger.upperWick", { pct: ((latest5m?.upperWickRatio ?? 0) * 100).toFixed(0) }),
+        t("vol.sig.sell.trigger.volZ", { z: volumeZScore.toFixed(2), th: THRESHOLDS.volumeZ }),
         shortLiquidations > 0
-          ? `5m 空头爆仓 ${formatCompactUsd(shortLiquidations)} 明显放大`
-          : "公开源未返回逐笔爆仓，信号以 OI 清洗、盘口恢复和放量确认",
-        `OI 5m 变化率 ${formatPercent(oiChangeRate)} < -2%`,
-        `Bid / Ask Ratio ${orderBook.bidAskRatio.toFixed(2)} < 0.80，卖盘深度恢复`,
+          ? t("vol.sig.sell.trigger.shortLiq", { usd: formatCompactUsd(shortLiquidations) })
+          : t("vol.sig.buy.trigger.noLiq"),
+        t("vol.sig.buy.trigger.oiFlush", { pct: formatPercent(oiChangeRate) }),
+        t("vol.sig.sell.trigger.askRecovery", { r: orderBook.bidAskRatio.toFixed(2) }),
       ],
       invalidationRules: [
-        "价格突破插针高点并持续创新高",
-        "OI 转为上升且价格继续上涨",
-        "Bid / Ask Ratio 回到 1.0 以上或成交量扩张消失",
+        t("vol.sig.sell.invalid.newHigh"),
+        t("vol.sig.sell.invalid.oiUp"),
+        t("vol.sig.sell.invalid.askFail"),
       ],
     }
   }
 
   return {
     direction: "Neutral",
-    headline: "阈值未形成单边观察信号",
+    headline: t("vol.sig.neutral.headline"),
     buyScore,
     sellScore,
     riskScore,
     riskLevel,
     triggerReasons: [
-      `5m return z-score ${fiveMinuteReturnZScore.toFixed(2)}，成交量 z-score ${volumeZScore.toFixed(2)}`,
-      `上影线 ${(((latest5m?.upperWickRatio ?? 0) * 100)).toFixed(0)}%，下影线 ${(((latest5m?.lowerWickRatio ?? 0) * 100)).toFixed(0)}%`,
-      `Bid / Ask Ratio ${orderBook.bidAskRatio.toFixed(2)}，OI 5m ${formatPercent(oiChangeRate)}`,
+      t("vol.sig.neutral.trigger.zscores", { pz: fiveMinuteReturnZScore.toFixed(2), vz: volumeZScore.toFixed(2) }),
+      t("vol.sig.neutral.trigger.wicks", {
+        up: ((latest5m?.upperWickRatio ?? 0) * 100).toFixed(0),
+        dn: ((latest5m?.lowerWickRatio ?? 0) * 100).toFixed(0),
+      }),
+      t("vol.sig.neutral.trigger.bookOi", { r: orderBook.bidAskRatio.toFixed(2), pct: formatPercent(oiChangeRate) }),
     ],
     invalidationRules: [
-      "任一方向满足价格 z-score、插针、放量、爆仓、OI 清洗和订单簿恢复的完整组合",
-      "价格继续创新高/新低且 OI 同步上升时切换为 High Risk",
+      t("vol.sig.neutral.invalid.fullCombo"),
+      t("vol.sig.neutral.invalid.highRiskSwitch"),
     ],
   }
 }
 
 function MiniKlineChart({ title, data, info }: { title: string; data: KlinePoint[]; info?: string }) {
+  const t = useT()
   const chartData = data.slice(-50)
   const minLow = chartData.length ? Math.min(...chartData.map((point) => point.low)) : 0
   const maxHigh = chartData.length ? Math.max(...chartData.map((point) => point.high)) : 1
@@ -406,10 +428,10 @@ function MiniKlineChart({ title, data, info }: { title: string; data: KlinePoint
           <h3 className="text-sm font-medium">{title}</h3>
           {info && <InfoTooltip description={info} />}
         </div>
-        <span className="text-[10px] text-muted-foreground">{chartData.length} candles</span>
+        <span className="text-[10px] text-muted-foreground">{t("vol.candles", { n: chartData.length })}</span>
       </div>
       {chartData.length === 0 ? (
-        <div className="flex h-32 items-center justify-center text-xs text-muted-foreground">等待 K 线数据...</div>
+        <div className="flex h-32 items-center justify-center text-xs text-muted-foreground">{t("vol.waitKline")}</div>
       ) : (
         <svg viewBox="0 0 340 130" className="h-32 w-full overflow-visible">
           {chartData.map((point, index) => {
@@ -518,6 +540,7 @@ export function BtcVolatilitySystem({
   dataSource: sourceId = "okx",
   onApiKeyStatusChange,
 }: BtcVolatilitySystemProps) {
+  const t = useT()
   const base = instId.split("-")[0] ?? "BTC"
   const rangeOption = getTimeRange(range)
 
@@ -645,6 +668,7 @@ export function BtcVolatilitySystem({
         oiChangeRate,
         orderBook,
         base,
+        t,
       }),
     [
       latest1m,
@@ -657,6 +681,7 @@ export function BtcVolatilitySystem({
       oiChangeRate,
       orderBook,
       base,
+      t,
     ],
   )
 
@@ -681,25 +706,51 @@ export function BtcVolatilitySystem({
   const volumeChartData = oneMinuteKlines.slice(-40).map((kline) => ({ time: kline.label, volume: kline.volume }))
 
   const rangePriceChartData = rangeKlines.map((kline) => ({ timestamp: kline.time, value: kline.close }))
-  const oiChartData = openInterestHistory.slice(-180).map((point) => ({ timestamp: point.time, value: point.value }))
+
+  /**
+   * Rolling z-score history across the selected range. Uses a 30-bar window
+   * over kline percent change; same definition as the 5m Z-Score tile, just
+   * applied along the wider time axis so a 1Y view shows historic extremes.
+   */
+  const zScoreHistoryData = useMemo(() => {
+    if (rangeKlines.length < 12) return []
+    const window = 30
+    const out: { timestamp: number; value: number }[] = []
+    for (let i = window; i < rangeKlines.length; i++) {
+      const slice = rangeKlines.slice(i - window, i).map((k) => k.changePercent)
+      const z = calculateZScore(slice, rangeKlines[i].changePercent)
+      out.push({ timestamp: rangeKlines[i].time, value: z })
+    }
+    return out
+  }, [rangeKlines])
+
+  /**
+   * Volume z-score history — same rolling window, applied to per-bar volume.
+   * High readings flag periods of unusual capital rotation.
+   */
+  const volumeZScoreHistoryData = useMemo(() => {
+    if (rangeKlines.length < 12) return []
+    const window = 30
+    const out: { timestamp: number; value: number }[] = []
+    for (let i = window; i < rangeKlines.length; i++) {
+      const slice = rangeKlines.slice(i - window, i).map((k) => k.volume)
+      const z = calculateZScore(slice, rangeKlines[i].volume)
+      out.push({ timestamp: rangeKlines[i].time, value: z })
+    }
+    return out
+  }, [rangeKlines])
+  /* Historical curves use the full range pulled from the API (which now scales with the global TimeRange). */
+  const oiChartData = openInterestHistory.map((point) => ({ timestamp: point.time, value: point.value }))
   const fundingChartData = fundingRateHistory.map((point) => ({ timestamp: point.time, value: point.rate }))
-  const accountRatioChartData = longShortAccountRatioHistory
-    .slice(-180)
-    .map((point) => ({ timestamp: point.time, value: point.ratio }))
-  const contractRatioChartData = contractLongShortRatioHistory
-    .slice(-180)
-    .map((point) => ({ timestamp: point.time, value: point.ratio }))
+  const accountRatioChartData = longShortAccountRatioHistory.map((point) => ({ timestamp: point.time, value: point.ratio }))
+  const contractRatioChartData = contractLongShortRatioHistory.map((point) => ({ timestamp: point.time, value: point.ratio }))
   const latestAccountRatio = longShortAccountRatioHistory.at(-1)?.ratio ?? 0
   const latestContractRatio = contractLongShortRatioHistory.at(-1)?.ratio ?? 0
-  const topTraderAccountRatioChartData = topTraderPositionHistory
-    .slice(-180)
-    .map((point) => ({ timestamp: point.time, value: point.longShortAccountRatio }))
-  const topTraderPositionRatioChartData = topTraderPositionHistory
-    .slice(-180)
-    .map((point) => ({ timestamp: point.time, value: point.longShortPositionRatio }))
+  const topTraderAccountRatioChartData = topTraderPositionHistory.map((point) => ({ timestamp: point.time, value: point.longShortAccountRatio }))
+  const topTraderPositionRatioChartData = topTraderPositionHistory.map((point) => ({ timestamp: point.time, value: point.longShortPositionRatio }))
   const latestTopTraderAccountRatio = topTraderPositionHistory.at(-1)?.longShortAccountRatio ?? 0
   const latestTopTraderPositionRatio = topTraderPositionHistory.at(-1)?.longShortPositionRatio ?? 0
-  const cvdChartData = takerVolumeHistory.slice(-180).map((point) => ({ timestamp: point.time, value: point.cvd }))
+  const cvdChartData = takerVolumeHistory.map((point) => ({ timestamp: point.time, value: point.cvd }))
   const latestCvd = takerVolumeHistory.at(-1)?.cvd ?? 0
 
   const orderBookRows = [
@@ -723,10 +774,8 @@ export function BtcVolatilitySystem({
                     {dataSourceLabel} · {instId} · {rangeOption.label} ({rangeOption.yahooInterval || rangeOption.okxBar})
                   </span>
                 </div>
-                <h2 className="text-xl font-bold tracking-tight md:text-2xl">{base} 极端波动监控</h2>
-                <p className="mt-0.5 max-w-2xl text-xs text-muted-foreground">
-                  价格 / K 线 / OI 历史 / 资金费率 / 多空比 / 订单簿失衡 全部使用 OKX 公开接口拉取。
-                </p>
+                <h2 className="text-xl font-bold tracking-tight md:text-2xl">{t("vol.title", { base })}</h2>
+                <p className="mt-0.5 max-w-2xl text-xs text-muted-foreground">{t("vol.subtitle")}</p>
                 {dataError && <p className="mt-1 text-[11px] text-destructive">{dataError}</p>}
               </div>
               <div className="text-right">
@@ -740,86 +789,83 @@ export function BtcVolatilitySystem({
 
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
-                label="5m 涨跌 Z-Score"
+                label={t("vol.metric.5mZ.label")}
                 value={fiveMinuteReturnZScore.toFixed(2)}
-                helper={`最新 5m ${formatPercent(latest5m?.changePercent ?? 0)}`}
+                helper={t("vol.metric.5mZ.helper", { pct: formatPercent(latest5m?.changePercent ?? 0) })}
                 tone={fiveMinuteReturnZScore > 2.5 ? "green" : fiveMinuteReturnZScore < -2.5 ? "red" : "default"}
                 info={{
-                  title: "5 分钟收益率 Z-Score",
-                  description:
-                    "用最近 30 根 5m K 线的涨跌幅算均值/方差，与最新一根做标准化。\n|Z| > 2.5 表示当前 5m 行情超过 99% 历史样本的极端值，常作为暴涨/暴跌的一个量化触发器。",
+                  title: t("vol.metric.5mZ.title"),
+                  description: t("vol.metric.5mZ.info"),
                 }}
               />
               <MetricCard
-                label="插针比例"
+                label={t("vol.metric.wick.label")}
                 value={`↑${(((latest5m?.upperWickRatio ?? 0) * 100)).toFixed(0)}% / ↓${(((latest5m?.lowerWickRatio ?? 0) * 100)).toFixed(0)}%`}
-                helper="基于当前 5m K 线高低点和实体"
+                helper={t("vol.metric.wick.helper")}
                 tone={(latest5m?.upperWickRatio ?? 0) > 0.55 || (latest5m?.lowerWickRatio ?? 0) > 0.55 ? "amber" : "default"}
                 info={{
-                  description: "上/下影线占整根 K 线的比例，越大说明长上下影针越明显，常对应快速冲高回落或闪崩反弹。",
+                  description: t("vol.metric.wick.info"),
                 }}
               />
               <MetricCard
-                label="Volume Z-Score"
+                label={t("vol.metric.volZ.label")}
                 value={volumeZScore.toFixed(2)}
-                helper={`1m 成交量 ${((latest1m?.volume ?? 0) / 1000).toFixed(2)}K ${base}`}
+                helper={t("vol.metric.volZ.helper", {
+                  vol: ((latest1m?.volume ?? 0) / 1000).toFixed(2),
+                  base,
+                })}
                 tone={volumeZScore > 2.5 ? "amber" : "default"}
                 info={{
-                  description: "1 分钟成交量相对最近 30 根的标准化分数。> 2.5 表示放量，越大越极端。",
+                  description: t("vol.metric.volZ.info"),
                 }}
               />
               <MetricCard
-                label="OI / Funding"
+                label={t("vol.metric.oi.label")}
                 value={`${formatPercent(oiChangeRate)} / ${fundingRate.toFixed(4)}%`}
                 helper={`OI ${formatCompactUsd(openInterestUsd)} / ${openInterest.toLocaleString("en-US", { maximumFractionDigits: 0 })} ${base}`}
                 tone={oiChangeRate < -2 ? "green" : oiChangeRate > 0.2 ? "red" : "default"}
                 info={{
-                  description:
-                    "OI（未平仓合约）短期变化率 + 当前永续资金费率。\nOI 急降配合价格止跌 = 杠杆清洗；资金费率高且持续为正 = 多头拥挤。",
+                  description: t("vol.metric.oi.info"),
                 }}
               />
             </div>
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
-                label="永续溢价"
+                label={t("vol.metric.basis.label")}
                 value={`${perpPremium >= 0 ? "+" : ""}${perpPremium.toFixed(4)}%`}
-                helper={`现货 ${spotPrice > 0 ? formatUsd(spotPrice, 2) : "..."}`}
+                helper={t("vol.metric.basis.helper", { spot: spotPrice > 0 ? formatUsd(spotPrice, 2) : "..." })}
                 tone={perpPremium > 0.05 ? "green" : perpPremium < -0.05 ? "red" : "default"}
                 info={{
                   title: "Perp Premium / Basis",
-                  description:
-                    "永续合约价格相对现货的溢价率 = (永续 - 现货) / 现货 × 100%。\n正溢价 = 多头情绪占优；负溢价 = 恐慌或套利机会。",
+                  description: t("vol.metric.basis.info"),
                 }}
               />
               <MetricCard
-                label="大户账户比"
+                label={t("vol.metric.topAcct.label")}
                 value={latestTopTraderAccountRatio ? latestTopTraderAccountRatio.toFixed(2) : "..."}
                 helper="Top Trader Account L/S"
                 tone={latestTopTraderAccountRatio > 1.5 ? "green" : latestTopTraderAccountRatio < 0.7 ? "red" : "default"}
                 info={{
-                  description:
-                    "OKX 大户账户多空比。> 1 = 大户偏多；< 1 = 大户偏空。\n大户与散户方向分歧时常有反向行情。",
+                  description: t("vol.metric.topAcct.info"),
                 }}
               />
               <MetricCard
-                label="大户持仓比"
+                label={t("vol.metric.topPos.label")}
                 value={latestTopTraderPositionRatio ? latestTopTraderPositionRatio.toFixed(2) : "..."}
                 helper="Top Trader Position L/S"
                 tone={latestTopTraderPositionRatio > 1.5 ? "green" : latestTopTraderPositionRatio < 0.7 ? "red" : "default"}
                 info={{
-                  description:
-                    "OKX 大户持仓量多空比。反映大户实际持仓规模的多空分布，比账户数更能体现资金方向。",
+                  description: t("vol.metric.topPos.info"),
                 }}
               />
               <MetricCard
-                label="CVD"
+                label={t("vol.metric.cvd.label")}
                 value={latestCvd ? formatCompactUsd(latestCvd) : "..."}
-                helper="累计成交量差"
+                helper={t("vol.metric.cvd.helper")}
                 tone={latestCvd > 0 ? "green" : latestCvd < 0 ? "red" : "default"}
                 info={{
                   title: "Cumulative Volume Delta",
-                  description:
-                    "主动买入量 - 主动卖出量的累计值。\nCVD 上升 = 买方主导；CVD 下降 = 卖方主导。\n价格新低但 CVD 不新低 = 可能有吸收；价格新高但 CVD 背离 = 上涨乏力。",
+                  description: t("vol.metric.cvd.info"),
                 }}
               />
             </div>
@@ -840,7 +886,7 @@ export function BtcVolatilitySystem({
             </div>
             <div className="mt-3 grid gap-2 text-xs md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               <div>
-                <p className="mb-1 font-medium">触发原因</p>
+                <p className="mb-1 font-medium">{t("vol.triggerReasons")}</p>
                 <ul className="space-y-0.5 text-muted-foreground">
                   {currentSignal.triggerReasons.map((reason) => (
                     <li key={reason}>- {reason}</li>
@@ -848,7 +894,7 @@ export function BtcVolatilitySystem({
                 </ul>
               </div>
               <div>
-                <p className="mb-1 font-medium">失效条件</p>
+                <p className="mb-1 font-medium">{t("vol.invalidationRules")}</p>
                 <ul className="space-y-0.5 text-muted-foreground">
                   {currentSignal.invalidationRules.map((rule) => (
                     <li key={rule}>- {rule}</li>
@@ -865,10 +911,10 @@ export function BtcVolatilitySystem({
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-1">
             <div className="flex items-center gap-1">
               <CardTitle className="text-sm">
-                {base} 价格 — {rangeOption.label} ({rangeOption.okxBar})
+                {t("vol.priceTitle", { base, label: rangeOption.label, bar: rangeOption.okxBar })}
               </CardTitle>
               <InfoTooltip
-                description={`基于 OKX 永续合约 ${rangeOption.okxBar} K 线收盘价。切换右上角时间周期可看到不同颗粒度（默认 1 月 / 1H 线）。`}
+                description={t("vol.priceInfo", { bar: rangeOption.okxBar })}
                 source="OKX Public API"
               />
             </div>
@@ -886,26 +932,69 @@ export function BtcVolatilitySystem({
         </Card>
       )}
 
+      {zScoreHistoryData.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-1">
+            <div className="flex items-center gap-1">
+              <CardTitle className="text-sm">{t("vol.zHistory.title")}</CardTitle>
+              <InfoTooltip
+                description={t("vol.zHistory.info", { window: 30, bar: rangeOption.okxBar })}
+                source="OKX Public API"
+              />
+            </div>
+            <span className="text-[11px] text-muted-foreground">±2.5 = extreme</span>
+          </CardHeader>
+          <CardContent className="grid gap-3 pt-0 md:grid-cols-2">
+            <div>
+              <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                {t("vol.zHistory.return")}
+              </p>
+              <SeriesChart
+                data={zScoreHistoryData}
+                unit="ratio"
+                height={140}
+                color="rgb(99 102 241)"
+                label="Return Z"
+                compact
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                {t("vol.zHistory.volume")}
+              </p>
+              <SeriesChart
+                data={volumeZScoreHistoryData}
+                unit="ratio"
+                height={140}
+                color="rgb(245 158 11)"
+                label="Volume Z"
+                compact
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-3 xl:grid-cols-[1.4fr_0.6fr]">
         <div className="space-y-3">
           <Card>
             <CardHeader className="pb-1">
               <div className="flex items-center gap-1">
                 <Activity className="h-4 w-4" />
-                <CardTitle className="text-sm">实时 K 线与成交量</CardTitle>
-                <InfoTooltip description="左：1 分钟 K 线（信号触发的基础颗粒度）；右：5 分钟 K 线（用于 5m 涨跌 Z-Score 与影线判断）；下：1m 成交量。" />
+                <CardTitle className="text-sm">{t("vol.candlesAndVolume")}</CardTitle>
+                <InfoTooltip description={t("vol.candlesAndVolumeInfo")} />
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid gap-2 lg:grid-cols-2">
-                <MiniKlineChart title="1m K 线" data={oneMinuteKlines} info="高频颗粒度，监控 1 分钟级别的瞬时动量。" />
-                <MiniKlineChart title="5m K 线" data={fiveMinuteKlines} info="5 分钟颗粒度，配合插针比例判断暴涨暴跌。" />
+                <MiniKlineChart title={t("vol.kline.1m")} data={oneMinuteKlines} info={t("vol.kline.1m.info")} />
+                <MiniKlineChart title={t("vol.kline.5m")} data={fiveMinuteKlines} info={t("vol.kline.5m.info")} />
               </div>
               <div className="rounded-lg border bg-background/80 p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-1">
-                    <h3 className="text-sm font-medium">成交量图</h3>
-                    <InfoTooltip description="1m 成交量柱状图。Volume Z-Score 高时通常对应资金大幅进出。" />
+                    <h3 className="text-sm font-medium">{t("vol.volumeChart")}</h3>
+                    <InfoTooltip description={t("vol.volumeChart.info")} />
                   </div>
                   <span className="text-[10px] text-muted-foreground">Volume Z {volumeZScore.toFixed(2)}</span>
                 </div>
@@ -932,49 +1021,47 @@ export function BtcVolatilitySystem({
               <CardHeader className="pb-1">
                 <div className="flex items-center gap-1">
                   <ShieldAlert className="h-4 w-4" />
-                  <CardTitle className="text-sm">OI / Funding / 多空比</CardTitle>
+                  <CardTitle className="text-sm">{t("vol.section.oiFundingLs")}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid gap-2 sm:grid-cols-3">
                   <MetricCard
-                    label="Open Interest"
+                    label={t("vol.metric.oiTitle.label")}
                     value={formatCompactUsd(openInterestUsd)}
                     helper={`OKX ${instId}`}
                     tone="default"
-                    info={{ description: "未平仓合约价值（USD）。OI 上升 = 新仓涌入，下降 = 仓位平仓或被强平。" }}
+                    info={{ description: t("vol.metric.oiTitle.info") }}
                   />
                   <MetricCard
-                    label="资金费率"
+                    label={t("vol.metric.funding.label")}
                     value={`${fundingRate.toFixed(4)}%`}
-                    helper="当前预测/结算费率"
+                    helper={t("vol.metric.funding.helper")}
                     tone={fundingRate >= 0 ? "green" : "red"}
                     info={{
-                      description:
-                        "永续合约多空之间的周期性资金交换。正 = 多头给空头付费（多头拥挤），负 = 空头给多头付费（空头拥挤）。",
+                      description: t("vol.metric.funding.info"),
                     }}
                   />
                   <MetricCard
-                    label="多空账户比"
+                    label={t("vol.metric.lsAcct.label")}
                     value={latestAccountRatio ? latestAccountRatio.toFixed(2) : "..."}
-                    helper={`合约账户 ${latestContractRatio ? latestContractRatio.toFixed(2) : "..."}`}
+                    helper={t("vol.metric.lsAcct.helper", { ratio: latestContractRatio ? latestContractRatio.toFixed(2) : "..." })}
                     tone="amber"
                     info={{
-                      description:
-                        "OKX Rubik：多空账户数比 / 多空合约持仓比。> 1 多头占优；< 1 空头占优。极端值常对应反向行情。",
+                      description: t("vol.metric.lsAcct.info"),
                     }}
                   />
                 </div>
                 <div className="rounded-lg border bg-background/80 p-3">
                   <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-sm font-medium">Open Interest 历史</h3>
+                    <h3 className="text-sm font-medium">{t("vol.oiHistory")}</h3>
                     <span className="text-[10px] text-muted-foreground">5m {formatPercent(oiChangeRate)}</span>
                   </div>
                   <SeriesChart data={oiChartData} unit="usd" height={120} color="rgb(99 102 241)" label="OI" compact />
                 </div>
                 <div className="rounded-lg border bg-background/80 p-3">
                   <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-sm font-medium">资金费率历史</h3>
+                    <h3 className="text-sm font-medium">{t("vol.fundingHistory")}</h3>
                     <span className="text-[10px] text-muted-foreground">8h funding</span>
                   </div>
                   <SeriesChart
@@ -988,7 +1075,7 @@ export function BtcVolatilitySystem({
                 </div>
                 <div className="rounded-lg border bg-background/80 p-3">
                   <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-sm font-medium">多空比历史</h3>
+                    <h3 className="text-sm font-medium">{t("vol.lsHistory")}</h3>
                     <span className="text-[10px] text-muted-foreground">account / contract</span>
                   </div>
                   <div className="grid gap-2 md:grid-cols-2">
@@ -1014,8 +1101,8 @@ export function BtcVolatilitySystem({
                   <div className="rounded-lg border bg-background/80 p-3">
                     <div className="mb-2 flex items-center justify-between">
                       <div className="flex items-center gap-1">
-                        <h3 className="text-sm font-medium">大户多空比历史</h3>
-                        <InfoTooltip description="OKX Top Trader 的账户数多空比和持仓量多空比。大户方向与散户分歧时常有反向行情。" />
+                        <h3 className="text-sm font-medium">{t("vol.topLsHistory")}</h3>
+                        <InfoTooltip description={t("vol.topLsHistory.info")} />
                       </div>
                       <span className="text-[10px] text-muted-foreground">top trader</span>
                     </div>
@@ -1043,8 +1130,8 @@ export function BtcVolatilitySystem({
                   <div className="rounded-lg border bg-background/80 p-3">
                     <div className="mb-2 flex items-center justify-between">
                       <div className="flex items-center gap-1">
-                        <h3 className="text-sm font-medium">CVD 累计成交量差</h3>
-                        <InfoTooltip description="Cumulative Volume Delta = 主动买入量 - 主动卖出量的累计值。CVD 与价格背离时需要警惕反向。" />
+                        <h3 className="text-sm font-medium">{t("vol.cvdSection")}</h3>
+                        <InfoTooltip description={t("vol.cvdSection.info")} />
                       </div>
                       <span className="text-[10px] text-muted-foreground">{formatCompactUsd(latestCvd)}</span>
                     </div>
@@ -1065,24 +1152,24 @@ export function BtcVolatilitySystem({
               <CardHeader className="pb-1">
                 <div className="flex items-center gap-1">
                   <Waves className="h-4 w-4" />
-                  <CardTitle className="text-sm">订单簿状态</CardTitle>
-                  <InfoTooltip description="OKX 现货深度 Top 20。Bid/Ask Ratio > 1.2 买盘明显占优；< 0.8 卖盘明显占优。" />
+                  <CardTitle className="text-sm">{t("vol.book.title")}</CardTitle>
+                  <InfoTooltip description={t("vol.book.info")} />
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="grid gap-2 sm:grid-cols-3">
-                  <MetricCard label="买盘深度" value={formatCompactUsd(orderBook.bidDepth)} helper="Top 20 bids" tone="green" />
-                  <MetricCard label="卖盘深度" value={formatCompactUsd(orderBook.askDepth)} helper="Top 20 asks" tone="red" />
+                  <MetricCard label={t("vol.book.bid")} value={formatCompactUsd(orderBook.bidDepth)} helper="Top 20 bids" tone="green" />
+                  <MetricCard label={t("vol.book.ask")} value={formatCompactUsd(orderBook.askDepth)} helper="Top 20 asks" tone="red" />
                   <MetricCard
                     label="Bid / Ask Ratio"
                     value={orderBook.bidAskRatio.toFixed(2)}
-                    helper={`失衡 ${orderBook.imbalance.toFixed(1)}%`}
+                    helper={t("vol.book.imbalance", { pct: orderBook.imbalance.toFixed(1) })}
                     tone={orderBook.bidAskRatio > 1.2 ? "green" : orderBook.bidAskRatio < 0.8 ? "red" : "default"}
                   />
                 </div>
                 <div className="space-y-0.5 rounded-lg border bg-background/80 p-2 font-mono text-[11px]">
                   {orderBookRows.length === 0 ? (
-                    <div className="py-8 text-center font-sans text-xs text-muted-foreground">等待订单簿数据...</div>
+                    <div className="py-8 text-center font-sans text-xs text-muted-foreground">{t("vol.book.waiting")}</div>
                   ) : (
                     orderBookRows.map((row) => (
                       <div
@@ -1112,28 +1199,28 @@ export function BtcVolatilitySystem({
             <CardHeader className="pb-1">
               <div className="flex items-center gap-1">
                 <Gauge className="h-4 w-4" />
-                <CardTitle className="text-sm">安全阈值</CardTitle>
+                <CardTitle className="text-sm">{t("vol.thresholds")}</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="space-y-2 text-xs">
               <div className="flex justify-between gap-4 border-b pb-1">
-                <span className="text-muted-foreground">5m z-score</span>
+                <span className="text-muted-foreground">{t("vol.threshold.5mZ")}</span>
                 <span>±{THRESHOLDS.priceZ}</span>
               </div>
               <div className="flex justify-between gap-4 border-b pb-1">
-                <span className="text-muted-foreground">上/下影线比例</span>
+                <span className="text-muted-foreground">{t("vol.threshold.wick")}</span>
                 <span>&gt; 55%</span>
               </div>
               <div className="flex justify-between gap-4 border-b pb-1">
-                <span className="text-muted-foreground">成交量 z-score</span>
+                <span className="text-muted-foreground">{t("vol.threshold.volZ")}</span>
                 <span>&gt; {THRESHOLDS.volumeZ}</span>
               </div>
               <div className="flex justify-between gap-4 border-b pb-1">
-                <span className="text-muted-foreground">OI 5m 清洗</span>
+                <span className="text-muted-foreground">{t("vol.threshold.oi")}</span>
                 <span>&lt; -2%</span>
               </div>
               <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">订单簿恢复</span>
+                <span className="text-muted-foreground">{t("vol.threshold.book")}</span>
                 <span>&gt; 1.2 / &lt; 0.8</span>
               </div>
             </CardContent>
@@ -1143,13 +1230,13 @@ export function BtcVolatilitySystem({
             <CardHeader className="pb-1">
               <div className="flex items-center gap-1">
                 <AlertTriangle className="h-4 w-4" />
-                <CardTitle className="text-sm">历史信号列表</CardTitle>
+                <CardTitle className="text-sm">{t("vol.history.title")}</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               {historySignals.length === 0 ? (
                 <div className="rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground">
-                  暂无 Buy Watch、Sell Watch 或 High Risk 信号。
+                  {t("vol.history.empty")}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1161,7 +1248,7 @@ export function BtcVolatilitySystem({
                           <p className="mt-1 text-xs font-medium">{signal.headline}</p>
                         </div>
                         <div className="text-right text-[10px] text-muted-foreground">
-                          <p>{new Date(signal.time).toLocaleTimeString("zh-CN")}</p>
+                          <p>{new Date(signal.time).toLocaleTimeString()}</p>
                           <p>{formatUsd(signal.price, 2)}</p>
                         </div>
                       </div>
@@ -1188,10 +1275,8 @@ export function BtcVolatilitySystem({
 
           <Card className="border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
             <CardContent className="text-xs">
-              <p className="font-medium">风险提示</p>
-              <p className="mt-1 text-amber-900/80 dark:text-amber-100/80">
-                本系统仅用于监控与观察，不构成交易建议。极端行情中数据推送可能延迟或缺失。
-              </p>
+              <p className="font-medium">{t("vol.risk.title")}</p>
+              <p className="mt-1 text-amber-900/80 dark:text-amber-100/80">{t("vol.risk.body")}</p>
             </CardContent>
           </Card>
         </div>

@@ -1,15 +1,15 @@
 "use client"
 
-import { Info } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import { ScoreIndexCard } from "@/components/score-index-card"
+import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import type { RegimeSignalBand } from "@/lib/crypto-regime-score"
 
 const REFRESH_MS = 60 * 1000
 
-const MODEL_INFO_DESCRIPTION = [
+const MODEL_INFO_DESCRIPTION_ZH = [
   "多因子 + 权重合成（总分 100）；所有分项均来自可追溯的公开市场 API（见 `/api/crypto/regime-score` 的 `upstream` 字段）。",
   "",
   "CoinGlass：`COINGLASS_API_KEY`（Header `CG-API-KEY`）——现货 BTC ETF 日度净流入；CEX BTC / USDT(ETH)+USDC 持仓加权 7 日变动。",
@@ -24,6 +24,30 @@ const MODEL_INFO_DESCRIPTION = [
   "",
   "面板约每 60 秒刷新。不构成投资建议。",
 ].join("\n")
+
+const MODEL_INFO_DESCRIPTION_EN = [
+  "Multi-factor weighted composite (0–100); every factor traces back to a public market API (see `upstream` in `/api/crypto/regime-score`).",
+  "",
+  "CoinGlass: `COINGLASS_API_KEY` (`CG-API-KEY` header) — spot BTC ETF daily net flows; CEX BTC / USDT(ETH)+USDC inventory 7-day change.",
+  "",
+  "① Flows (25%): DefiLlama stablecoin mcap 7-day change; CoinGlass ETF; CEX stablecoin inventory.",
+  "② Leverage / sentiment (25%): OKX BTC perp funding, Rubik OI-USD (1h), long/short account ratio with risk downweighting.",
+  "③ On-chain cycle (20%): Blockchain.info BTCUSD daily vs SMA200; CoinGecko distance from ATH%; CoinGlass CEX BTC; mempool.space hashrate.",
+  "④ Market structure (15%): OKX Taker, book imbalance, 4H volume ratio, 24h change.",
+  "⑤ Options risk (15%): Deribit DVOL + 7-day options Put/Call.",
+  "",
+  "Rules: extreme funding / OI spikes deduct; expanding stablecoins with strong ETF weekly momentum can add slightly. Bands: 75–100 strong bull … 0–30 strong bear.",
+  "",
+  "Panel refreshes ~60s. Not investment advice.",
+].join("\n")
+
+const BAND_LABEL: Record<RegimeSignalBand, { zh: string; en: string }> = {
+  strong_bull: { zh: "强多 · 可顺势加仓", en: "Strong Bull · Trend-follow OK" },
+  bull: { zh: "偏多 · 回调买入", en: "Bull · Buy dips" },
+  neutral: { zh: "中性 · 观望", en: "Neutral · Wait" },
+  bear: { zh: "偏空 · 降低仓位", en: "Bear · Reduce risk" },
+  strong_bear: { zh: "强空 · 防守或等极端反转", en: "Strong Bear · Defensive" },
+}
 
 interface RegimeSummary {
   total: number
@@ -71,7 +95,15 @@ async function fetchRegimePayload(): Promise<RegimePayload> {
   return json
 }
 
-function RegimeDetailPanel({
+const FACTOR_WEIGHT_PCT: Record<string, number> = {
+  capitalFlows: 25,
+  leverage: 25,
+  onchainCycle: 20,
+  marketStructure: 15,
+  options: 15,
+}
+
+function RegimeInfoHover({
   loading,
   error,
   payload,
@@ -82,67 +114,88 @@ function RegimeDetailPanel({
   payload: RegimePayload | null
   updatedHint: string
 }) {
-  return (
-    <div className="space-y-2.5 px-3 py-2.5 text-left">
-      <div>
-        <p className="text-xs font-semibold tracking-tight text-foreground">BTC 多时框架</p>
-        {loading ? (
-          <p className="mt-1 text-[11px] text-muted-foreground">载入中…</p>
-        ) : error ? (
-          <p className="mt-1 text-[11px] text-destructive">{error}</p>
-        ) : payload ? (
-          <div className="mt-1 space-y-1.5">
-            <p className={cn("text-xs font-medium leading-snug", bandStyles(payload.summary.band))}>{payload.summary.signalZh}</p>
-            <p className="text-[10px] text-muted-foreground">
-              <span className="tabular-nums font-medium text-foreground/90">{Math.round(payload.summary.total)}</span>
-              {" / 100"}
-              {updatedHint ? ` · ${updatedHint}` : ""}
-              {` · 加权原始分 ${payload.summary.rawWeighted.toFixed(1)}`}
-            </p>
-            {payload.penaltiesZh.length ? (
-              <p className="rounded bg-orange-950/25 px-1.5 py-1 text-[10px] text-orange-900 dark:text-orange-200">
-                ⚠ {payload.penaltiesZh.join(" ")}
-              </p>
-            ) : null}
-            {payload.boostsZh.length ? (
-              <p className="rounded bg-teal-950/20 px-1.5 py-1 text-[10px] text-teal-900 dark:text-teal-100">
-                ↑ {payload.boostsZh.join(" ")}
-              </p>
-            ) : null}
-            <p className="pt-0.5 text-[10px] font-medium text-foreground">分项得分</p>
-            <dl className="space-y-2">
-              {payload.factors.map((f) => (
-                <div key={f.id}>
-                  <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-0.5">
-                    <dt className="text-[10px] text-muted-foreground">{f.label}</dt>
-                    <dd className="text-[11px] font-semibold tabular-nums">
-                      {f.score.toFixed(0)}
-                      <span className="font-normal text-muted-foreground"> → {f.weighted.toFixed(1)}</span>
-                    </dd>
-                  </div>
-                  <dd className="mt-1 space-y-0.5 text-[10px] leading-snug text-muted-foreground">
-                    {f.lines.map((line, i) => (
-                      <div key={`${f.id}-L${i}`}>{line}</div>
-                    ))}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        ) : null}
-      </div>
+  const { locale, t } = useI18n()
+  const modelDescription = locale === "zh" ? MODEL_INFO_DESCRIPTION_ZH : MODEL_INFO_DESCRIPTION_EN
 
-      <details className="mt-2 rounded-md border border-border/55 bg-muted/20 [&_summary::-webkit-details-marker]:hidden">
-        <summary className="cursor-pointer select-none px-0 py-1 text-sm font-semibold text-foreground hover:text-foreground/90">
-          评分模型说明
-        </summary>
-        <div className="pb-1 pt-1">
-          <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-muted-foreground">{MODEL_INFO_DESCRIPTION}</p>
-          <p className="mt-2 text-[10px] text-muted-foreground/80">
-            数据源：OKX / DefiLlama / CoinGlass / Blockchain.info / mempool.space · CoinGecko · Deribit
-          </p>
-        </div>
-      </details>
+  return (
+    <div className="space-y-3 px-3 py-2.5 text-left">
+      {loading ? (
+        <p className="text-[11px] text-muted-foreground">{t("regime.hover.loading")}</p>
+      ) : error ? (
+        <p className="text-[11px] text-destructive">{error}</p>
+      ) : payload ? (
+        <p className="text-[10px] text-muted-foreground">
+          {updatedHint ? `${updatedHint} · ` : ""}
+          {t("regime.hover.refreshHint")}
+          {` · ${t("regime.hover.weighted", { value: payload.summary.rawWeighted.toFixed(1) })}`}
+        </p>
+      ) : null}
+
+      {payload && payload.factors.length > 0 && (
+        <section className="space-y-2">
+          <p className="text-xs font-semibold text-foreground">{t("regime.hover.factorsTitle")}</p>
+          <div className="space-y-2">
+            {payload.factors.map((factor) => {
+              const weightPct = FACTOR_WEIGHT_PCT[factor.id] ?? 0
+              const label = t(`regime.factor.${factor.id}`)
+              return (
+                <div key={factor.id} className="rounded-md border border-border/55 bg-muted/20 px-2 py-1.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-[11px] font-semibold text-foreground">
+                      {label === `regime.factor.${factor.id}` ? factor.label : label}
+                    </p>
+                    <p className="text-[10px] tabular-nums text-muted-foreground">
+                      {t("regime.hover.factorScore", {
+                        score: factor.score.toFixed(1),
+                        weight: weightPct,
+                        weighted: factor.weighted.toFixed(1),
+                      })}
+                    </p>
+                  </div>
+                  <ul className="mt-1 space-y-0.5">
+                    {factor.lines.map((line, idx) => (
+                      <li key={idx} className="text-[10.5px] leading-relaxed text-muted-foreground">
+                        · {line}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {payload && (payload.penaltiesZh.length > 0 || payload.boostsZh.length > 0) && (
+        <section className="grid gap-2 sm:grid-cols-2">
+          {payload.penaltiesZh.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">{t("regime.hover.penalties")}</p>
+              <ul className="mt-0.5 space-y-0.5">
+                {payload.penaltiesZh.map((p, idx) => (
+                  <li key={idx} className="text-[10.5px] leading-relaxed text-muted-foreground">- {p}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {payload.boostsZh.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">{t("regime.hover.boosts")}</p>
+              <ul className="mt-0.5 space-y-0.5">
+                {payload.boostsZh.map((b, idx) => (
+                  <li key={idx} className="text-[10.5px] leading-relaxed text-muted-foreground">- {b}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="rounded-md border border-border/55 bg-muted/20 px-2 py-2">
+        <p className="text-xs font-semibold text-foreground">{t("regime.hover.modelTitle")}</p>
+        <p className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-muted-foreground">{modelDescription}</p>
+        <p className="mt-2 text-[10px] text-muted-foreground/80">{t("regime.hover.sources")}</p>
+      </section>
     </div>
   )
 }
@@ -151,6 +204,7 @@ export function CryptoRegimeScoreCard({ className }: { className?: string }) {
   const [payload, setPayload] = useState<RegimePayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { locale, t } = useI18n()
 
   const load = useCallback(async () => {
     try {
@@ -173,7 +227,7 @@ export function CryptoRegimeScoreCard({ className }: { className?: string }) {
   const updatedHint = useMemo(() => {
     if (!payload?.updatedAt) return ""
     try {
-      return new Intl.DateTimeFormat("zh-CN", {
+      return new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
@@ -181,59 +235,42 @@ export function CryptoRegimeScoreCard({ className }: { className?: string }) {
     } catch {
       return ""
     }
-  }, [payload?.updatedAt])
+  }, [payload?.updatedAt, locale])
+
+  const valueAriaLabel = loading
+    ? t("regime.aria.loading")
+    : error
+      ? t("regime.aria.error")
+      : payload
+        ? t("regime.aria.value", { value: Math.round(payload.summary.total) })
+        : t("regime.aria.idle")
+
+  const valueText = loading ? "…" : error ? "—" : payload ? Math.round(payload.summary.total) : "—"
+  const toneClass = error
+    ? "text-muted-foreground"
+    : payload
+      ? bandStyles(payload.summary.band)
+      : "text-foreground"
+
+  const signal = loading
+    ? t("regime.hover.loading")
+    : error
+      ? error
+      : payload
+        ? BAND_LABEL[payload.summary.band][locale]
+        : null
 
   return (
-    <div
-      className={cn(
-        "flex h-9 shrink-0 items-center gap-0 rounded-md border bg-card/95 pl-1 pr-0.5 shadow-sm backdrop-blur-sm",
-        className,
-      )}
-    >
-      <div
-        className="flex min-w-[1.75rem] items-center justify-center px-0.5"
-        aria-label={
-          loading
-            ? "BTC 多时框架指数载入中"
-            : error
-              ? "BTC 多时框架指数不可用，悬停旁侧信息图标查看原因"
-              : payload
-                ? `BTC 多时框架指数 ${Math.round(payload.summary.total)}`
-                : "BTC 多时框架指数"
-        }
-      >
-        <span
-          className={cn(
-            "text-[1.35rem] font-bold tabular-nums leading-none md:text-2xl",
-            error ? "text-muted-foreground" : payload ? bandStyles(payload.summary.band) : "text-foreground",
-          )}
-        >
-          {loading ? "…" : error ? "—" : payload ? Math.round(payload.summary.total) : "—"}
-        </span>
-      </div>
-
-      <HoverCard openDelay={120} closeDelay={180}>
-        <HoverCardTrigger asChild>
-          <button
-            type="button"
-            aria-label="悬停或聚焦查看：BTC 多时框架信号、分项与模型说明"
-            className={cn(
-              "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground",
-              "outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring",
-            )}
-          >
-            <Info className="h-3.5 w-3.5" />
-          </button>
-        </HoverCardTrigger>
-        <HoverCardContent
-          align="end"
-          side="bottom"
-          collisionPadding={16}
-          className="max-h-[min(520px,_72vh)] w-[min(22rem,_92vw)] overflow-y-auto p-0"
-        >
-          <RegimeDetailPanel loading={loading} error={error} payload={payload} updatedHint={updatedHint} />
-        </HoverCardContent>
-      </HoverCard>
-    </div>
+    <ScoreIndexCard
+      className={cn(className)}
+      label={t("regime.label")}
+      value={valueText}
+      valueSuffix={t("regime.hover.scoreSuffix")}
+      signal={signal}
+      toneClassName={toneClass}
+      valueAriaLabel={valueAriaLabel}
+      infoAriaLabel={t("regime.hover.aria")}
+      infoContent={<RegimeInfoHover loading={loading} error={error} payload={payload} updatedHint={updatedHint} />}
+    />
   )
 }
