@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/macro?range=10y",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 1 * * *"
     }
   ]
 }
