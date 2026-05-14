@@ -117,32 +117,84 @@ export const STOCK_CATEGORIES = {
   vietnam: { name: "越南概念股", stocks: VIETNAM_STOCKS },
 }
 
-// Fetch stock data via Yahoo Finance API
-export async function fetchStockData(symbols: string[]): Promise<Map<string, StockAsset>> {
+// Yahoo accepts up to ~200 symbols per call, but URL-length caps mean ~50 is
+// safer in practice. We chunk and fire chunks in parallel — one round-trip per
+// 50 symbols replaces the previous one-per-symbol fan-out.
+const STOCK_BATCH_SIZE = 50
+const SPARK_DEFAULT_RANGE = "1y"
+const SPARK_DEFAULT_INTERVAL = "1d"
+
+export interface FetchStockDataOptions {
+  includeSparkline?: boolean
+  sparkRange?: string
+  sparkInterval?: string
+}
+
+export async function fetchStockData(
+  symbols: string[],
+  options: FetchStockDataOptions = {},
+): Promise<Map<string, StockAsset>> {
   const stockMap = new Map<string, StockAsset>()
+  if (symbols.length === 0) return stockMap
+
+  const includeSparkline = options.includeSparkline ?? true
+  const sparkRange = options.sparkRange ?? SPARK_DEFAULT_RANGE
+  const sparkInterval = options.sparkInterval ?? SPARK_DEFAULT_INTERVAL
+
+  const chunks: string[][] = []
+  for (let i = 0; i < symbols.length; i += STOCK_BATCH_SIZE) {
+    chunks.push(symbols.slice(i, i + STOCK_BATCH_SIZE))
+  }
 
   try {
-    // Fetch data for all symbols in parallel
-    const promises = symbols.map(async (symbol) => {
-      try {
-        const response = await fetch(`/api/stock-price?symbol=${symbol}`)
-        if (!response.ok) return null
+    const [quoteResults, sparkResults] = await Promise.all([
+      Promise.all(
+        chunks.map(async (chunk) => {
+          try {
+            const url = `/api/stock-quotes?symbols=${encodeURIComponent(chunk.join(","))}`
+            const response = await fetch(url)
+            if (!response.ok) return [] as StockAsset[]
+            const payload = (await response.json()) as { quotes?: StockAsset[] }
+            return payload.quotes ?? []
+          } catch (error) {
+            console.error("[v0] Error fetching stock quotes batch:", error)
+            return [] as StockAsset[]
+          }
+        }),
+      ),
+      includeSparkline
+        ? Promise.all(
+            chunks.map(async (chunk) => {
+              try {
+                const url =
+                  `/api/stock-sparklines?symbols=${encodeURIComponent(chunk.join(","))}` +
+                  `&range=${encodeURIComponent(sparkRange)}&interval=${encodeURIComponent(sparkInterval)}`
+                const response = await fetch(url)
+                if (!response.ok) return {} as Record<string, number[]>
+                const payload = (await response.json()) as { series?: Record<string, number[]> }
+                return payload.series ?? {}
+              } catch (error) {
+                console.error("[v0] Error fetching sparkline batch:", error)
+                return {} as Record<string, number[]>
+              }
+            }),
+          )
+        : Promise.resolve([] as Record<string, number[]>[]),
+    ])
 
-        const data = await response.json()
-        return data
-      } catch (error) {
-        console.error(`[v0] Error fetching ${symbol}:`, error)
-        return null
+    const sparkSeries = new Map<string, number[]>()
+    for (const batch of sparkResults) {
+      for (const [symbol, series] of Object.entries(batch)) {
+        sparkSeries.set(symbol, series)
       }
-    })
+    }
 
-    const results = await Promise.all(promises)
-
-    results.forEach((data) => {
-      if (data) {
-        stockMap.set(data.symbol, data)
+    for (const quotes of quoteResults) {
+      for (const quote of quotes) {
+        const sparkline = sparkSeries.get(quote.symbol)
+        stockMap.set(quote.symbol, sparkline ? { ...quote, sparkline } : quote)
       }
-    })
+    }
   } catch (error) {
     console.error("[v0] Error fetching stock data:", error)
   }

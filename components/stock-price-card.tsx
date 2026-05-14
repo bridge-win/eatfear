@@ -1,5 +1,7 @@
 "use client"
 
+import { Area, AreaChart, ResponsiveContainer } from "recharts"
+
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -60,9 +62,32 @@ export function StockPriceCard({ asset, isSubscribed = false, onSubscribeToggle 
               {formattedChange}
             </span>
           </div>
+          {asset.sparkline && asset.sparkline.length > 2 ? <Sparkline values={asset.sparkline} positive={isPositive} /> : null}
           <p className="text-xs text-muted-foreground">Volume: {formattedVolume}</p>
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function Sparkline({ values, positive }: { values: number[]; positive: boolean }) {
+  const data = values.map((value, index) => ({ index, value }))
+  const color = positive ? "rgb(22 163 74)" : "rgb(220 38 38)"
+  return (
+    <div className="-mx-1 h-9">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 1, right: 0, left: 0, bottom: 0 }}>
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke={color}
+            fill={color}
+            fillOpacity={0.16}
+            strokeWidth={1.4}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   )
 }

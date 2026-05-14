@@ -151,9 +151,12 @@ export async function GET() {
     .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
     .slice(0, 80)
 
-  return NextResponse.json({
-    updatedAt: Date.now(),
-    source: rssSources.map((source) => source.name).join(" + "),
-    articles,
-  })
+  return NextResponse.json(
+    {
+      updatedAt: Date.now(),
+      source: rssSources.map((source) => source.name).join(" + "),
+      articles,
+    },
+    { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },
+  )
 }

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
 
-export const runtime = "edge"
+// Cache stock snapshots for ~30s at the edge; allow 60s of stale-while-revalidate.
+export const revalidate = 30
+
+const CACHE_HEADER = "public, s-maxage=30, stale-while-revalidate=60"
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -11,13 +14,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Use Yahoo Finance API via query1.finance.yahoo.com
     const response = await fetch(
       `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=2d`,
       {
-        headers: {
-          "User-Agent": "Mozilla/5.0",
-        },
+        headers: { "User-Agent": "Mozilla/5.0" },
+        next: { revalidate },
       },
     )
 
@@ -35,25 +36,26 @@ export async function GET(request: Request) {
     const meta = result.meta
     const quote = result.indicators.quote[0]
 
-    // Get current price and calculate change
     const currentPrice = meta.regularMarketPrice || quote.close[quote.close.length - 1]
     const previousClose = meta.chartPreviousClose || quote.close[0]
     const changeToday = currentPrice - previousClose
     const changePercentToday = (changeToday / previousClose) * 100
     const volume = quote.volume[quote.volume.length - 1] || 0
 
-    // Get stock name from meta or use symbol
     const stockName = meta.longName || meta.shortName || symbol
 
-    return NextResponse.json({
-      symbol: symbol,
-      name: stockName,
-      price: currentPrice,
-      changeToday: changeToday,
-      changePercentToday: changePercentToday,
-      volume: volume,
-      lastUpdate: Date.now(),
-    })
+    return NextResponse.json(
+      {
+        symbol,
+        name: stockName,
+        price: currentPrice,
+        changeToday,
+        changePercentToday,
+        volume,
+        lastUpdate: Date.now(),
+      },
+      { headers: { "Cache-Control": CACHE_HEADER } },
+    )
   } catch {
     return NextResponse.json({ error: "Failed to fetch stock data" }, { status: 502 })
   }

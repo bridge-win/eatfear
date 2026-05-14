@@ -16,6 +16,8 @@ export interface StockAsset {
   changePercentToday: number
   volume: number
   lastUpdate: number
+  /** Optional closing-price series for sparkline display (default 1y daily). */
+  sparkline?: number[]
 }
 
 export type AssetType = "crypto" | "stock" | "hk_stock" | "vietnam_stock"

@@ -11,11 +11,18 @@ interface MarketStatsPanelProps {
 export function MarketStatsPanel({ stats }: MarketStatsPanelProps) {
   if (!stats) return null
 
+  /* Locale-free formatter — `toLocaleString()` without a locale arg picks up
+     the runtime default, which differs between Node SSR and the browser and
+     breaks hydration. */
+  const groupDigits = (n: number) => {
+    const fixed = n.toFixed(0)
+    return fixed.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  }
   const formatCurrency = (value: number) => {
     if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`
     if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`
     if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`
-    return `$${value.toLocaleString()}`
+    return `$${groupDigits(value)}`
   }
 
   const isPositiveChange = stats.marketCapChange24h >= 0
@@ -47,7 +54,7 @@ export function MarketStatsPanel({ stats }: MarketStatsPanelProps) {
           </div>
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground">Active Cryptocurrencies</p>
-            <p className="text-2xl font-bold">{stats.activeCryptos.toLocaleString()}</p>
+            <p className="text-2xl font-bold">{groupDigits(stats.activeCryptos)}</p>
           </div>
         </div>
       </CardContent>

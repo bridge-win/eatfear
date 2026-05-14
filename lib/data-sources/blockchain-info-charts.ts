@@ -24,3 +24,24 @@ export async function fetchBtcUsdDailyFromBlockchain(
 
   return points.length >= 120 ? { points } : null
 }
+
+/**
+ * Generic Blockchain.com chart fetcher — returns aligned daily points for
+ * any of the public on-chain series (hash-rate, difficulty, n-transactions,
+ * n-unique-addresses, mempool-size, transaction-fees-usd, …).
+ *
+ * No API key required.
+ */
+export async function fetchBlockchainInfoSeries(
+  chart: string,
+  timespan: string,
+  revalidate = 1800,
+): Promise<Array<{ timestamp: number; value: number }>> {
+  const url = `https://api.blockchain.info/charts/${encodeURIComponent(
+    chart,
+  )}?timespan=${encodeURIComponent(timespan)}&interval=daily&format=json`
+  const payload = await fetchJson<BlockchainChartPayload>(url, { revalidate, timeoutMs: 15_000 })
+  return (payload?.values ?? [])
+    .map((point) => ({ timestamp: point.x * 1000, value: Number(point.y) }))
+    .filter((point) => Number.isFinite(point.timestamp) && Number.isFinite(point.value))
+}

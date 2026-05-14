@@ -12,6 +12,7 @@ import {
 } from "recharts"
 
 import { cn } from "@/lib/utils"
+import { useT } from "@/lib/i18n"
 
 export type SeriesChartUnit = "index" | "percent" | "usd" | "ratio" | "count"
 
@@ -49,6 +50,7 @@ export function SeriesChart({
 }: SeriesChartProps) {
   const reactId = React.useId()
   const gradientId = `series-chart-gradient-${reactId.replace(/[:]/g, "")}`
+  const t = useT()
 
   const trendUp = data.length > 1 ? data[data.length - 1].value >= data[0].value : true
   const strokeColor = color ?? (trendUp ? "rgb(22 163 74)" : "rgb(220 38 38)")
@@ -69,7 +71,7 @@ export function SeriesChart({
         className={cn("flex items-center justify-center text-xs text-muted-foreground", className)}
         style={{ height }}
       >
-        无数据
+        {t("chart.noData")}
       </div>
     )
   }
@@ -173,11 +175,14 @@ export const formatValue = (value: number, unit: SeriesChartUnit, short = false)
     return value.toFixed(0)
   }
 
+  /* Deterministic comma-grouped formatter — avoids Intl ICU diffs between
+     Node (SSR) and the browser that would otherwise cause hydration mismatches. */
   const abs = Math.abs(value)
   if (abs >= 1e3) {
-    return value.toLocaleString("en-US", {
-      maximumFractionDigits: short ? 0 : 2,
-    })
+    const fixed = value.toFixed(short ? 0 : 2)
+    const [whole, frac] = fixed.split(".")
+    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    return frac ? `${grouped}.${frac}` : grouped
   }
   return value.toFixed(short ? 1 : 2)
 }

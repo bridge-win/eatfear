@@ -191,6 +191,8 @@ export async function GET(request: Request) {
     const bar = sanitizeBar(url.searchParams.get("bar"), range.okxBar)
     const limit = sanitizeLimit(url.searchParams.get("limit"), range.okxLimit)
     const rubikPeriod = RUBIK_PERIODS.has(bar) ? bar : "1H"
+    /* OKX rubik endpoints cap at ~300 points/request, so we keep history below that ceiling. */
+    const rubikLimit = Math.max(60, Math.min(300, range.okxLimit))
 
     const [
       tickerRows,
@@ -215,18 +217,18 @@ export async function GET(request: Request) {
       okxFetchSafe<OkxOrderBook>(`/api/v5/market/books?instId=${instId}&sz=20`),
       okxFetchSafe<OkxOpenInterest>(`/api/v5/public/open-interest?instType=SWAP&instId=${instId}`),
       okxFetchSafe<OkxFundingRate>(`/api/v5/public/funding-rate?instId=${instId}`),
-      okxFetchSafe<OkxFundingRate>(`/api/v5/public/funding-rate-history?instId=${instId}&limit=100`),
-      okxFetchSafe<string[]>(`/api/v5/rubik/stat/contracts/open-interest-volume?ccy=${ccy}&period=${rubikPeriod}`),
-      okxFetchSafe<string[]>(`/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=${ccy}&period=${rubikPeriod}`),
+      okxFetchSafe<OkxFundingRate>(`/api/v5/public/funding-rate-history?instId=${instId}&limit=${rubikLimit}`),
+      okxFetchSafe<string[]>(`/api/v5/rubik/stat/contracts/open-interest-volume?ccy=${ccy}&period=${rubikPeriod}&limit=${rubikLimit}`),
+      okxFetchSafe<string[]>(`/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=${ccy}&period=${rubikPeriod}&limit=${rubikLimit}`),
       okxFetchSafe<string[]>(
-        `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract?instId=${instId}&period=${rubikPeriod}`,
+        `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract?instId=${instId}&period=${rubikPeriod}&limit=${rubikLimit}`,
       ),
       // Top trader position ratio (account + position)
       okxFetchSafe<string[]>(
-        `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader?instId=${instId}&period=${rubikPeriod}`,
+        `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader?instId=${instId}&period=${rubikPeriod}&limit=${rubikLimit}`,
       ),
       // Taker buy/sell volume (for CVD calculation)
-      okxFetchSafe<string[]>(`/api/v5/rubik/stat/taker-volume?ccy=${ccy}&instType=SWAP&period=${rubikPeriod}`),
+      okxFetchSafe<string[]>(`/api/v5/rubik/stat/taker-volume?ccy=${ccy}&instType=SWAP&period=${rubikPeriod}&limit=${rubikLimit}`),
       // Spot ticker for basis calculation
       okxFetchSafe<OkxTicker>(`/api/v5/market/ticker?instId=${ccy}-USDT`),
     ])

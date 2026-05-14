@@ -4,6 +4,7 @@ import { AlertCircle, Key, RefreshCw, X } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useT } from "@/lib/i18n"
 
 export interface ApiKeyStatus {
   missing?: boolean
@@ -23,6 +24,7 @@ interface ApiKeyWarningProps {
 
 export function ApiKeyWarning({ status, source, className, onDismiss, onRetry }: ApiKeyWarningProps) {
   const [dismissed, setDismissed] = useState(false)
+  const t = useT()
 
   if (!status || dismissed) return null
 
@@ -44,27 +46,25 @@ export function ApiKeyWarning({ status, source, className, onDismiss, onRetry }:
 
   if (invalid) {
     variant = "error"
-    title = `${source} API Key 无效`
-    message = "API Key 已过期或无效，请检查并更新。"
+    title = t("apiKey.invalid.title", { source })
+    message = t("apiKey.invalid.msg")
     showEnvVar = true
   } else if (rateLimited) {
     variant = "warning"
-    title = `${source} 请求频率受限`
-    message = missing
-      ? "已达到免费 API 速率限制。添加 API Key 可获得更高的请求配额。"
-      : "已达到 API 速率限制，请稍后重试。"
+    title = t("apiKey.rateLimited.title", { source })
+    message = missing ? t("apiKey.rateLimited.msg.missing") : t("apiKey.rateLimited.msg.has")
     showEnvVar = Boolean(missing)
   } else if (missing) {
     // For CoinGecko, this is just informational since it works without key
     if (source === "CoinGecko") {
       variant = "info"
-      title = `${source} 使用免费 API`
-      message = "当前使用免费 API（10-30 次/分钟）。如需更高频率，可添加 API Key。"
+      title = t("apiKey.freeTier.title", { source })
+      message = t("apiKey.freeTier.msg")
       showEnvVar = true
     } else {
       variant = "info"
-      title = `${source} API Key 未设置`
-      message = "某些功能可能受限。添加 API Key 可解锁完整功能。"
+      title = t("apiKey.missing.title", { source })
+      message = t("apiKey.missing.msg")
       showEnvVar = true
     }
   }
@@ -99,13 +99,13 @@ export function ApiKeyWarning({ status, source, className, onDismiss, onRetry }:
           {showEnvVar && envVar && (
             <div className="mt-2 flex items-center gap-2">
               <code className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-mono">{envVar}</code>
-              <span className="text-[10px] text-muted-foreground">environment variable</span>
+              <span className="text-[10px] text-muted-foreground">{t("apiKey.envVar")}</span>
             </div>
           )}
           {rateLimited && onRetry && (
             <Button variant="ghost" size="sm" className="mt-2 h-7 text-xs" onClick={onRetry}>
               <RefreshCw className="mr-1.5 h-3 w-3" />
-              Retry
+              {t("apiKey.retry")}
             </Button>
           )}
         </div>
@@ -114,7 +114,7 @@ export function ApiKeyWarning({ status, source, className, onDismiss, onRetry }:
           size="icon"
           className="h-6 w-6 shrink-0"
           onClick={handleDismiss}
-          aria-label="Dismiss"
+          aria-label={t("apiKey.dismiss")}
         >
           <X className="h-3.5 w-3.5" />
         </Button>

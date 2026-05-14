@@ -107,13 +107,16 @@ export async function GET(request: Request) {
 
   indicators.sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999))
 
-  return NextResponse.json({
-    updatedAt: Date.now(),
-    range: range.id,
-    interval: range.yahooInterval,
-    fredEnabled: Boolean(process.env.FRED_API_KEY ?? process.env.NEXT_PUBLIC_FRED_API_KEY),
-    indicators,
-    requested: MACRO_INDICATORS.length,
-    returned: indicators.length,
-  })
+  return NextResponse.json(
+    {
+      updatedAt: Date.now(),
+      range: range.id,
+      interval: range.yahooInterval,
+      fredEnabled: Boolean(process.env.FRED_API_KEY ?? process.env.NEXT_PUBLIC_FRED_API_KEY),
+      indicators,
+      requested: MACRO_INDICATORS.length,
+      returned: indicators.length,
+    },
+    { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },
+  )
 }
