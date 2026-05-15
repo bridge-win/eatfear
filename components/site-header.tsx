@@ -9,7 +9,7 @@ import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 const navItems = [
-  { href: "/", key: "nav.home" },
+  { href: "/home", key: "nav.home" },
   { href: "/crypto", key: "nav.crypto" },
   { href: "/stock", key: "nav.stock" },
   { href: "/macro", key: "nav.macro" },
@@ -23,7 +23,7 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container mx-auto flex min-h-12 flex-col gap-2 px-4 py-2 md:flex-row md:items-center md:justify-between">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/crypto" className="flex items-center gap-2">
           <TrendingDown className="h-5 w-5 text-primary" />
           <span className="text-lg font-bold">eatfear</span>
         </Link>
@@ -31,8 +31,8 @@ export function SiteHeader() {
           <nav className="flex flex-wrap items-center gap-2">
             {navItems.map((item) => {
               const isActive =
-                item.href === "/"
-                  ? pathname === "/" || pathname === "/home"
+                item.href === "/home"
+                  ? pathname === "/home"
                   : pathname === item.href || pathname.startsWith(`${item.href}/`)
 
               return (

@@ -1,49 +1,12 @@
 import { Button } from "@/components/ui/button"
+import { SiteHeader } from "@/components/site-header"
 import { ArrowRight, Bell, LineChart, TrendingDown } from "lucide-react"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/server"
 
-export default async function MarketingLanding() {
-  const supabase = await createClient()
-  let user = null
-
-  if (supabase) {
-    const { data } = await supabase.auth.getUser()
-    user = data.user
-  }
-
+export default function MarketingLanding() {
   return (
     <div className="flex min-h-svh flex-col bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <TrendingDown className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold">eatfear</span>
-          </div>
-          <nav className="flex items-center gap-4">
-            {user ? (
-              <>
-                <Link href="/dashboard">
-                  <Button variant="ghost">Dashboard</Button>
-                </Link>
-                <Link href="/profile">
-                  <Button>Profile</Button>
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link href="/auth/login">
-                  <Button variant="ghost">Login</Button>
-                </Link>
-                <Link href="/auth/sign-up">
-                  <Button>Get Started</Button>
-                </Link>
-              </>
-            )}
-          </nav>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* Hero Section */}
       <main className="flex-1">
