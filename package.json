@@ -7,7 +7,10 @@
     "dev": "next dev --turbopack",
     "dev:webpack": "next dev",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "deploy": "vercel deploy -y",
+    "deploy:preview": "vercel deploy -y",
+    "deploy:prod": "vercel deploy --prod -y"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

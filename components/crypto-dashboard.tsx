@@ -257,7 +257,7 @@ export function CryptoDashboard({
 
           <KpiStrip tiles={kpiTiles} />
 
-          <Tabs defaultValue="volatility" className="w-full">
+          <Tabs defaultValue="compare" className="w-full">
             <TabsList className="grid h-auto w-full max-w-xl grid-cols-3">
               <TabsTrigger value="volatility" className="text-xs">{t("crypto.tab.volatility")}</TabsTrigger>
               <TabsTrigger value="markets" className="text-xs">{t("crypto.tab.markets")}</TabsTrigger>
