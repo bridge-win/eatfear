@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState } from "react"
 import { CrashAlertBanner } from "@/components/crash-alert-banner"
 import { CrashLeaderboard } from "@/components/crash-leaderboard"
 import { KpiStrip, type KpiTile } from "@/components/kpi-strip"
+import { DashboardFrame } from "@/components/page-frame"
 import { formatValue as formatSeriesValue, type SeriesChartUnit } from "@/components/series-chart"
-import { SiteHeader } from "@/components/site-header"
 import { StockPriceCard } from "@/components/stock-price-card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TimeRangeSelector } from "@/components/time-range-selector"
@@ -20,26 +20,103 @@ import { CrashDetector } from "@/lib/crash-detector"
 import { useT } from "@/lib/i18n"
 import { calculateCrashLeaderboard, fetchStockData, STOCK_CATEGORIES } from "@/lib/stock-service"
 import { type TimeRangeId } from "@/lib/time-range"
-
-const STOCK_DEFAULT_RANGE: TimeRangeId = "1y"
 import type { CrashAlert, MacroIndicator, StockAsset } from "@/lib/types"
 
+const STOCK_DEFAULT_RANGE: TimeRangeId = "1y"
+
 const STOCK_KPI_SYMBOLS = [
+  "ES=F",
+  "NQ=F",
   "^GSPC",
+  "^NDX",
   "^IXIC",
-  "^DJI",
   "^RUT",
+  "^SOX",
+  "SMH",
+  "XLK",
+  "XLF",
+  "KRE",
+  "XLE",
+  "^VIX",
+  "^VXN",
+  "^VVIX",
+  "^SKEW",
+  "FRED:DGS10",
+  "FRED:DGS2",
+  "FRED:T10Y2Y",
+  "FRED:DFII10",
+  "FRED:BAMLH0A0HYM2",
+  "FRED:NFCI",
+  "DX-Y.NYB",
+  "HYG",
+  "LQD",
+  "TLT",
+  "^DJI",
   "^HSI",
   "^N225",
-  "^VIX",
-  "DX-Y.NYB",
   "GC=F",
   "CL=F",
+  "HG=F",
 ]
+
+const US_STOCK_DISPLAY_PRIORITY = [
+  "SPY",
+  "QQQ",
+  "DIA",
+  "NVDA",
+  "TSLA",
+  "AAPL",
+  "MSFT",
+  "META",
+  "AMZN",
+  "GOOGL",
+  "AMD",
+  "AVGO",
+  "JPM",
+  "GS",
+  "XOM",
+  "CAT",
+] as const
+
+const HK_STOCK_DISPLAY_PRIORITY = [
+  "0700.HK",
+  "9988.HK",
+  "3690.HK",
+  "0388.HK",
+  "1299.HK",
+  "0005.HK",
+  "0941.HK",
+  "0883.HK",
+] as const
+
+const VIETNAM_STOCK_DISPLAY_PRIORITY = [
+  "VNM",
+  "FUTU",
+  "BABA",
+  "PDD",
+  "JD",
+  "LI",
+  "NIO",
+  "XPEV",
+] as const
 
 const KPI_SPARK_POINTS = 30
 const STOCK_REFRESH_MS = 60 * 1000
 const MACRO_REFRESH_MS = 5 * 60 * 1000
+
+const sortStockAssets = <T extends readonly string[]>(assets: StockAsset[], priority: T) => {
+  const order = new Map<string, number>(priority.map((symbol, index) => [symbol, index]))
+  return assets
+    .map((asset, index) => ({ asset, index }))
+    .sort((a, b) => {
+      const priorityDelta =
+        (order.get(a.asset.symbol) ?? Number.MAX_SAFE_INTEGER) -
+        (order.get(b.asset.symbol) ?? Number.MAX_SAFE_INTEGER)
+      if (priorityDelta !== 0) return priorityDelta
+      return a.index - b.index
+    })
+    .map(({ asset }) => asset)
+}
 
 export interface StockDashboardProps {
   initialUsStocks?: StockAsset[]
@@ -153,69 +230,73 @@ export function StockDashboard({
     }).filter((tile): tile is KpiTile => tile !== null)
   }, [macroIndicators])
 
-  const usStockArray = Array.from(usStockAssets.values())
-  const hkStockArray = Array.from(hkStockAssets.values())
-  const vietnamStockArray = Array.from(vietnamStockAssets.values())
+  const usStockArray = useMemo(
+    () => sortStockAssets(Array.from(usStockAssets.values()), US_STOCK_DISPLAY_PRIORITY),
+    [usStockAssets],
+  )
+  const hkStockArray = useMemo(
+    () => sortStockAssets(Array.from(hkStockAssets.values()), HK_STOCK_DISPLAY_PRIORITY),
+    [hkStockAssets],
+  )
+  const vietnamStockArray = useMemo(
+    () => sortStockAssets(Array.from(vietnamStockAssets.values()), VIETNAM_STOCK_DISPLAY_PRIORITY),
+    [vietnamStockAssets],
+  )
   const crashLeaderboard = calculateCrashLeaderboard([...usStockArray, ...hkStockArray, ...vietnamStockArray])
 
   return (
-    <div className="min-h-svh bg-background">
-      <SiteHeader />
-      <main className="container mx-auto px-4 py-3">
-        <div className="space-y-3">
-          <header className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">{t("stock.title")}</h1>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">{t("stock.subtitle")}</p>
-            </div>
-            <TimeRangeSelector value={range} onChange={setRange} />
-          </header>
-
-          <KpiStrip tiles={kpiTiles} />
-
-          <CrashAlertBanner crashes={crashes} />
-          <CrashLeaderboard stocks={crashLeaderboard} />
-
-          <Tabs defaultValue="us-stocks" className="w-full">
-            <TabsList className="grid h-auto w-full max-w-2xl grid-cols-1 sm:grid-cols-3">
-              <TabsTrigger value="us-stocks" className="text-xs">{t("stock.tab.us")}</TabsTrigger>
-              <TabsTrigger value="hk-stocks" className="text-xs">{t("stock.tab.hk")}</TabsTrigger>
-              <TabsTrigger value="vietnam" className="text-xs">{t("stock.tab.vietnam")}</TabsTrigger>
-            </TabsList>
-            <TabsContent value="us-stocks" className="mt-3">
-              <StockGrid
-                title={t("stock.tab.us")}
-                description={t("stock.us.desc")}
-                stocks={usStockArray}
-                isLoading={isLoading}
-                loadingLabel={t("stock.loading")}
-                emptyLabel={t("stock.empty")}
-              />
-            </TabsContent>
-            <TabsContent value="hk-stocks" className="mt-3">
-              <StockGrid
-                title={t("stock.tab.hk")}
-                description={t("stock.hk.desc")}
-                stocks={hkStockArray}
-                isLoading={isLoading}
-                loadingLabel={t("stock.loading")}
-                emptyLabel={t("stock.empty")}
-              />
-            </TabsContent>
-            <TabsContent value="vietnam" className="mt-3">
-              <StockGrid
-                title={t("stock.tab.vietnam")}
-                description={t("stock.vietnam.desc")}
-                stocks={vietnamStockArray}
-                isLoading={isLoading}
-                loadingLabel={t("stock.loading")}
-                emptyLabel={t("stock.empty")}
-              />
-            </TabsContent>
-          </Tabs>
+    <DashboardFrame>
+      <header className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">{t("stock.title")}</h1>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{t("stock.subtitle")}</p>
         </div>
-      </main>
-    </div>
+        <TimeRangeSelector value={range} onChange={setRange} />
+      </header>
+
+      <CrashAlertBanner crashes={crashes} />
+
+      <KpiStrip tiles={kpiTiles} />
+      <CrashLeaderboard stocks={crashLeaderboard} />
+
+      <Tabs defaultValue="us-stocks" className="w-full">
+        <TabsList className="grid h-auto w-full max-w-2xl grid-cols-1 sm:grid-cols-3">
+          <TabsTrigger value="us-stocks" className="text-xs">{t("stock.tab.us")}</TabsTrigger>
+          <TabsTrigger value="hk-stocks" className="text-xs">{t("stock.tab.hk")}</TabsTrigger>
+          <TabsTrigger value="vietnam" className="text-xs">{t("stock.tab.vietnam")}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="us-stocks" className="mt-3">
+          <StockGrid
+            title={t("stock.tab.us")}
+            description={t("stock.us.desc")}
+            stocks={usStockArray}
+            isLoading={isLoading}
+            loadingLabel={t("stock.loading")}
+            emptyLabel={t("stock.empty")}
+          />
+        </TabsContent>
+        <TabsContent value="hk-stocks" className="mt-3">
+          <StockGrid
+            title={t("stock.tab.hk")}
+            description={t("stock.hk.desc")}
+            stocks={hkStockArray}
+            isLoading={isLoading}
+            loadingLabel={t("stock.loading")}
+            emptyLabel={t("stock.empty")}
+          />
+        </TabsContent>
+        <TabsContent value="vietnam" className="mt-3">
+          <StockGrid
+            title={t("stock.tab.vietnam")}
+            description={t("stock.vietnam.desc")}
+            stocks={vietnamStockArray}
+            isLoading={isLoading}
+            loadingLabel={t("stock.loading")}
+            emptyLabel={t("stock.empty")}
+          />
+        </TabsContent>
+      </Tabs>
+    </DashboardFrame>
   )
 }
 

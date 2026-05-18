@@ -1,13 +1,11 @@
 import { Button } from "@/components/ui/button"
-import { SiteHeader } from "@/components/site-header"
+import { AppFrame } from "@/components/page-frame"
 import { ArrowRight, Bell, LineChart, TrendingDown } from "lucide-react"
 import Link from "next/link"
 
 export default function MarketingLanding() {
   return (
-    <div className="flex min-h-svh flex-col bg-background">
-      <SiteHeader />
-
+    <AppFrame className="flex flex-col">
       {/* Hero Section */}
       <main className="flex-1">
         <section className="container mx-auto px-4 py-24 md:py-32">
@@ -78,6 +76,6 @@ export default function MarketingLanding() {
           </div>
         </div>
       </footer>
-    </div>
+    </AppFrame>
   )
 }

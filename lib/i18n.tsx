@@ -94,6 +94,8 @@ const DICT: Dict = {
   // KPI labels
   "kpi.btc": { zh: "BTC 现货", en: "BTC Spot" },
   "kpi.eth": { zh: "ETH 现货", en: "ETH Spot" },
+  "kpi.ethBtc": { zh: "ETH/BTC 强弱", en: "ETH/BTC Strength" },
+  "kpi.ethBtc.helper": { zh: "ETH 相对 BTC", en: "ETH relative to BTC" },
   "kpi.sol": { zh: "SOL 现货", en: "SOL Spot" },
   "kpi.mcap": { zh: "总市值", en: "Total Market Cap" },
   "kpi.btcd": { zh: "BTC 占比", en: "BTC Dominance" },
@@ -103,8 +105,8 @@ const DICT: Dict = {
   // Stock dashboard
   "stock.title": { zh: "股票看板", en: "Stock Dashboard" },
   "stock.subtitle": {
-    zh: "美股、港股和越南概念股公开行情；顶部 KPI 取自宏观核心指标（Yahoo Finance，延迟 15-30 分钟）。",
-    en: "US, HK and Vietnam-themed equity quotes; KPI strip pulls from macro indicators (Yahoo Finance, 15–30m delayed).",
+    zh: "美股、港股和越南概念股公开行情；顶部优先展示股指期货、波动率、利率、信用、美元和商品等量化交易核心因子。",
+    en: "US, HK and Vietnam-themed equity quotes; top KPIs prioritize index futures, volatility, rates, credit, dollar and commodity factors for quant trading.",
   },
   "stock.tab.us": { zh: "美股 Top 50", en: "US Top 50" },
   "stock.tab.hk": { zh: "港股 Top 20", en: "HK Top 20" },
@@ -127,11 +129,16 @@ const DICT: Dict = {
   // Macro dashboard
   "macro.title": { zh: "宏观看板", en: "Macro Dashboard" },
   "macro.subtitle": {
-    zh: "跨资产宏观指标，按业内重要性（利率 → 通胀 → 就业 → 流动性 → 信用 → 股指 → 波动率 → 商品 → 加密 → 链上）排序。每条指标右上角提供来源 + 含义解释。",
-    en: "Cross-asset macro indicators ordered by importance (Rates → Inflation → Employment → Liquidity → Credit → Equity → Volatility → Commodity → Crypto → On-chain). Each tile has a source + interpretation.",
+    zh: "跨资产金融与宏观指标，优先展示利率、流动性、信用、股指、波动率、外汇和商品，再进入通胀、就业和增长。每条指标右上角提供来源 + 含义解释。",
+    en: "Cross-asset financial and macro indicators: rates, liquidity, credit, equity, volatility, FX and commodities first, then inflation, employment and growth. Each tile has a source + interpretation.",
   },
   "macro.tab.realtime": { zh: "实时", en: "Realtime" },
   "macro.tab.history": { zh: "历史曲线", en: "History" },
+  "macro.historyCompare.title": { zh: "宏观历史对比 · 统一时间轴", en: "Macro History Compare · Unified time axis" },
+  "macro.historyCompare.info": {
+    zh: "将所有宏观与金融指标按类型分组绘制在同一套时间轴上。每个面板共享左右时间边界，悬停任意面板会同步到同一天；点击图例可显示 / 隐藏单条曲线，用于对齐查看历史趋势。",
+    en: "Groups every macro and financial indicator onto one shared time axis. Panes use the same left/right bounds, hover syncs all panes to the same date, and legend clicks show/hide individual lines for aligned trend review.",
+  },
   "macro.indicators": { zh: "{returned}/{requested} 指标", en: "{returned}/{requested} indicators" },
   "macro.loading": { zh: "正在加载宏观指标…", en: "Loading macro indicators…" },
   "macro.updated": { zh: "更新于 {time}", en: "Updated {time}" },
@@ -198,6 +205,10 @@ const DICT: Dict = {
   // Crypto KPI info text
   "kpi.btc.info": { zh: "Bitcoin 现货报价（OKX）。加密市场总市值的核心锚。", en: "Bitcoin spot price (OKX). Anchor for total crypto market cap." },
   "kpi.eth.info": { zh: "Ethereum 现货。DeFi/L2 生态主导链。", en: "Ethereum spot. Leading DeFi / L2 chain." },
+  "kpi.ethBtc.info": {
+    zh: "ETH/BTC 衡量 ETH 相对 BTC 的风险偏好。上行通常表示资金愿意承担更高 Beta；下行表示资金回到 BTC 或现金。",
+    en: "ETH/BTC measures ETH risk appetite versus BTC. Rising usually means capital is accepting higher beta; falling means rotation back to BTC or cash.",
+  },
   "kpi.sol.info": {
     zh: "Solana 现货。高吞吐公链，风险偏好高时与 BTC 同向波动常放大。",
     en: "Solana spot. High-throughput chain; tends to amplify BTC moves in risk-on regimes.",
