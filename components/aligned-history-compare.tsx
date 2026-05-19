@@ -33,18 +33,25 @@ export interface AlignedHistoryPoint {
 export interface AlignedHistorySeries {
   key: string
   label: string
-  paneIndex: number
   color: string
   unit: AlignedHistoryUnit
   data: AlignedHistoryPoint[]
 }
 
-export interface AlignedHistoryData {
-  timeline: number[]
+export interface AlignedHistoryGroup {
+  key: string
+  label?: string
   series: AlignedHistorySeries[]
 }
 
+export interface AlignedHistoryData {
+  groups: AlignedHistoryGroup[]
+  timeline?: number[]
+}
+
 interface SeriesGroup {
+  key: string
+  label?: string
   paneIndex: number
   specs: AlignedHistorySeries[]
 }
@@ -73,6 +80,7 @@ export interface AlignedHistoryCompareProps {
 
 const toUtc = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp
 const LWC_VALUE_CAP = 8.9e13
+const COMPACT_WIDTH = 560
 
 function formatRaw(value: number, unit: AlignedHistoryUnit): string {
   if (!Number.isFinite(value)) return "—"
@@ -164,20 +172,29 @@ function summarize(points: AlignedHistoryPoint[]): { first: number; last: number
   return { first, last, pct }
 }
 
-function groupSeries(series: AlignedHistorySeries[]): SeriesGroup[] {
-  const byPane = new Map<number, AlignedHistorySeries[]>()
-  for (const spec of series) {
-    const specs = byPane.get(spec.paneIndex)
-    if (specs) {
-      specs.push(spec)
-    } else {
-      byPane.set(spec.paneIndex, [spec])
+function getTimeline(data: AlignedHistoryData): number[] {
+  const timeline = new Set<number>(data.timeline ?? [])
+  for (const group of data.groups) {
+    for (const series of group.series) {
+      for (const point of series.data) {
+        if (Number.isFinite(point.time)) timeline.add(point.time)
+      }
     }
   }
+  return Array.from(timeline).sort((a, b) => a - b)
+}
 
-  return Array.from(byPane.entries())
-    .sort(([a], [b]) => a - b)
-    .map(([paneIndex, specs]) => ({ paneIndex, specs }))
+function getGroups(data: AlignedHistoryData): SeriesGroup[] {
+  return data.groups
+    .map((group, paneIndex) => ({
+      key: group.key,
+      label: group.label,
+      paneIndex,
+      specs: group.series.filter((series) =>
+        series.data.some((point) => point.value !== null && Number.isFinite(point.value)),
+      ),
+    }))
+    .filter((group) => group.specs.length > 0)
 }
 
 function getTimelineRange(timeline: number[]): { from: UTCTimestamp; to: UTCTimestamp } | null {
@@ -204,27 +221,53 @@ export function AlignedHistoryCompare({
   className,
 }: AlignedHistoryCompareProps) {
   const { locale } = useI18n()
+  const cardRef = useRef<HTMLDivElement | null>(null)
   const gridRef = useRef<HTMLDivElement | null>(null)
   const chartsRef = useRef<PaneChart[]>([])
   const hiddenRef = useRef<Set<string>>(new Set())
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [hoverTime, setHoverTime] = useState<number | null>(null)
-  const groups = useMemo(() => (data ? groupSeries(data.series) : []), [data])
+  const [cardWidth, setCardWidth] = useState(0)
+  const groups = useMemo(() => (data ? getGroups(data) : []), [data])
+  const timeline = useMemo(() => (data ? getTimeline(data) : []), [data])
+  const isCompact = cardWidth > 0 && cardWidth < COMPACT_WIDTH
+  const seriesCount = useMemo(() => groups.reduce((count, group) => count + group.specs.length, 0), [groups])
 
   useEffect(() => {
     hiddenRef.current = hidden
   }, [hidden])
 
   useEffect(() => {
-    if (!gridRef.current || !data || data.series.length === 0) return
+    const card = cardRef.current
+    if (!card) return
+
+    const updateWidth = () => setCardWidth(Math.round(card.getBoundingClientRect().width))
+    updateWidth()
+
+    const observer = new ResizeObserver(updateWidth)
+    observer.observe(card)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!data) return
+    const validKeys = new Set(groups.flatMap((group) => group.specs.map((spec) => spec.key)))
+    setHidden((previous) => {
+      const next = new Set(Array.from(previous).filter((key) => validKeys.has(key)))
+      return next.size === previous.size ? previous : next
+    })
+  }, [data, groups])
+
+  useEffect(() => {
+    if (!gridRef.current || !data || seriesCount === 0 || timeline.length === 0) return
     const grid = gridRef.current
 
     const isDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false
     const textColor = isDark ? "rgba(229,231,235,0.85)" : "rgba(30,41,59,0.85)"
     const gridColor = isDark ? "rgba(148,163,184,0.10)" : "rgba(148,163,184,0.14)"
-    const sharedRange = getTimelineRange(data.timeline)
-    const timeVisible = shouldShowTime(data.timeline)
-    const timelineAnchorData = toTimelineAnchorData(data.timeline)
+    const sharedRange = getTimelineRange(timeline)
+    const timeVisible = shouldShowTime(timeline)
+    const timelineAnchorData = toTimelineAnchorData(timeline)
     const sharedLogicalRange =
       timelineAnchorData.length > 1
         ? ({ from: 0 as Logical, to: (timelineAnchorData.length - 1) as Logical } satisfies LogicalRange)
@@ -240,16 +283,16 @@ export function AlignedHistoryCompare({
         layout: {
           background: { type: ColorType.Solid, color: "transparent" },
           textColor,
-          fontSize: 9,
+          fontSize: isCompact ? 8 : 9,
           attributionLogo: false,
         },
         grid: { vertLines: { visible: false }, horzLines: { color: gridColor } },
         rightPriceScale: {
           visible: true,
           borderVisible: false,
-          scaleMargins: { top: 0.1, bottom: 0.1 },
+          scaleMargins: isCompact ? { top: 0.18, bottom: 0.18 } : { top: 0.1, bottom: 0.1 },
           entireTextOnly: true,
-          minimumWidth: 84,
+          minimumWidth: isCompact ? 52 : 84,
         },
         timeScale: {
           visible: showsSharedXAxis,
@@ -262,8 +305,18 @@ export function AlignedHistoryCompare({
           lockVisibleTimeRangeOnResize: true,
         },
         crosshair: { mode: CrosshairMode.Magnet, vertLine: { width: 1 }, horzLine: { visible: false } },
-        handleScroll: false,
-        handleScale: false,
+        handleScroll: {
+          mouseWheel: false,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: false,
+        },
+        handleScale: {
+          mouseWheel: false,
+          pinch: true,
+          axisPressedMouseMove: { time: true, price: false },
+          axisDoubleClickReset: { time: true, price: false },
+        },
       })
 
       const anchorSeries = chart.addSeries(LineSeries, {
@@ -285,14 +338,14 @@ export function AlignedHistoryCompare({
           priceLineVisible: false,
           lastValueVisible: false,
           crosshairMarkerVisible: true,
-          crosshairMarkerRadius: 3,
+          crosshairMarkerRadius: isCompact ? 2 : 3,
           priceFormat: {
             type: "custom",
             formatter: (value: BarPrice) => formatRaw(value, spec.unit),
             minMove: 0.0001,
           },
         })
-        const prepared = prepareLineSeries(spec.data, data.timeline)
+        const prepared = prepareLineSeries(spec.data, timeline)
         series.setData(prepared.lineData)
         seriesByKey.set(spec.key, series)
         rawByKey.set(spec.key, prepared.rawByTime)
@@ -378,7 +431,7 @@ export function AlignedHistoryCompare({
       chartsRef.current = []
       for (const pane of panes) pane.chart.remove()
     }
-  }, [data, groups])
+  }, [data, groups, isCompact, seriesCount, timeline])
 
   useEffect(() => {
     for (const pane of chartsRef.current) {
@@ -402,12 +455,14 @@ export function AlignedHistoryCompare({
   const summaries = useMemo(() => {
     const out = new Map<string, { first: number; last: number; pct: number }>()
     if (!data) return out
-    for (const series of data.series) {
-      const summary = summarize(series.data)
-      if (summary) out.set(series.key, summary)
+    for (const group of groups) {
+      for (const series of group.specs) {
+        const summary = summarize(series.data)
+        if (summary) out.set(series.key, summary)
+      }
     }
     return out
-  }, [data])
+  }, [data, groups])
 
   const hoverRaws = useMemo(() => {
     const out = new Map<string, number>()
@@ -431,22 +486,27 @@ export function AlignedHistoryCompare({
   }, [hoverTime, locale])
 
   const visibleSeriesCount = useMemo(() => {
-    if (!data) return 0
-    return data.series.reduce((count, spec) => count + (hidden.has(spec.key) ? 0 : 1), 0)
-  }, [data, hidden])
+    return groups.reduce(
+      (count, group) =>
+        count + group.specs.reduce((groupCount, spec) => groupCount + (hidden.has(spec.key) ? 0 : 1), 0),
+      0,
+    )
+  }, [groups, hidden])
 
   return (
-    <Card className={cn("py-2.5", className)}>
+    <Card ref={cardRef} data-history-compare className={cn("py-2.5", className)}>
       <CardHeader className="px-3 pb-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <CardTitle className="text-sm">{title}</CardTitle>
+            <CardTitle data-history-title className="text-sm">
+              {title}
+            </CardTitle>
             <InfoTooltip title={title} description={infoDescription} source={infoSource} />
           </div>
-          {data && (
+          {data && seriesCount > 0 && (
             <span className="text-[10px] text-muted-foreground">
               {hoverDateLabel ? `${hoverDateLabel} · ` : ""}
-              {visibleSeriesCount}/{data.series.length} {seriesCountLabel}
+              {visibleSeriesCount}/{seriesCount} {seriesCountLabel}
             </span>
           )}
         </div>
@@ -456,16 +516,20 @@ export function AlignedHistoryCompare({
           <p className="py-12 text-center text-xs text-destructive">{error}</p>
         ) : loading && !data ? (
           <p className="py-12 text-center text-xs text-muted-foreground">{loadingLabel}</p>
-        ) : !data || data.series.length === 0 ? (
+        ) : !data || seriesCount === 0 || timeline.length === 0 ? (
           <p className="py-12 text-center text-xs text-muted-foreground">{noDataLabel}</p>
         ) : (
-          <div ref={gridRef} className="flex flex-col gap-1">
+          <div ref={gridRef} className="flex flex-col gap-0.5 sm:gap-1">
             {groups.map((group, groupIndex) => (
               <section
                 key={group.paneIndex}
-                className="border-t border-border/60 pt-1 first:border-t-0 first:pt-0"
+                data-history-group={group.key}
+                className="border-t border-border/60 pt-0.5 first:border-t-0 first:pt-0 sm:pt-1"
               >
-                <div className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <div
+                  data-history-pane-legend
+                  className="mb-0.5 flex min-h-4 snap-x flex-nowrap items-center gap-x-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:gap-x-2 sm:gap-y-0.5 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden"
+                >
                   {group.specs.map((spec) => {
                     const summary = summaries.get(spec.key)
                     const hoverRaw = hoverRaws.get(spec.key)
@@ -490,7 +554,7 @@ export function AlignedHistoryCompare({
                         onClick={() => toggle(spec.key)}
                         aria-pressed={!isHidden}
                         className={cn(
-                          "inline-flex max-w-full items-baseline gap-1 truncate text-left tabular-nums transition-opacity hover:text-foreground",
+                          "inline-flex max-w-[220px] shrink-0 snap-start items-baseline gap-0.5 truncate text-left tabular-nums transition-opacity hover:text-foreground sm:max-w-full sm:shrink sm:gap-1",
                           isHidden ? "opacity-35" : "opacity-100",
                         )}
                       >
@@ -501,7 +565,7 @@ export function AlignedHistoryCompare({
                         <span className="truncate text-[10px] font-medium leading-none" title={spec.label}>
                           {spec.label}
                         </span>
-                        <span className="shrink-0 text-[10px] font-semibold leading-none">
+                        <span className="shrink-0 text-[9px] font-semibold leading-none sm:text-[10px]">
                           {liveValue !== undefined ? formatRaw(liveValue, spec.unit) : "—"}
                         </span>
                         <span className={cn("shrink-0 text-[9px] leading-none", pctTone)}>
@@ -513,7 +577,10 @@ export function AlignedHistoryCompare({
                 </div>
                 <div
                   data-pane={group.paneIndex}
-                  className={cn("w-full", groupIndex === groups.length - 1 ? "h-[120px]" : "h-[108px]")}
+                  className={cn(
+                    "w-full",
+                    groupIndex === groups.length - 1 ? "h-[86px] sm:h-[120px]" : "h-[74px] sm:h-[108px]",
+                  )}
                 />
               </section>
             ))}
