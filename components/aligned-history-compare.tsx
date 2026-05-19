@@ -22,7 +22,7 @@ import { InfoTooltip } from "@/components/info-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
-export type AlignedHistoryUnit = "usd" | "pct" | "ratio" | "raw" | "count"
+export type AlignedHistoryUnit = "usd" | "cny" | "pct" | "ratio" | "raw" | "count"
 
 export interface AlignedHistoryPoint {
   time: number
@@ -35,6 +35,11 @@ export interface AlignedHistorySeries {
   color: string
   unit: AlignedHistoryUnit
   data: AlignedHistoryPoint[]
+  info?: {
+    title?: string
+    description: string
+    source?: string
+  }
 }
 
 export interface AlignedHistoryGroup {
@@ -108,11 +113,14 @@ function formatRaw(value: number, unit: AlignedHistoryUnit): string {
   const abs = Math.abs(value)
   switch (unit) {
     case "usd":
-      if (abs >= 1e12) return `$${(value / 1e12).toFixed(2)}T`
-      if (abs >= 1e9) return `$${(value / 1e9).toFixed(2)}B`
-      if (abs >= 1e6) return `$${(value / 1e6).toFixed(2)}M`
-      if (abs >= 1e3) return `$${(value / 1e3).toFixed(2)}K`
-      return `$${value.toFixed(2)}`
+    case "cny": {
+      const prefix = unit === "cny" ? "¥" : "$"
+      if (abs >= 1e12) return `${prefix}${(value / 1e12).toFixed(2)}T`
+      if (abs >= 1e9) return `${prefix}${(value / 1e9).toFixed(2)}B`
+      if (abs >= 1e6) return `${prefix}${(value / 1e6).toFixed(2)}M`
+      if (abs >= 1e3) return `${prefix}${(value / 1e3).toFixed(2)}K`
+      return `${prefix}${value.toFixed(2)}`
+    }
     case "pct":
       return `${value >= 0 ? "+" : ""}${value.toFixed(3)}%`
     case "ratio":
@@ -139,38 +147,53 @@ type AlignedLineData = Array<LineData<Time> | WhitespaceData<Time>>
 interface PreparedLineSeries {
   lineData: AlignedLineData
   rawByTime: Map<number, number>
+  plotScale: number
 }
 
-function getValidPointMap(points: AlignedHistoryPoint[]): Map<UTCTimestamp, number> {
+function getFinitePointMap(points: AlignedHistoryPoint[]): Map<UTCTimestamp, number> {
   const validPoints = new Map<UTCTimestamp, number>()
   for (const point of points) {
-    if (point.value === null || !Number.isFinite(point.value) || Math.abs(point.value) >= LWC_VALUE_CAP) continue
+    if (point.value === null || !Number.isFinite(point.value)) continue
     validPoints.set(toUtc(point.time), point.value)
   }
   return validPoints
 }
 
-function toLineData(points: AlignedHistoryPoint[], timeline: number[]): AlignedLineData {
-  const valuesByTime = getValidPointMap(points)
+function getPlotScale(points: AlignedHistoryPoint[]): number {
+  let maxAbs = 0
+  for (const point of points) {
+    if (point.value === null || !Number.isFinite(point.value)) continue
+    maxAbs = Math.max(maxAbs, Math.abs(point.value))
+  }
+  if (maxAbs < LWC_VALUE_CAP) return 1
+  return 1000 ** Math.ceil(Math.log(maxAbs / (LWC_VALUE_CAP / 2)) / Math.log(1000))
+}
+
+function toLineData(points: AlignedHistoryPoint[], timeline: number[], plotScale: number): AlignedLineData {
+  const valuesByTime = getFinitePointMap(points)
   const timelineSeconds = Array.from(new Set([...timeline.map(toUtc), ...valuesByTime.keys()])).sort((a, b) => a - b)
 
   if (timelineSeconds.length === 0) {
     return Array.from(valuesByTime.entries())
       .sort(([a], [b]) => a - b)
-      .map(([time, value]) => ({ time, value }))
+      .map(([time, value]) => ({ time, value: value / plotScale }))
   }
 
   return timelineSeconds.map((time) => {
     const value = valuesByTime.get(time)
-    return value === undefined ? { time } : { time, value }
+    if (value === undefined) return { time }
+    const scaled = value / plotScale
+    return Math.abs(scaled) < LWC_VALUE_CAP ? { time, value: scaled } : { time }
   })
 }
 
 function prepareLineSeries(points: AlignedHistoryPoint[], timeline: number[]): PreparedLineSeries {
-  const rawByTime = getValidPointMap(points)
+  const rawByTime = getFinitePointMap(points)
+  const plotScale = getPlotScale(points)
   return {
-    lineData: toLineData(points, timeline),
+    lineData: toLineData(points, timeline, plotScale),
     rawByTime,
+    plotScale,
   }
 }
 
@@ -382,6 +405,7 @@ export function AlignedHistoryCompare({
       const seriesByKey = new Map<string, ISeriesApi<"Line">>()
       const rawByKey = new Map<string, Map<number, number>>()
       for (const spec of group.specs) {
+        const prepared = prepareLineSeries(spec.data, timeline)
         const series = chart.addSeries(LineSeries, {
           color: spec.color,
           lineWidth: group.specs.length === 1 ? 2 : 1,
@@ -391,11 +415,10 @@ export function AlignedHistoryCompare({
           crosshairMarkerRadius: isCompact ? 2 : 3,
           priceFormat: {
             type: "custom",
-            formatter: (value: BarPrice) => formatRaw(value, spec.unit),
+            formatter: (value: BarPrice) => formatRaw(Number(value) * prepared.plotScale, spec.unit),
             minMove: 0.0001,
           },
         })
-        const prepared = prepareLineSeries(spec.data, timeline)
         series.setData(prepared.lineData)
         seriesByKey.set(spec.key, series)
         rawByKey.set(spec.key, prepared.rawByTime)
@@ -597,6 +620,11 @@ export function AlignedHistoryCompare({
                 data-history-group={group.key}
                 className="border-t border-border/50 pt-px first:border-t-0 first:pt-0 sm:pt-0.5"
               >
+                {group.label && (
+                  <div className="mb-px h-3 overflow-hidden truncate text-[8px] font-semibold leading-3 text-muted-foreground sm:text-[9px]">
+                    {group.label}
+                  </div>
+                )}
                 <div
                   data-history-pane-legend
                   className="mb-px grid grid-cols-2 items-center gap-x-1.5 gap-y-px"
@@ -613,30 +641,43 @@ export function AlignedHistoryCompare({
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-red-600 dark:text-red-400"
                     return (
-                      <button
+                      <div
                         key={spec.key}
-                        type="button"
-                        onClick={() => toggle(spec.key)}
-                        aria-pressed={!isHidden}
-                        className={cn(
-                          "inline-grid h-3.5 min-w-0 grid-cols-[auto_minmax(0,1fr)_4.1rem_2.8rem] items-center gap-0.5 text-left tabular-nums transition-opacity hover:text-foreground sm:grid-cols-[auto_minmax(0,1fr)_4.5rem_3.2rem] sm:gap-1",
-                          isHidden ? "opacity-35" : "opacity-100",
-                        )}
+                        className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-0.5"
                       >
-                        <span
-                          className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{ background: spec.color }}
-                        />
-                        <span className="min-w-0 truncate text-[9px] font-medium leading-none sm:text-[10px]" title={spec.label}>
-                          {spec.label}
-                        </span>
-                        <span className="w-[4.1rem] overflow-hidden truncate text-right text-[8px] font-semibold leading-none sm:w-[4.5rem] sm:text-[10px]">
-                          {liveValue !== undefined ? formatRaw(liveValue, spec.unit) : "—"}
-                        </span>
-                        <span className={cn("w-[2.8rem] overflow-hidden truncate text-right text-[8px] leading-none sm:w-[3.2rem] sm:text-[9px]", pctTone)}>
-                          {livePct !== undefined ? formatPct(livePct) : ""}
-                        </span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => toggle(spec.key)}
+                          aria-pressed={!isHidden}
+                          className={cn(
+                            "inline-grid h-3.5 min-w-0 grid-cols-[auto_minmax(0,1fr)_4.1rem_2.8rem] items-center gap-0.5 text-left tabular-nums transition-opacity hover:text-foreground sm:grid-cols-[auto_minmax(0,1fr)_4.5rem_3.2rem] sm:gap-1",
+                            isHidden ? "opacity-35" : "opacity-100",
+                          )}
+                        >
+                          <span
+                            className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{ background: spec.color }}
+                          />
+                          <span className="min-w-0 truncate text-[9px] font-medium leading-none sm:text-[10px]" title={spec.label}>
+                            {spec.label}
+                          </span>
+                          <span className="w-[4.1rem] overflow-hidden truncate text-right text-[8px] font-semibold leading-none sm:w-[4.5rem] sm:text-[10px]">
+                            {liveValue !== undefined ? formatRaw(liveValue, spec.unit) : "—"}
+                          </span>
+                          <span className={cn("w-[2.8rem] overflow-hidden truncate text-right text-[8px] leading-none sm:w-[3.2rem] sm:text-[9px]", pctTone)}>
+                            {livePct !== undefined ? formatPct(livePct) : ""}
+                          </span>
+                        </button>
+                        {spec.info && (
+                          <InfoTooltip
+                            title={spec.info.title ?? spec.label}
+                            description={spec.info.description}
+                            source={spec.info.source}
+                            className="h-3 w-3"
+                            iconClassName="h-2.5 w-2.5"
+                          />
+                        )}
+                      </div>
                     )
                   })}
                 </div>

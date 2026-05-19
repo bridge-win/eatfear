@@ -44,8 +44,10 @@ export const formatChangeWithPercent = (indicator: MacroIndicator): string => {
 
 /** Build a consistent `<InfoTooltip>` source string ("FRED · Daily") without trailing separator. */
 export const buildInfoSource = (indicator: MacroIndicator): string => {
-  if (indicator.frequency) return `${indicator.source} · ${indicator.frequency}`
-  return indicator.source
+  const parts = [indicator.source, indicator.frequency, indicator.sourceNote].filter((part): part is string =>
+    Boolean(part),
+  )
+  return parts.join(" · ")
 }
 
 /** Props for the shared InfoTooltip when fed from a macro indicator. */
@@ -56,10 +58,19 @@ export interface IndicatorInfoProps {
 }
 
 export const buildIndicatorInfo = (indicator: MacroIndicator): IndicatorInfoProps | undefined => {
-  if (!indicator.description) return undefined
+  if (!indicator.description && !indicator.meaning && !indicator.impact) return undefined
+  const meaning = indicator.meaning ?? indicator.description
+  const impact =
+    indicator.impact ?? "扩展指标，影响方向需结合指标说明、历史趋势和同组指标一起判断。"
+  const descriptionParts = [
+    meaning ? `意义：${meaning}` : null,
+    `影响方向：${impact}`,
+    indicator.meaning && indicator.description ? `说明：${indicator.description}` : null,
+  ].filter((part): part is string => Boolean(part))
+
   return {
     title: indicator.name,
-    description: indicator.description,
+    description: descriptionParts.join("\n"),
     source: buildInfoSource(indicator),
   }
 }

@@ -1,46 +1,34 @@
 import { NextResponse } from "next/server"
 import { fetchJson } from "@/lib/data-sources/_fetch"
+import { fetchMempoolHashrateHistory } from "@/lib/data-sources/mempool"
+import {
+  computeMiningCostFromHashrateHps,
+  resolveMiningCostParameters,
+  type MiningCostPoint,
+} from "@/lib/mining-cost"
 import { DEFAULT_TIME_RANGE, getBlockchainTimespan, getRangeDays, getTimeRange } from "@/lib/time-range"
 
 export const revalidate = 600
 
 /**
- * Mining cost / electricity-cost proxy curve.
+ * Mining cost / electricity-cost proxy curves.
  *
  * We combine three public, free-tier feeds:
  *   - mempool.space network hashrate history (per-day avg hashrate in H/s)
  *   - blockchain.info market price (USD per BTC) for the same window
- *   - a configurable miner efficiency (J/TH) and electricity rate (USD/kWh)
+ *   - configurable miner efficiency, electricity rate, and comprehensive-cost multiplier
  *     so the curve can be tuned via env without breaking when keys are absent.
  *
  * Cost-of-production per BTC is approximated as:
  *   network_kWh_per_day = hashrate_TH/s * 86_400_s * efficiency_J/TH / 3.6e6
  *   btc_per_day         = 144 blocks/day * block_reward (3.125 post-2024 halving)
- *   cost_per_btc        = network_kWh_per_day * electricity_rate / btc_per_day
+ *   electricity_cost    = network_kWh_per_day * electricity_rate / btc_per_day
+ *   comprehensive_cost  = electricity_cost * comprehensive_multiplier
  *
  * This is intentionally a coarse proxy — what matters is the *shape* relative
  * to price, which is the actionable signal traders track (cost-of-production
  * vs. spot defines miner-capitulation regimes).
  */
-
-const DEFAULT_EFFICIENCY_J_PER_TH = Number(process.env.MINING_EFFICIENCY_J_PER_TH ?? 21) // mid-fleet ASIC
-const DEFAULT_ELEC_USD_PER_KWH = Number(process.env.MINING_ELECTRICITY_USD_PER_KWH ?? 0.05)
-const HALVING_BLOCK_REWARD = 3.125 // post-Apr-2024 halving
-
-interface HashrateRow {
-  timestamp: number
-  avgHashrate: number // H/s
-}
-
-async function fetchHashrateHistory(): Promise<HashrateRow[]> {
-  const payload = await fetchJson<{ hashrates?: HashrateRow[] }>(
-    "https://mempool.space/api/v1/mining/hashrate/total",
-    { revalidate, timeoutMs: 15_000 },
-  )
-  return (payload?.hashrates ?? []).filter(
-    (row) => Number.isFinite(row.timestamp) && Number.isFinite(row.avgHashrate) && row.avgHashrate > 0,
-  )
-}
 
 interface BlockchainPriceEnvelope {
   values?: { x: number; y: number }[]
@@ -58,28 +46,13 @@ async function fetchBtcPriceHistory(timespan: string): Promise<{ time: number; p
     .filter((row) => Number.isFinite(row.time) && Number.isFinite(row.price) && row.price > 0)
 }
 
-interface CostPoint {
-  time: number
-  hashrate: number // EH/s
-  electricityUsdPerBtc: number
-  marketPriceUsd: number | null
-  marginPct: number | null // (price - cost) / cost * 100
-}
-
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const range = getTimeRange(url.searchParams.get("range") ?? DEFAULT_TIME_RANGE)
-  const efficiency =
-    Number(url.searchParams.get("efficiency")) > 0
-      ? Number(url.searchParams.get("efficiency"))
-      : DEFAULT_EFFICIENCY_J_PER_TH
-  const electricityRate =
-    Number(url.searchParams.get("rate")) > 0
-      ? Number(url.searchParams.get("rate"))
-      : DEFAULT_ELEC_USD_PER_KWH
+  const parameters = resolveMiningCostParameters(url.searchParams)
 
   const [hashrates, prices] = await Promise.all([
-    fetchHashrateHistory(),
+    fetchMempoolHashrateHistory(revalidate),
     fetchBtcPriceHistory(getBlockchainTimespan(range.id)),
   ])
 
@@ -119,39 +92,23 @@ export async function GET(request: Request) {
     return Math.abs(a.time - time) <= Math.abs(b.time - time) ? a.price : b.price
   }
 
-  const btcPerDay = 144 * HALVING_BLOCK_REWARD
-
-  const points: CostPoint[] = hashrates
-    .filter((row) => row.timestamp * 1000 >= horizonStart)
+  const points: MiningCostPoint[] = hashrates
+    .filter((row) => row.timestamp >= horizonStart)
     .map((row) => {
-      const time = row.timestamp * 1000
-      const hashrateThPerSec = row.avgHashrate / 1e12
-      const networkKwhPerDay = (hashrateThPerSec * 86_400 * efficiency) / 3.6e6
-      const electricityUsdPerBtc = (networkKwhPerDay * electricityRate) / btcPerDay
-      const marketPriceUsd = nearestPrice(time)
-      const marginPct =
-        marketPriceUsd && marketPriceUsd > 0 && electricityUsdPerBtc > 0
-          ? ((marketPriceUsd - electricityUsdPerBtc) / electricityUsdPerBtc) * 100
-          : null
-      return {
-        time,
-        hashrate: row.avgHashrate / 1e18,
-        electricityUsdPerBtc,
-        marketPriceUsd,
-        marginPct,
-      }
+      return computeMiningCostFromHashrateHps({
+        time: row.timestamp,
+        hashrateHps: row.hashrateHps,
+        marketPriceUsd: nearestPrice(row.timestamp),
+        parameters,
+      })
     })
 
   const latest = points[points.length - 1] ?? null
 
   return NextResponse.json({
-    source: "mempool.space hashrate × blockchain.info price (efficiency / electricity-rate model)",
+    source: "mempool.space hashrate × blockchain.info price (electricity + comprehensive cost model)",
     range: range.id,
-    parameters: {
-      efficiencyJPerTh: efficiency,
-      electricityUsdPerKwh: electricityRate,
-      blockReward: HALVING_BLOCK_REWARD,
-    },
+    parameters,
     points,
     latest,
     updatedAt: Date.now(),

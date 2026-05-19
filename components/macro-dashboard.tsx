@@ -14,13 +14,11 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { InfoTooltip } from "@/components/info-tooltip"
-import { KpiStrip, type KpiTile } from "@/components/kpi-strip"
 import { DashboardFrame } from "@/components/page-frame"
 import { formatValue as formatSeriesValue, type SeriesChartUnit } from "@/components/series-chart"
 import { TimeRangeSelector } from "@/components/time-range-selector"
 import {
   buildIndicatorInfo,
-  buildInfoSource,
   formatPercentDelta,
   getDeltaTone,
   stripSymbolPrefix,
@@ -33,22 +31,20 @@ import { cn } from "@/lib/utils"
 
 const MACRO_DEFAULT_RANGE: TimeRangeId = "10y"
 
-const KPI_PRIORITY_LIMIT = 12
-const KPI_SPARK_POINTS = 40
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
 const GROUP_ORDER: MacroGroup[] = [
   "Rates",
-  "Liquidity",
-  "Credit",
-  "Equity",
-  "Volatility",
-  "FX",
-  "Commodity",
   "Inflation",
-  "Employment",
+  "Liquidity",
   "Growth",
+  "Employment",
+  "FX",
   "RealEstate",
+  "Equity",
+  "Credit",
+  "Commodity",
+  "Volatility",
   "Crypto",
   "OnChain",
   "Sentiment",
@@ -73,25 +69,6 @@ const GROUP_KEY: Record<MacroGroup, string> = {
   CrossAsset: "macro.group.CrossAsset",
 }
 
-const MACRO_KPI_SYMBOLS = [
-  "FRED:DFF",
-  "FRED:DGS10",
-  "FRED:DGS2",
-  "FRED:DFII10",
-  "FRED:T10Y2Y",
-  "FRED:BAMLH0A0HYM2",
-  "FRED:NFCI",
-  "DX-Y.NYB",
-  "^GSPC",
-  "^NDX",
-  "^VIX",
-  "^SOX",
-  "GC=F",
-  "CL=F",
-  "FRED:CPIAUCSL",
-  "FRED:UNRATE",
-] as const
-
 const MACRO_SERIES_COLORS = [
   "#2563eb",
   "#dc2626",
@@ -115,6 +92,21 @@ const getGroupPaneIndex = (group: MacroGroup) => {
   return index === -1 ? GROUP_ORDER.length : index
 }
 
+const getMacroSortRank = (indicator: MacroIndicator) => indicator.macroRank ?? 100 + getGroupPaneIndex(indicator.group)
+
+const sortMacroIndicators = (a: MacroIndicator, b: MacroIndicator) => {
+  const rankDelta = getMacroSortRank(a) - getMacroSortRank(b)
+  if (rankDelta !== 0) return rankDelta
+  return (a.priority ?? 999) - (b.priority ?? 999)
+}
+
+const getMacroSectionKey = (indicator: MacroIndicator) => indicator.macroCategory ?? indicator.group
+
+const getMacroSectionOrder = (indicator: MacroIndicator) => getMacroSortRank(indicator)
+
+const getMacroSectionLabel = (indicator: MacroIndicator, t: (key: string) => string) =>
+  indicator.macroCategory ?? t(GROUP_KEY[indicator.group])
+
 const getMacroSeriesColor = (indicator: MacroIndicator, index: number) => {
   const seed = [...indicator.symbol].reduce((sum, char) => sum + char.charCodeAt(0), index)
   return MACRO_SERIES_COLORS[seed % MACRO_SERIES_COLORS.length]
@@ -125,7 +117,8 @@ const toAlignedUnit = (unit: MacroIndicator["unit"]): AlignedHistoryUnit => {
     case "percent":
       return "pct"
     case "usd":
-      return "usd"
+    case "cny":
+      return unit
     case "ratio":
       return "ratio"
     case "count":
@@ -138,12 +131,8 @@ const toAlignedUnit = (unit: MacroIndicator["unit"]): AlignedHistoryUnit => {
 const buildMacroHistoryData = (indicators: MacroIndicator[]): AlignedHistoryData | null => {
   if (indicators.length === 0) return null
 
-  const sortedIndicators = [...indicators].sort((a, b) => {
-    const groupDelta = getGroupPaneIndex(a.group) - getGroupPaneIndex(b.group)
-    if (groupDelta !== 0) return groupDelta
-    return (a.priority ?? 999) - (b.priority ?? 999)
-  })
-  const grouped = new Map<MacroGroup, AlignedHistorySeries[]>()
+  const sortedIndicators = [...indicators].sort(sortMacroIndicators)
+  const grouped = new Map<string, { label: string; order: number; series: AlignedHistorySeries[] }>()
 
   sortedIndicators.forEach((indicator, index) => {
     const data = indicator.history
@@ -158,23 +147,28 @@ const buildMacroHistoryData = (indicators: MacroIndicator[]): AlignedHistoryData
       color: getMacroSeriesColor(indicator, index),
       unit: toAlignedUnit(indicator.unit),
       data,
+      info: buildIndicatorInfo(indicator),
     }
-    const group = grouped.get(indicator.group)
+    const groupKey = getMacroSectionKey(indicator)
+    const group = grouped.get(groupKey)
     if (group) {
-      group.push(series)
+      group.series.push(series)
     } else {
-      grouped.set(indicator.group, [series])
+      grouped.set(groupKey, {
+        label: indicator.macroCategory ?? indicator.group,
+        order: getMacroSectionOrder(indicator),
+        series: [series],
+      })
     }
   })
 
-  const groups: AlignedHistoryGroup[] = GROUP_ORDER.map((group) => {
-    const series = grouped.get(group) ?? []
-    return {
-      key: group,
-      label: group,
-      series,
-    }
-  }).filter((group) => group.series.length > 0)
+  const groups: AlignedHistoryGroup[] = Array.from(grouped.entries())
+    .sort(([, a], [, b]) => a.order - b.order)
+    .map(([key, group]) => ({
+      key,
+      label: group.label,
+      series: group.series,
+    }))
 
   return groups.length > 0 ? { groups } : null
 }
@@ -239,48 +233,24 @@ export function MacroDashboard({
     }
   }, [range])
 
-  const groupedIndicators = useMemo(() => {
-    const grouped = new Map<MacroGroup, MacroIndicator[]>()
-    for (const indicator of indicators) {
-      const bucket = grouped.get(indicator.group)
-      if (bucket) {
-        bucket.push(indicator)
+  const indicatorSections = useMemo(() => {
+    const sections = new Map<string, { key: string; label: string; order: number; indicators: MacroIndicator[] }>()
+    for (const indicator of [...indicators].sort(sortMacroIndicators)) {
+      const key = getMacroSectionKey(indicator)
+      const section = sections.get(key)
+      if (section) {
+        section.indicators.push(indicator)
       } else {
-        grouped.set(indicator.group, [indicator])
+        sections.set(key, {
+          key,
+          label: getMacroSectionLabel(indicator, t),
+          order: getMacroSectionOrder(indicator),
+          indicators: [indicator],
+        })
       }
     }
-    return grouped
-  }, [indicators])
-
-  const kpiTiles: KpiTile[] = useMemo(() => {
-    const indicatorBySymbol = new Map(indicators.map((indicator) => [indicator.symbol, indicator]))
-    const selectedIndicators: MacroIndicator[] = []
-    const selectedSymbols = new Set<string>()
-
-    for (const symbol of MACRO_KPI_SYMBOLS) {
-      const indicator = indicatorBySymbol.get(symbol)
-      if (!indicator) continue
-      selectedIndicators.push(indicator)
-      selectedSymbols.add(symbol)
-    }
-
-    const fallbackIndicators = indicators
-      .filter((indicator) => !selectedSymbols.has(indicator.symbol))
-      .filter((indicator) => (indicator.priority ?? 999) <= KPI_PRIORITY_LIMIT)
-
-    return [...selectedIndicators, ...fallbackIndicators]
-      .slice(0, KPI_PRIORITY_LIMIT)
-      .map((indicator) => ({
-        id: indicator.symbol,
-        label: indicator.name,
-        value: formatSeriesValue(indicator.value, indicator.unit as SeriesChartUnit, true),
-        delta: formatPercentDelta(indicator.changePercent),
-        deltaTone: getDeltaTone(indicator.change),
-        helper: `${indicator.source} · #${indicator.priority ?? "-"}`,
-        sparkline: indicator.history.slice(-KPI_SPARK_POINTS).map((point) => point.value),
-        info: buildIndicatorInfo(indicator),
-      }))
-  }, [indicators])
+    return Array.from(sections.values()).sort((a, b) => a.order - b.order)
+  }, [indicators, t])
 
   const macroHistoryData = useMemo(() => buildMacroHistoryData(indicators), [indicators])
 
@@ -308,8 +278,6 @@ export function MacroDashboard({
 
       {fredEnabled === false && <FredHint />}
 
-      <KpiStrip tiles={kpiTiles} />
-
       {error && (
         <Card className="border-destructive/40">
           <CardContent className="text-xs text-destructive">{error}</CardContent>
@@ -334,7 +302,7 @@ export function MacroDashboard({
 
           <TabsContent value="realtime" className="mt-3">
             <IndicatorSections
-              groupedIndicators={groupedIndicators}
+              sections={indicatorSections}
               renderIndicator={(indicator) => <RealtimeTile key={indicator.symbol} indicator={indicator} />}
               gridClassName="grid gap-1.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6"
             />
@@ -345,7 +313,7 @@ export function MacroDashboard({
               data={macroHistoryData}
               title={t("macro.historyCompare.title")}
               infoDescription={t("macro.historyCompare.info")}
-              infoSource="FRED · Yahoo Finance · CoinGecko · DefiLlama · Blockchain.com · Alternative.me · TradingView Lightweight Charts"
+              infoSource="FRED · IMF/World Bank via FRED · Yahoo Finance · CoinGecko · DefiLlama · Blockchain.com · Alternative.me · TradingView Lightweight Charts"
               loading={isLoading}
               error={error}
               loadingLabel={t("macro.loading")}
@@ -372,29 +340,26 @@ function FredHint() {
 }
 
 interface IndicatorSectionsProps {
-  groupedIndicators: Map<MacroGroup, MacroIndicator[]>
+  sections: Array<{ key: string; label: string; indicators: MacroIndicator[] }>
   renderIndicator: (indicator: MacroIndicator) => React.ReactNode
   gridClassName: string
 }
 
-function IndicatorSections({ groupedIndicators, renderIndicator, gridClassName }: IndicatorSectionsProps) {
-  const t = useT()
+function IndicatorSections({ sections, renderIndicator, gridClassName }: IndicatorSectionsProps) {
   return (
     <div className="space-y-3">
-      {GROUP_ORDER.map((groupId) => {
-        const group = groupedIndicators.get(groupId)
-        if (!group || group.length === 0) return null
+      {sections.map((section) => {
         return (
-          <section key={groupId} className="space-y-1.5">
+          <section key={section.key} className="space-y-1.5">
             <header className="flex items-center justify-between">
               <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {t(GROUP_KEY[groupId])}
+                {section.label}
               </h2>
               <Badge variant="secondary" className="h-4 px-1.5 text-[9px] font-normal">
-                {group.length}
+                {section.indicators.length}
               </Badge>
             </header>
-            <div className={gridClassName}>{group.map(renderIndicator)}</div>
+            <div className={gridClassName}>{section.indicators.map(renderIndicator)}</div>
           </section>
         )
       })}
@@ -404,6 +369,7 @@ function IndicatorSections({ groupedIndicators, renderIndicator, gridClassName }
 
 function RealtimeTile({ indicator }: { indicator: MacroIndicator }) {
   const isPositive = indicator.change >= 0
+  const info = buildIndicatorInfo(indicator)
   return (
     <div className="rounded-md border bg-card/80 px-2.5 py-1.5 shadow-sm">
       <div className="flex items-start justify-between gap-1.5">
@@ -413,11 +379,11 @@ function RealtimeTile({ indicator }: { indicator: MacroIndicator }) {
             {stripSymbolPrefix(indicator.symbol)} · <span className="opacity-80">{indicator.source}</span>
           </p>
         </div>
-        {indicator.description && (
+        {info && (
           <InfoTooltip
-            title={indicator.name}
-            description={indicator.description}
-            source={buildInfoSource(indicator)}
+            title={info.title}
+            description={info.description}
+            source={info.source}
           />
         )}
       </div>

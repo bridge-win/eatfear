@@ -8,7 +8,7 @@
     "dev:webpack": "next dev",
     "lint": "eslint .",
     "start": "next start",
-    "deploy": "vercel deploy -y",
+    "deploy": "vercel deploy --prod -y",
     "deploy:preview": "vercel deploy -y",
     "deploy:prod": "vercel deploy --prod -y"
   },

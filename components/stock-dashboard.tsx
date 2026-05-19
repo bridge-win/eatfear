@@ -2,6 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react"
 
+import {
+  AlignedHistoryCompare,
+  type AlignedHistoryData,
+  type AlignedHistoryGroup,
+  type AlignedHistorySeries,
+  type AlignedHistoryUnit,
+} from "@/components/aligned-history-compare"
 import { CrashAlertBanner } from "@/components/crash-alert-banner"
 import { CrashLeaderboard } from "@/components/crash-leaderboard"
 import { KpiStrip, type KpiTile } from "@/components/kpi-strip"
@@ -19,7 +26,7 @@ import {
 import { CrashDetector } from "@/lib/crash-detector"
 import { useT } from "@/lib/i18n"
 import { calculateCrashLeaderboard, fetchStockData, STOCK_CATEGORIES } from "@/lib/stock-service"
-import { type TimeRangeId } from "@/lib/time-range"
+import { getRangeDays, getTimeRange, type TimeRangeId } from "@/lib/time-range"
 import type { CrashAlert, MacroIndicator, StockAsset } from "@/lib/types"
 
 const STOCK_DEFAULT_RANGE: TimeRangeId = "1y"
@@ -103,6 +110,20 @@ const VIETNAM_STOCK_DISPLAY_PRIORITY = [
 const KPI_SPARK_POINTS = 30
 const STOCK_REFRESH_MS = 60 * 1000
 const MACRO_REFRESH_MS = 5 * 60 * 1000
+const STOCK_HISTORY_COLORS = [
+  "#2563eb",
+  "#dc2626",
+  "#16a34a",
+  "#9333ea",
+  "#ea580c",
+  "#0891b2",
+  "#be123c",
+  "#4f46e5",
+  "#65a30d",
+  "#c026d3",
+  "#0f766e",
+  "#ca8a04",
+] as const
 
 const sortStockAssets = <T extends readonly string[]>(assets: StockAsset[], priority: T) => {
   const order = new Map<string, number>(priority.map((symbol, index) => [symbol, index]))
@@ -116,6 +137,116 @@ const sortStockAssets = <T extends readonly string[]>(assets: StockAsset[], prio
       return a.index - b.index
     })
     .map(({ asset }) => asset)
+}
+
+const getStockSeriesColor = (symbol: string, index: number) => {
+  const seed = [...symbol].reduce((sum, char) => sum + char.charCodeAt(0), index)
+  return STOCK_HISTORY_COLORS[seed % STOCK_HISTORY_COLORS.length]
+}
+
+const toAlignedUnit = (unit: MacroIndicator["unit"]): AlignedHistoryUnit => {
+  switch (unit) {
+    case "percent":
+      return "pct"
+    case "usd":
+    case "cny":
+      return unit
+    case "ratio":
+      return "ratio"
+    case "count":
+      return "count"
+    default:
+      return "raw"
+  }
+}
+
+const stockSparklineToSeries = (
+  asset: StockAsset,
+  range: TimeRangeId,
+  color: string,
+): AlignedHistorySeries | null => {
+  const values = asset.sparkline?.filter((value) => Number.isFinite(value)) ?? []
+  if (values.length < 2) return null
+
+  const now = Date.now()
+  const days = getRangeDays(range)
+  const start = now - days * 86_400_000
+  const step = values.length > 1 ? (now - start) / (values.length - 1) : 0
+
+  return {
+    key: `stock:${asset.symbol}`,
+    label: `${asset.symbol} · ${asset.name}`,
+    color,
+    unit: "usd",
+    data: values.map((value, index) => ({
+      time: Math.round(start + step * index),
+      value,
+    })),
+    info: {
+      title: `${asset.symbol} · ${asset.name}`,
+      description: "意义：股票/ETF 历史价格用于观察趋势、相对强弱和风险偏好。\n影响方向：价格上行代表该资产资金偏好改善；下行代表该资产承压。",
+      source: "Yahoo Finance",
+    },
+  }
+}
+
+const buildStockHistoryData = ({
+  range,
+  macroIndicators,
+  usStocks,
+  hkStocks,
+  vietnamStocks,
+}: {
+  range: TimeRangeId
+  macroIndicators: MacroIndicator[]
+  usStocks: StockAsset[]
+  hkStocks: StockAsset[]
+  vietnamStocks: StockAsset[]
+}): AlignedHistoryData | null => {
+  const macroBySymbol = new Map(macroIndicators.map((indicator) => [indicator.symbol, indicator]))
+  const macroSeries = STOCK_KPI_SYMBOLS.map((symbol, index): AlignedHistorySeries | null => {
+    const indicator = macroBySymbol.get(symbol)
+    if (!indicator || indicator.history.length === 0) return null
+    return {
+      key: `macro:${indicator.symbol}`,
+      label: indicator.name,
+      color: getStockSeriesColor(indicator.symbol, index),
+      unit: toAlignedUnit(indicator.unit),
+      data: indicator.history.map((point) => ({ time: point.timestamp, value: point.value })),
+      info: buildIndicatorInfo(indicator),
+    }
+  }).filter((series): series is AlignedHistorySeries => series !== null)
+
+  const stockGroups: AlignedHistoryGroup[] = [
+    {
+      key: "stock-macro",
+      label: "Equity macro factors",
+      series: macroSeries,
+    },
+    {
+      key: "us-stocks",
+      label: "US stocks",
+      series: usStocks
+        .map((asset, index) => stockSparklineToSeries(asset, range, getStockSeriesColor(asset.symbol, index)))
+        .filter((series): series is AlignedHistorySeries => series !== null),
+    },
+    {
+      key: "hk-stocks",
+      label: "HK stocks",
+      series: hkStocks
+        .map((asset, index) => stockSparklineToSeries(asset, range, getStockSeriesColor(asset.symbol, index)))
+        .filter((series): series is AlignedHistorySeries => series !== null),
+    },
+    {
+      key: "vietnam-stocks",
+      label: "Vietnam-themed",
+      series: vietnamStocks
+        .map((asset, index) => stockSparklineToSeries(asset, range, getStockSeriesColor(asset.symbol, index)))
+        .filter((series): series is AlignedHistorySeries => series !== null),
+    },
+  ].filter((group) => group.series.length > 0)
+
+  return stockGroups.length > 0 ? { groups: stockGroups } : null
 }
 
 export interface StockDashboardProps {
@@ -150,12 +281,22 @@ export function StockDashboard({
 
   useEffect(() => {
     const crashDetector = new CrashDetector()
+    const rangeOption = getTimeRange(range)
 
     async function loadStockData() {
       const [usData, hkData, vietnamData] = await Promise.all([
-        fetchStockData(STOCK_CATEGORIES.us.stocks.map((stock) => stock.symbol)),
-        fetchStockData(STOCK_CATEGORIES.hk.stocks.map((stock) => stock.symbol)),
-        fetchStockData(STOCK_CATEGORIES.vietnam.stocks.map((stock) => stock.symbol)),
+        fetchStockData(STOCK_CATEGORIES.us.stocks.map((stock) => stock.symbol), {
+          sparkRange: rangeOption.yahooRange,
+          sparkInterval: rangeOption.yahooInterval,
+        }),
+        fetchStockData(STOCK_CATEGORIES.hk.stocks.map((stock) => stock.symbol), {
+          sparkRange: rangeOption.yahooRange,
+          sparkInterval: rangeOption.yahooInterval,
+        }),
+        fetchStockData(STOCK_CATEGORIES.vietnam.stocks.map((stock) => stock.symbol), {
+          sparkRange: rangeOption.yahooRange,
+          sparkInterval: rangeOption.yahooInterval,
+        }),
       ])
 
       setUsStockAssets(usData)
@@ -186,7 +327,7 @@ export function StockDashboard({
     loadStockData()
     const stockInterval = setInterval(loadStockData, STOCK_REFRESH_MS)
     return () => clearInterval(stockInterval)
-  }, [])
+  }, [range])
 
   useEffect(() => {
     let isActive = true
@@ -243,6 +384,17 @@ export function StockDashboard({
     [vietnamStockAssets],
   )
   const crashLeaderboard = calculateCrashLeaderboard([...usStockArray, ...hkStockArray, ...vietnamStockArray])
+  const stockHistoryData = useMemo(
+    () =>
+      buildStockHistoryData({
+        range,
+        macroIndicators,
+        usStocks: usStockArray,
+        hkStocks: hkStockArray,
+        vietnamStocks: vietnamStockArray,
+      }),
+    [range, macroIndicators, usStockArray, hkStockArray, vietnamStockArray],
+  )
 
   return (
     <DashboardFrame>
@@ -254,18 +406,15 @@ export function StockDashboard({
         <TimeRangeSelector value={range} onChange={setRange} />
       </header>
 
-      <CrashAlertBanner crashes={crashes} />
-
-      <KpiStrip tiles={kpiTiles} />
-      <CrashLeaderboard stocks={crashLeaderboard} />
-
-      <Tabs defaultValue="us-stocks" className="w-full">
-        <TabsList className="grid h-auto w-full max-w-2xl grid-cols-1 sm:grid-cols-3">
-          <TabsTrigger value="us-stocks" className="text-xs">{t("stock.tab.us")}</TabsTrigger>
-          <TabsTrigger value="hk-stocks" className="text-xs">{t("stock.tab.hk")}</TabsTrigger>
-          <TabsTrigger value="vietnam" className="text-xs">{t("stock.tab.vietnam")}</TabsTrigger>
+      <Tabs defaultValue="history" className="w-full">
+        <TabsList className="grid h-auto w-full max-w-xs grid-cols-2">
+          <TabsTrigger value="realtime" className="text-xs">{t("stock.tab.realtime")}</TabsTrigger>
+          <TabsTrigger value="history" className="text-xs">{t("stock.tab.history")}</TabsTrigger>
         </TabsList>
-        <TabsContent value="us-stocks" className="mt-3">
+        <TabsContent value="realtime" className="mt-3 space-y-3">
+          <CrashAlertBanner crashes={crashes} />
+          <KpiStrip tiles={kpiTiles} />
+          <CrashLeaderboard stocks={crashLeaderboard} />
           <StockGrid
             title={t("stock.tab.us")}
             description={t("stock.us.desc")}
@@ -274,8 +423,6 @@ export function StockDashboard({
             loadingLabel={t("stock.loading")}
             emptyLabel={t("stock.empty")}
           />
-        </TabsContent>
-        <TabsContent value="hk-stocks" className="mt-3">
           <StockGrid
             title={t("stock.tab.hk")}
             description={t("stock.hk.desc")}
@@ -284,8 +431,6 @@ export function StockDashboard({
             loadingLabel={t("stock.loading")}
             emptyLabel={t("stock.empty")}
           />
-        </TabsContent>
-        <TabsContent value="vietnam" className="mt-3">
           <StockGrid
             title={t("stock.tab.vietnam")}
             description={t("stock.vietnam.desc")}
@@ -293,6 +438,19 @@ export function StockDashboard({
             isLoading={isLoading}
             loadingLabel={t("stock.loading")}
             emptyLabel={t("stock.empty")}
+          />
+        </TabsContent>
+        <TabsContent value="history" className="mt-3">
+          <AlignedHistoryCompare
+            data={stockHistoryData}
+            title={t("stock.historyCompare.title")}
+            infoDescription={t("stock.historyCompare.info")}
+            infoSource="Yahoo Finance · FRED · TradingView Lightweight Charts"
+            loading={isLoading}
+            error={null}
+            loadingLabel={t("stock.loading")}
+            noDataLabel={t("chart.noData")}
+            seriesCountLabel={t("compare.seriesCount")}
           />
         </TabsContent>
       </Tabs>
