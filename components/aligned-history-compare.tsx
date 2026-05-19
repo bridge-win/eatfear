@@ -107,6 +107,10 @@ function formatPct(value: number): string {
 }
 
 type AlignedLineData = Array<LineData<Time> | WhitespaceData<Time>>
+interface PreparedLineSeries {
+  lineData: AlignedLineData
+  rawByTime: Map<number, number>
+}
 
 function getValidPointMap(points: AlignedHistoryPoint[]): Map<UTCTimestamp, number> {
   const validPoints = new Map<UTCTimestamp, number>()
@@ -131,6 +135,14 @@ function toLineData(points: AlignedHistoryPoint[], timeline: number[]): AlignedL
     const value = valuesByTime.get(time)
     return value === undefined ? { time } : { time, value }
   })
+}
+
+function prepareLineSeries(points: AlignedHistoryPoint[], timeline: number[]): PreparedLineSeries {
+  const rawByTime = getValidPointMap(points)
+  return {
+    lineData: toLineData(points, timeline),
+    rawByTime,
+  }
 }
 
 function toTimelineAnchorData(timeline: number[]): WhitespaceData<Time>[] {
@@ -280,13 +292,10 @@ export function AlignedHistoryCompare({
             minMove: 0.0001,
           },
         })
-        const lineData = toLineData(spec.data, data.timeline)
-        series.setData(lineData)
+        const prepared = prepareLineSeries(spec.data, data.timeline)
+        series.setData(prepared.lineData)
         seriesByKey.set(spec.key, series)
-
-        const rawByTime = new Map<number, number>()
-        for (const [time, value] of getValidPointMap(spec.data)) rawByTime.set(time, value)
-        rawByKey.set(spec.key, rawByTime)
+        rawByKey.set(spec.key, prepared.rawByTime)
       }
 
       if (sharedRange) chart.timeScale().setVisibleRange(sharedRange)
