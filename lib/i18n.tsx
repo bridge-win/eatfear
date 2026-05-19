@@ -21,9 +21,11 @@ const DICT: Dict = {
   // Crypto dashboard chrome
   "crypto.title": { zh: "加密看板", en: "Crypto Dashboard" },
   "crypto.subtitle": {
-    zh: "现货 + 永续衍生品（{source}）。右侧为宏观多因子评分；数据源与时间周期在中间切换。",
-    en: "Spot + perpetuals ({source}). Right: macro multi-factor score. Switch data source / range in the middle.",
+    zh: "现货 + 永续衍生品（{source}）。实时与历史曲线合并展示，默认进入历史对比；数据源与时间周期在右侧切换。",
+    en: "Spot + perpetuals ({source}). Realtime and history curves are unified, history opens by default, and source / range switch on the right.",
   },
+  "crypto.tab.realtime": { zh: "实时", en: "Realtime" },
+  "crypto.tab.history": { zh: "历史曲线", en: "History" },
   "crypto.tab.volatility": { zh: "极端波动监控", en: "Volatility Watch" },
   "crypto.tab.markets": { zh: "现货行情", en: "Spot Markets" },
   "crypto.tab.compare": { zh: "历史对比", en: "History Compare" },
@@ -105,9 +107,11 @@ const DICT: Dict = {
   // Stock dashboard
   "stock.title": { zh: "股票看板", en: "Stock Dashboard" },
   "stock.subtitle": {
-    zh: "美股、港股和越南概念股公开行情；顶部优先展示股指期货、波动率、利率、信用、美元和商品等量化交易核心因子。",
-    en: "US, HK and Vietnam-themed equity quotes; top KPIs prioritize index futures, volatility, rates, credit, dollar and commodity factors for quant trading.",
+    zh: "美股、港股和越南概念股公开行情；实时行情与历史曲线合并展示，默认进入历史对比，覆盖股指、波动率、利率、信用、美元和商品等核心因子。",
+    en: "US, HK and Vietnam-themed equity quotes; realtime quotes and history curves are unified with history as the default, covering index, volatility, rates, credit, dollar and commodity factors.",
   },
+  "stock.tab.realtime": { zh: "实时", en: "Realtime" },
+  "stock.tab.history": { zh: "历史曲线", en: "History" },
   "stock.tab.us": { zh: "美股 Top 50", en: "US Top 50" },
   "stock.tab.hk": { zh: "港股 Top 20", en: "HK Top 20" },
   "stock.tab.vietnam": { zh: "越南概念股", en: "Vietnam-themed" },
@@ -125,19 +129,24 @@ const DICT: Dict = {
   },
   "stock.loading": { zh: "正在加载股票数据…", en: "Loading stock data…" },
   "stock.empty": { zh: "暂无股票数据。", en: "No stock data available." },
+  "stock.historyCompare.title": { zh: "股票历史对比 · 统一时间轴", en: "Stock History Compare · Unified time axis" },
+  "stock.historyCompare.info": {
+    zh: "把股票/ETF、股指、波动率、利率、信用、美元和商品因子合并到同一套历史曲线中。每个面板共享时间轴，悬停同步日期；图例右侧 i 展示数据源、意义和影响方向。",
+    en: "Combines stocks/ETFs, indices, volatility, rates, credit, dollar and commodity factors into one historical comparison surface. Panes share a time axis, hover syncs dates, and legend info icons explain source, meaning and direction.",
+  },
 
   // Macro dashboard
   "macro.title": { zh: "宏观看板", en: "Macro Dashboard" },
   "macro.subtitle": {
-    zh: "跨资产金融与宏观指标，优先展示利率、流动性、信用、股指、波动率、外汇和商品，再进入通胀、就业和增长。每条指标右上角提供来源 + 含义解释。",
-    en: "Cross-asset financial and macro indicators: rates, liquidity, credit, equity, volatility, FX and commodities first, then inflation, employment and growth. Each tile has a source + interpretation.",
+    zh: "按普通投资者最常用的宏观顺序展示：利率/央行政策、10年期国债、通胀、社融/M2/信贷、PMI、GDP、就业、汇率、房地产、消费，再展开工业、投资、盈利、资金流、成交、商品、贸易、财政、行业与政策信号。每个指标右上角说明数据源、意义和影响方向。",
+    en: "Ordered by the macro checklist ordinary investors use most: policy rates, 10Y yields, inflation, M2/credit, PMI, GDP, jobs, FX, real estate, consumption, then industrial activity, investment, earnings, flows, turnover, commodities, trade, fiscal impulse, sectors and policy proxies. Each indicator tooltip explains source, meaning and market direction.",
   },
   "macro.tab.realtime": { zh: "实时", en: "Realtime" },
   "macro.tab.history": { zh: "历史曲线", en: "History" },
   "macro.historyCompare.title": { zh: "宏观历史对比 · 统一时间轴", en: "Macro History Compare · Unified time axis" },
   "macro.historyCompare.info": {
-    zh: "将所有宏观与金融指标按类型分组绘制在同一套时间轴上。每个面板共享左右时间边界，悬停任意面板会同步到同一天；点击图例可显示 / 隐藏单条曲线，用于对齐查看历史趋势。",
-    en: "Groups every macro and financial indicator onto one shared time axis. Panes use the same left/right bounds, hover syncs all panes to the same date, and legend clicks show/hide individual lines for aligned trend review.",
+    zh: "默认按 1-20 个宏观优先级分组绘制历史对比。每个面板共享左右时间边界，悬停任意面板会同步到同一天；点击图例可显示 / 隐藏单条曲线，图例右侧 i 可查看数据源、意义和影响方向。",
+    en: "Defaults to historical comparison grouped by the 1-20 macro priority checklist. Panes use the same left/right bounds, hover syncs all panes to the same date, legend clicks show/hide lines, and each legend info icon explains source, meaning and market direction.",
   },
   "macro.indicators": { zh: "{returned}/{requested} 指标", en: "{returned}/{requested} indicators" },
   "macro.loading": { zh: "正在加载宏观指标…", en: "Loading macro indicators…" },
@@ -163,8 +172,8 @@ const DICT: Dict = {
   // Macro FRED hint
   "macro.fredHint.title": { zh: "FRED 数据未启用", en: "FRED data not enabled" },
   "macro.fredHint.body": {
-    zh: "美联储利率 / 通胀 / 就业 / 流动性 / 信用 等约 30 项指标需要 FRED 免费 API key。前往 fred.stlouisfed.org 注册后在 .env.local 添加 FRED_API_KEY=YOUR_KEY，重启服务即可生效。",
-    en: "About 30 indicators (Fed rates, inflation, employment, liquidity, credit, etc.) need a free FRED API key. Sign up at fred.stlouisfed.org, then add FRED_API_KEY=YOUR_KEY to .env.local and restart the service.",
+    zh: "美联储利率 / 通胀 / 就业 / 流动性 / M1/M2 / PMI / GDP / 房地产 / 消费 / 工业 / 投资 / 企业盈利 / 贸易 / 财政 / World Bank 市值与成交等指标需要 FRED 免费 API key。前往 fred.stlouisfed.org 注册后在 .env.local 添加 FRED_API_KEY=YOUR_KEY，重启服务即可生效。",
+    en: "Fed rates, inflation, employment, liquidity, M1/M2, PMI, GDP, housing, consumption, industrial activity, investment, corporate profits, trade, fiscal and World Bank market-cap/turnover indicators need a free FRED API key. Sign up at fred.stlouisfed.org, then add FRED_API_KEY=YOUR_KEY to .env.local and restart the service.",
   },
 
   // Series chart
@@ -542,20 +551,23 @@ const DICT: Dict = {
   "smart.kpi.cumNet": { zh: "累计净买入", en: "Cumulative net buy" },
 
   // Mining cost / electricity curve
-  "mining.title": { zh: "BTC 挖矿成本 / 电费曲线", en: "BTC Mining Cost / Electricity Curve" },
+  "mining.title": { zh: "BTC 挖矿成本曲线", en: "BTC Mining Cost Curves" },
   "mining.info": {
-    zh: "用 mempool.space 全网算力 × ASIC 能效（{eff} J/TH）× 电价（${rate}/kWh）× 区块奖励（{reward}）估算每枚 BTC 的电力成本。叠加 blockchain.info 的现价用于观察「现价 vs 成本」的矿工边际。\n用途：现价跌入或接近成本曲线时往往触发矿工资本支出收缩或停机；反之，溢价扩大代表行业盈利。",
-    en: "Cost-of-production proxy: mempool.space network hashrate × ASIC efficiency ({eff} J/TH) × electricity rate (${rate}/kWh) × block reward ({reward}) → USD per BTC. Overlaid with blockchain.info BTC price.\nWhen price approaches the cost curve, miners typically curtail; widening premium signals industry profitability.",
+    zh: "用 mempool.space 全网算力 × ASIC 能效（{eff} J/TH）× 电价（${rate}/kWh）× 区块奖励（{reward}）估算每枚 BTC 的电力成本；综合成本按电力成本 × {multiplier} 估算，用于覆盖机器折旧、托管、矿池费和其他运营成本。叠加 blockchain.info 的现价用于观察矿工边际。\n用途：现价跌入或接近综合成本曲线时往往触发资本支出收缩或停机；电力成本是更底层的关机线。",
+    en: "Electricity cost uses mempool.space network hashrate × ASIC efficiency ({eff} J/TH) × electricity rate (${rate}/kWh) × block reward ({reward}). Comprehensive cost applies a {multiplier}× multiplier for hardware depreciation, hosting, pool fees, and operating overhead. BTC price comes from blockchain.info.\nWhen price approaches comprehensive cost, miners often cut capex or curtail; electricity cost is the lower shutdown line.",
   },
   "mining.info.fallback": {
-    zh: "用 mempool.space 全网算力 × ASIC 能效 × 电价估算每枚 BTC 的电力成本。",
-    en: "Cost-of-production proxy from network hashrate × ASIC efficiency × electricity rate.",
+    zh: "用 mempool.space 全网算力 × ASIC 能效 × 电价估算电力成本，并用倍率估算综合成本。",
+    en: "Electricity cost comes from network hashrate × ASIC efficiency × electricity rate, with a multiplier for comprehensive cost.",
   },
   "mining.loading": { zh: "正在加载挖矿成本曲线…", en: "Loading mining-cost curve…" },
   "mining.kpi.hashrate": { zh: "算力", en: "Hashrate" },
-  "mining.kpi.cost": { zh: "电力成本/枚", en: "Cost / BTC" },
+  "mining.kpi.cost": { zh: "电力成本/枚", en: "Electricity / BTC" },
+  "mining.kpi.electricityCost": { zh: "电力成本/枚", en: "Electricity / BTC" },
+  "mining.kpi.comprehensiveCost": { zh: "综合成本/枚", en: "Comprehensive / BTC" },
   "mining.kpi.price": { zh: "现价", en: "Price" },
   "mining.kpi.margin": { zh: "毛利", en: "Margin" },
+  "mining.kpi.comprehensiveMargin": { zh: "综合毛利", en: "Full margin" },
 
   // History Compare (TradingView-style multi-pane)
   "compare.title": { zh: "历史对比 · 多指标统一时间轴", en: "History Compare · Unified time axis" },
@@ -565,7 +577,9 @@ const DICT: Dict = {
   },
   "compare.loading": { zh: "正在加载多指标历史…", en: "Loading multi-indicator history…" },
   "compare.s.price": { zh: "BTC 价格", en: "BTC Price" },
-  "compare.s.miningCost": { zh: "挖矿成本/枚", en: "Mining Cost / BTC" },
+  "compare.s.miningCost": { zh: "电力成本/枚", en: "Electricity Cost / BTC" },
+  "compare.s.miningElectricityCost": { zh: "电力成本/枚", en: "Electricity Cost / BTC" },
+  "compare.s.miningComprehensiveCost": { zh: "综合成本/枚", en: "Comprehensive Cost / BTC" },
   "compare.s.oi": { zh: "未平仓 OI (USD)", en: "Open Interest (USD)" },
   "compare.s.funding": { zh: "资金费率 (%)", en: "Funding Rate (%)" },
   "compare.s.ls": { zh: "多空账户比", en: "Long/Short Acct Ratio" },
@@ -580,6 +594,12 @@ const DICT: Dict = {
     en: "Click legend items to hide / show lines. Legend values show the hovered raw reading and % change since the start of the window.",
   },
   "compare.s.ethPrice": { zh: "ETH 价格", en: "ETH Price" },
+  "compare.s.solPrice": { zh: "SOL 价格", en: "SOL Price" },
+  "compare.s.xrpPrice": { zh: "XRP 价格", en: "XRP Price" },
+  "compare.s.bnbPrice": { zh: "BNB 价格", en: "BNB Price" },
+  "compare.s.dogePrice": { zh: "DOGE 价格", en: "DOGE Price" },
+  "compare.s.returnZ": { zh: "BTC 日收益 Z-Score", en: "BTC Daily Return Z-Score" },
+  "compare.s.oiZ": { zh: "OI 日变化 Z-Score", en: "OI Daily Change Z-Score" },
   "compare.s.stablecoin": { zh: "稳定币总市值", en: "Stablecoin Mcap" },
   "compare.s.defiTvl": { zh: "DeFi TVL", en: "DeFi TVL" },
   "compare.s.fng": { zh: "恐慌贪婪指数", en: "Fear & Greed" },

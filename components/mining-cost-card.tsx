@@ -22,7 +22,10 @@ interface CostPoint {
   time: number
   hashrate: number
   electricityUsdPerBtc: number
+  comprehensiveUsdPerBtc: number
   marketPriceUsd: number | null
+  electricityMarginPct: number | null
+  comprehensiveMarginPct: number | null
   marginPct: number | null
 }
 
@@ -32,6 +35,7 @@ interface MiningCostResponse {
   parameters: {
     efficiencyJPerTh: number
     electricityUsdPerKwh: number
+    comprehensiveMultiplier: number
     blockReward: number
   }
   points: CostPoint[]
@@ -97,17 +101,20 @@ export function MiningCostCard({ range, className }: MiningCostCardProps) {
           month: "short",
           day: "2-digit",
         }),
-        cost: point.electricityUsdPerBtc,
+        electricityCost: point.electricityUsdPerBtc,
+        comprehensiveCost: point.comprehensiveUsdPerBtc,
         price: point.marketPriceUsd ?? undefined,
-        margin: point.marginPct ?? undefined,
+        electricityMargin: point.electricityMarginPct ?? point.marginPct ?? undefined,
+        comprehensiveMargin: point.comprehensiveMarginPct ?? undefined,
       })),
     [payload?.points, locale],
   )
 
   const latest = payload?.latest
   const latestPrice = latest?.marketPriceUsd ?? null
-  const latestCost = latest?.electricityUsdPerBtc ?? null
-  const latestMargin = latest?.marginPct ?? null
+  const latestElectricityCost = latest?.electricityUsdPerBtc ?? null
+  const latestComprehensiveCost = latest?.comprehensiveUsdPerBtc ?? null
+  const latestComprehensiveMargin = latest?.comprehensiveMarginPct ?? null
 
   return (
     <Card className={cn("py-2.5", className)}>
@@ -122,6 +129,7 @@ export function MiningCostCard({ range, className }: MiningCostCardProps) {
                   ? t("mining.info", {
                       eff: payload.parameters.efficiencyJPerTh,
                       rate: payload.parameters.electricityUsdPerKwh,
+                      multiplier: payload.parameters.comprehensiveMultiplier,
                       reward: payload.parameters.blockReward,
                     })
                   : t("mining.info.fallback")
@@ -134,9 +142,14 @@ export function MiningCostCard({ range, className }: MiningCostCardProps) {
               <span>
                 {t("mining.kpi.hashrate")} {latest.hashrate.toFixed(1)} EH/s
               </span>
-              {latestCost !== null && (
+              {latestElectricityCost !== null && (
                 <span>
-                  {t("mining.kpi.cost")} {formatUsd(latestCost)}
+                  {t("mining.kpi.electricityCost")} {formatUsd(latestElectricityCost)}
+                </span>
+              )}
+              {latestComprehensiveCost !== null && (
+                <span>
+                  {t("mining.kpi.comprehensiveCost")} {formatUsd(latestComprehensiveCost)}
                 </span>
               )}
               {latestPrice !== null && (
@@ -144,17 +157,17 @@ export function MiningCostCard({ range, className }: MiningCostCardProps) {
                   {t("mining.kpi.price")} {formatUsd(latestPrice)}
                 </span>
               )}
-              {latestMargin !== null && (
+              {latestComprehensiveMargin !== null && (
                 <span
                   className={cn(
                     "rounded border px-1.5 py-0 text-[9px]",
-                    latestMargin >= 0
+                    latestComprehensiveMargin >= 0
                       ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                       : "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-400",
                   )}
                 >
-                  {t("mining.kpi.margin")} {latestMargin >= 0 ? "+" : ""}
-                  {latestMargin.toFixed(0)}%
+                  {t("mining.kpi.comprehensiveMargin")} {latestComprehensiveMargin >= 0 ? "+" : ""}
+                  {latestComprehensiveMargin.toFixed(0)}%
                 </span>
               )}
             </div>
@@ -184,7 +197,8 @@ export function MiningCostCard({ range, className }: MiningCostCardProps) {
                 <Tooltip
                   cursor={{ stroke: "hsl(var(--muted-foreground))", strokeOpacity: 0.3 }}
                   formatter={(value: number, name) => {
-                    if (name === "cost") return [formatUsd(value), t("mining.kpi.cost")]
+                    if (name === "electricityCost") return [formatUsd(value), t("mining.kpi.electricityCost")]
+                    if (name === "comprehensiveCost") return [formatUsd(value), t("mining.kpi.comprehensiveCost")]
                     if (name === "price") return [formatUsd(value), t("mining.kpi.price")]
                     return [value, name]
                   }}
@@ -192,15 +206,24 @@ export function MiningCostCard({ range, className }: MiningCostCardProps) {
                 <Legend
                   wrapperStyle={{ fontSize: 10 }}
                   formatter={(value) => {
-                    if (value === "cost") return t("mining.kpi.cost")
+                    if (value === "electricityCost") return t("mining.kpi.electricityCost")
+                    if (value === "comprehensiveCost") return t("mining.kpi.comprehensiveCost")
                     if (value === "price") return t("mining.kpi.price")
                     return value
                   }}
                 />
                 <Line
                   type="monotone"
-                  dataKey="cost"
+                  dataKey="electricityCost"
                   stroke="rgb(245 158 11)"
+                  strokeWidth={1.6}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="comprehensiveCost"
+                  stroke="rgb(217 119 6)"
                   strokeWidth={1.6}
                   dot={false}
                   isAnimationActive={false}

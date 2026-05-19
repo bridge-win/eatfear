@@ -14,7 +14,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useT } from "@/lib/i18n"
 
-export type SeriesChartUnit = "index" | "percent" | "usd" | "ratio" | "count"
+export type SeriesChartUnit = "index" | "percent" | "usd" | "cny" | "ratio" | "count"
 
 export interface SeriesPoint {
   timestamp: number
@@ -157,13 +157,14 @@ export const formatValue = (value: number, unit: SeriesChartUnit, short = false)
   if (unit === "percent") return `${value.toFixed(short ? 1 : 2)}%`
   if (unit === "ratio") return value.toFixed(short ? 2 : 4)
 
-  if (unit === "usd") {
+  if (unit === "usd" || unit === "cny") {
+    const prefix = unit === "cny" ? "¥" : "$"
     const abs = Math.abs(value)
-    if (abs >= 1e12) return `$${(value / 1e12).toFixed(short ? 1 : 2)}T`
-    if (abs >= 1e9) return `$${(value / 1e9).toFixed(short ? 1 : 2)}B`
-    if (abs >= 1e6) return `$${(value / 1e6).toFixed(short ? 1 : 2)}M`
-    if (abs >= 1e3) return `$${(value / 1e3).toFixed(short ? 1 : 2)}K`
-    return `$${value.toFixed(short ? 0 : 2)}`
+    if (abs >= 1e12) return `${prefix}${(value / 1e12).toFixed(short ? 1 : 2)}T`
+    if (abs >= 1e9) return `${prefix}${(value / 1e9).toFixed(short ? 1 : 2)}B`
+    if (abs >= 1e6) return `${prefix}${(value / 1e6).toFixed(short ? 1 : 2)}M`
+    if (abs >= 1e3) return `${prefix}${(value / 1e3).toFixed(short ? 1 : 2)}K`
+    return `${prefix}${value.toFixed(short ? 0 : 2)}`
   }
 
   if (unit === "count") {

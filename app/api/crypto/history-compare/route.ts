@@ -6,8 +6,14 @@ import {
   fetchBtcUsdDailyFromBlockchain,
 } from "@/lib/data-sources/blockchain-info-charts"
 import { fetchStablecoinMarketCap, fetchDefiTvl } from "@/lib/data-sources/defillama"
+import { fetchMempoolHashrateHistory } from "@/lib/data-sources/mempool"
 import { fetchYahooSeries } from "@/lib/data-sources/yahoo"
 import { fetchJson } from "@/lib/data-sources/_fetch"
+import {
+  computeMiningCostFromHashrateHps,
+  computeMiningCostFromHashrateThPerSec,
+  resolveMiningCostParameters,
+} from "@/lib/mining-cost"
 import {
   DEFAULT_TIME_RANGE,
   getBlockchainTimespan,
@@ -50,12 +56,31 @@ function dropOutOfRange(points: RawPoint[]): RawPoint[] {
   return points.filter((p) => Math.abs(p.value) < LWC_MAX_ABS && Number.isFinite(p.value))
 }
 
+function rollingReturnZScore(points: RawPoint[], windowSize: number): RawPoint[] {
+  const sorted = dropOutOfRange(points).sort((a, b) => a.timestamp - b.timestamp)
+  if (sorted.length === 0) return []
+
+  const returns: RawPoint[] = sorted.map((point, index) => {
+    const previous = sorted[index - 1]
+    if (!previous || previous.value === 0) return { timestamp: point.timestamp, value: 0 }
+    return { timestamp: point.timestamp, value: (point.value / previous.value - 1) * 100 }
+  })
+
+  return returns.map((point, index) => {
+    const sample = returns.slice(Math.max(0, index - windowSize + 1), index + 1).map((row) => row.value)
+    const mean = sample.reduce((sum, value) => sum + value, 0) / sample.length
+    const variance = sample.reduce((sum, value) => sum + (value - mean) ** 2, 0) / sample.length
+    const deviation = Math.sqrt(variance)
+    return { timestamp: point.timestamp, value: deviation === 0 ? 0 : (point.value - mean) / deviation }
+  })
+}
+
 interface SeriesSpec {
   key: string
   i18nKey: string
   paneIndex: number
   color: string
-  unit: "usd" | "pct" | "ratio" | "raw" | "count"
+  unit: "usd" | "pct" | "ratio" | "raw" | "count" | "cny"
   data: { time: number; value: number | null }[]
 }
 
@@ -238,6 +263,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const rangeId = url.searchParams.get("range") ?? DEFAULT_TIME_RANGE
   const range = getTimeRange(rangeId)
+  const miningCostParameters = resolveMiningCostParameters(url.searchParams)
   const days = getRangeDays(range.id)
   const ccy = (url.searchParams.get("ccy") ?? "BTC").toUpperCase()
   const instId = `${ccy}-USDT-SWAP`
@@ -252,6 +278,10 @@ export async function GET(request: Request) {
     btcPriceA, // blockchain.info (longer history)
     btcPriceB, // OKX daily (fallback / verification)
     ethPrice,
+    solPrice,
+    xrpPrice,
+    bnbPrice,
+    dogePrice,
     oi,
     funding,
     lsRatio,
@@ -259,6 +289,7 @@ export async function GET(request: Request) {
     fng,
     stablecoin,
     defiTvl,
+    mempoolHashRate,
     hashRate,
     difficulty,
     nTxs,
@@ -287,6 +318,10 @@ export async function GET(request: Request) {
     ),
     okxDailyKlines(instId, okxLimit),
     okxDailyKlines("ETH-USDT", okxLimit),
+    okxDailyKlines("SOL-USDT", okxLimit),
+    okxDailyKlines("XRP-USDT", okxLimit),
+    okxDailyKlines("BNB-USDT", okxLimit),
+    okxDailyKlines("DOGE-USDT", okxLimit),
     okxOiHistory(ccy, okxLimit),
     okxFundingHistory(instId, okxLimit),
     okxLongShort(ccy, okxLimit),
@@ -300,6 +335,7 @@ export async function GET(request: Request) {
     fetchDefiTvl(range, revalidate).then((r) =>
       (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
     ),
+    fetchMempoolHashrateHistory(revalidate),
     blockchainSeries("hash-rate", blockchainSpan),
     blockchainSeries("difficulty", blockchainSpan),
     blockchainSeries("n-transactions", blockchainSpan),
@@ -330,73 +366,101 @@ export async function GET(request: Request) {
     btcPrice = chooseCompleteCandidate([btcPriceA, btcPriceB], timeline)
   }
 
-  /* Mining-cost proxy reuses the same model as /api/crypto/mining-cost so the
-     two views agree numerically. (Computed BEFORE scaling hashRate down to
-     EH/s, so we still divide by the full H/s magnitude here.) */
-  const efficiencyJPerTh = 21
-  const electricityUsdPerKwh = 0.05
-  const btcPerDay = 144 * 3.125
-  const miningCost: RawPoint[] = hashRate.map((row) => {
-    const networkKwhPerDay = (row.value * 86_400 * efficiencyJPerTh) / 3.6e6
-    return { timestamp: row.timestamp, value: (networkKwhPerDay * electricityUsdPerKwh) / btcPerDay }
-  })
+  /* Prefer mempool.space for production-cost curves because it is the same
+     hashrate source as /api/crypto/mining-cost; fall back to Blockchain.com
+     when mempool is unavailable. */
+  const miningCostPoints =
+    mempoolHashRate.length > 0
+      ? mempoolHashRate.map((row) =>
+          computeMiningCostFromHashrateHps({
+            time: row.timestamp,
+            hashrateHps: row.hashrateHps,
+            marketPriceUsd: null,
+            parameters: miningCostParameters,
+          }),
+        )
+      : hashRate.map((row) =>
+          computeMiningCostFromHashrateThPerSec({
+            time: row.timestamp,
+            hashrateThPerSec: row.value,
+            marketPriceUsd: null,
+            parameters: miningCostParameters,
+          }),
+        )
+  const miningElectricityCost: RawPoint[] = miningCostPoints.map((point) => ({
+    timestamp: point.time,
+    value: point.electricityUsdPerBtc,
+  }))
+  const miningComprehensiveCost: RawPoint[] = miningCostPoints.map((point) => ({
+    timestamp: point.time,
+    value: point.comprehensiveUsdPerBtc,
+  }))
 
   /* Scale to chart-friendly units. Storing the divisor next to the series
      keeps the i18n label honest (e.g. "Hashrate (EH/s)" — the user sees the
      unit baked into the legend instead of guessing). */
-  const hashRateEH = scale(hashRate, 1e18) // H/s → EH/s
+  const hashRateEH = scale(hashRate, 1e6) // TH/s → EH/s
   const difficultyT = scale(difficulty, 1e12) // raw → T
   const mempoolMB = scale(mempool, 1e6) // bytes → MB
   const avgBlockSizeMB = scale(avgBlockSize, 1) // already MB
+  const btcReturnZ = rollingReturnZScore(btcPrice, 30)
+  const oiReturnZ = rollingReturnZScore(oi, 30)
 
   /* Build the series specs. paneIndex grouping is curated to keep visually
      comparable units together; the order also drives the on-screen stack. */
   const specsRaw: Array<Omit<SeriesSpec, "data"> & { points: RawPoint[] }> = [
     { key: "btcPrice", i18nKey: "compare.s.price", paneIndex: 0, color: "rgb(99 102 241)", unit: "usd", points: btcPrice },
-    { key: "miningCost", i18nKey: "compare.s.miningCost", paneIndex: 0, color: "rgb(245 158 11)", unit: "usd", points: miningCost },
+    { key: "miningElectricityCost", i18nKey: "compare.s.miningElectricityCost", paneIndex: 0, color: "rgb(245 158 11)", unit: "usd", points: miningElectricityCost },
+    { key: "miningComprehensiveCost", i18nKey: "compare.s.miningComprehensiveCost", paneIndex: 0, color: "rgb(217 119 6)", unit: "usd", points: miningComprehensiveCost },
     { key: "ethPrice", i18nKey: "compare.s.ethPrice", paneIndex: 0, color: "rgb(168 85 247)", unit: "usd", points: ethPrice },
+    { key: "solPrice", i18nKey: "compare.s.solPrice", paneIndex: 0, color: "rgb(20 184 166)", unit: "usd", points: solPrice },
+    { key: "xrpPrice", i18nKey: "compare.s.xrpPrice", paneIndex: 0, color: "rgb(59 130 246)", unit: "usd", points: xrpPrice },
+    { key: "bnbPrice", i18nKey: "compare.s.bnbPrice", paneIndex: 0, color: "rgb(234 179 8)", unit: "usd", points: bnbPrice },
+    { key: "dogePrice", i18nKey: "compare.s.dogePrice", paneIndex: 0, color: "rgb(202 138 4)", unit: "usd", points: dogePrice },
+    { key: "btcReturnZ", i18nKey: "compare.s.returnZ", paneIndex: 1, color: "rgb(244 63 94)", unit: "raw", points: btcReturnZ },
 
-    { key: "stablecoinMcap", i18nKey: "compare.s.stablecoin", paneIndex: 1, color: "rgb(20 184 166)", unit: "usd", points: stablecoin },
-    { key: "defiTvl", i18nKey: "compare.s.defiTvl", paneIndex: 1, color: "rgb(34 197 94)", unit: "usd", points: defiTvl },
+    { key: "stablecoinMcap", i18nKey: "compare.s.stablecoin", paneIndex: 2, color: "rgb(20 184 166)", unit: "usd", points: stablecoin },
+    { key: "defiTvl", i18nKey: "compare.s.defiTvl", paneIndex: 2, color: "rgb(34 197 94)", unit: "usd", points: defiTvl },
 
-    { key: "oi", i18nKey: "compare.s.oi", paneIndex: 2, color: "rgb(59 130 246)", unit: "usd", points: oi },
-    { key: "funding", i18nKey: "compare.s.funding", paneIndex: 3, color: "rgb(236 72 153)", unit: "pct", points: funding },
-    { key: "ls", i18nKey: "compare.s.ls", paneIndex: 4, color: "rgb(168 85 247)", unit: "ratio", points: lsRatio },
+    { key: "oi", i18nKey: "compare.s.oi", paneIndex: 3, color: "rgb(59 130 246)", unit: "usd", points: oi },
+    { key: "oiReturnZ", i18nKey: "compare.s.oiZ", paneIndex: 3, color: "rgb(14 165 233)", unit: "raw", points: oiReturnZ },
+    { key: "funding", i18nKey: "compare.s.funding", paneIndex: 4, color: "rgb(236 72 153)", unit: "pct", points: funding },
+    { key: "ls", i18nKey: "compare.s.ls", paneIndex: 5, color: "rgb(168 85 247)", unit: "ratio", points: lsRatio },
 
-    { key: "smartBuy", i18nKey: "compare.s.smartBuy", paneIndex: 5, color: "rgb(22 163 74)", unit: "raw", points: taker.buy },
-    { key: "smartSell", i18nKey: "compare.s.smartSell", paneIndex: 5, color: "rgb(220 38 38)", unit: "raw", points: taker.sell },
-    { key: "smartCum", i18nKey: "compare.s.smartCum", paneIndex: 6, color: "rgb(59 130 246)", unit: "raw", points: taker.cumulativeNet },
+    { key: "smartBuy", i18nKey: "compare.s.smartBuy", paneIndex: 6, color: "rgb(22 163 74)", unit: "raw", points: taker.buy },
+    { key: "smartSell", i18nKey: "compare.s.smartSell", paneIndex: 6, color: "rgb(220 38 38)", unit: "raw", points: taker.sell },
+    { key: "smartCum", i18nKey: "compare.s.smartCum", paneIndex: 7, color: "rgb(59 130 246)", unit: "raw", points: taker.cumulativeNet },
 
-    { key: "fng", i18nKey: "compare.s.fng", paneIndex: 7, color: "rgb(245 158 11)", unit: "raw", points: fng },
-    { key: "dvol", i18nKey: "compare.s.dvol", paneIndex: 8, color: "rgb(244 114 182)", unit: "raw", points: dvol },
+    { key: "fng", i18nKey: "compare.s.fng", paneIndex: 8, color: "rgb(245 158 11)", unit: "raw", points: fng },
+    { key: "dvol", i18nKey: "compare.s.dvol", paneIndex: 9, color: "rgb(244 114 182)", unit: "raw", points: dvol },
 
-    { key: "hashRate", i18nKey: "compare.s.hashRate", paneIndex: 9, color: "rgb(20 184 166)", unit: "raw", points: hashRateEH },
-    { key: "difficulty", i18nKey: "compare.s.difficulty", paneIndex: 9, color: "rgb(168 85 247)", unit: "raw", points: difficultyT },
+    { key: "hashRate", i18nKey: "compare.s.hashRate", paneIndex: 10, color: "rgb(20 184 166)", unit: "raw", points: hashRateEH },
+    { key: "difficulty", i18nKey: "compare.s.difficulty", paneIndex: 10, color: "rgb(168 85 247)", unit: "raw", points: difficultyT },
 
-    { key: "nTxs", i18nKey: "compare.s.nTxs", paneIndex: 10, color: "rgb(59 130 246)", unit: "count", points: nTxs },
-    { key: "activeAddrs", i18nKey: "compare.s.activeAddrs", paneIndex: 10, color: "rgb(99 102 241)", unit: "count", points: activeAddrs },
+    { key: "nTxs", i18nKey: "compare.s.nTxs", paneIndex: 11, color: "rgb(59 130 246)", unit: "count", points: nTxs },
+    { key: "activeAddrs", i18nKey: "compare.s.activeAddrs", paneIndex: 11, color: "rgb(99 102 241)", unit: "count", points: activeAddrs },
 
-    { key: "mempool", i18nKey: "compare.s.mempool", paneIndex: 11, color: "rgb(245 158 11)", unit: "raw", points: mempoolMB },
-    { key: "txFeesUsd", i18nKey: "compare.s.txFeesUsd", paneIndex: 11, color: "rgb(220 38 38)", unit: "usd", points: txFeesUsd },
-    { key: "avgBlockSize", i18nKey: "compare.s.avgBlockSize", paneIndex: 11, color: "rgb(34 197 94)", unit: "raw", points: avgBlockSizeMB },
+    { key: "mempool", i18nKey: "compare.s.mempool", paneIndex: 12, color: "rgb(245 158 11)", unit: "raw", points: mempoolMB },
+    { key: "txFeesUsd", i18nKey: "compare.s.txFeesUsd", paneIndex: 12, color: "rgb(220 38 38)", unit: "usd", points: txFeesUsd },
+    { key: "avgBlockSize", i18nKey: "compare.s.avgBlockSize", paneIndex: 12, color: "rgb(34 197 94)", unit: "raw", points: avgBlockSizeMB },
 
-    { key: "dxy", i18nKey: "compare.s.dxy", paneIndex: 12, color: "rgb(99 102 241)", unit: "raw", points: dxy },
-    { key: "us10y", i18nKey: "compare.s.us10y", paneIndex: 13, color: "rgb(245 158 11)", unit: "pct", points: us10y },
-    { key: "us2y", i18nKey: "compare.s.us2y", paneIndex: 13, color: "rgb(236 72 153)", unit: "pct", points: us2y },
+    { key: "dxy", i18nKey: "compare.s.dxy", paneIndex: 13, color: "rgb(99 102 241)", unit: "raw", points: dxy },
+    { key: "us10y", i18nKey: "compare.s.us10y", paneIndex: 14, color: "rgb(245 158 11)", unit: "pct", points: us10y },
+    { key: "us2y", i18nKey: "compare.s.us2y", paneIndex: 14, color: "rgb(236 72 153)", unit: "pct", points: us2y },
 
-    { key: "vix", i18nKey: "compare.s.vix", paneIndex: 14, color: "rgb(220 38 38)", unit: "raw", points: vix },
-    { key: "sp500", i18nKey: "compare.s.sp500", paneIndex: 15, color: "rgb(99 102 241)", unit: "raw", points: sp500 },
-    { key: "nasdaq", i18nKey: "compare.s.nasdaq", paneIndex: 15, color: "rgb(168 85 247)", unit: "raw", points: nasdaq },
-    { key: "russell", i18nKey: "compare.s.russell", paneIndex: 15, color: "rgb(20 184 166)", unit: "raw", points: russell2k },
+    { key: "vix", i18nKey: "compare.s.vix", paneIndex: 15, color: "rgb(220 38 38)", unit: "raw", points: vix },
+    { key: "sp500", i18nKey: "compare.s.sp500", paneIndex: 16, color: "rgb(99 102 241)", unit: "raw", points: sp500 },
+    { key: "nasdaq", i18nKey: "compare.s.nasdaq", paneIndex: 16, color: "rgb(168 85 247)", unit: "raw", points: nasdaq },
+    { key: "russell", i18nKey: "compare.s.russell", paneIndex: 16, color: "rgb(20 184 166)", unit: "raw", points: russell2k },
 
-    { key: "gold", i18nKey: "compare.s.gold", paneIndex: 16, color: "rgb(245 158 11)", unit: "usd", points: gold },
-    { key: "silver", i18nKey: "compare.s.silver", paneIndex: 16, color: "rgb(148 163 184)", unit: "usd", points: silver },
-    { key: "copper", i18nKey: "compare.s.copper", paneIndex: 16, color: "rgb(217 119 6)", unit: "usd", points: copper },
-    { key: "oil", i18nKey: "compare.s.oil", paneIndex: 17, color: "rgb(34 197 94)", unit: "usd", points: oil },
-    { key: "natgas", i18nKey: "compare.s.natgas", paneIndex: 17, color: "rgb(59 130 246)", unit: "usd", points: natgas },
+    { key: "gold", i18nKey: "compare.s.gold", paneIndex: 17, color: "rgb(245 158 11)", unit: "usd", points: gold },
+    { key: "silver", i18nKey: "compare.s.silver", paneIndex: 17, color: "rgb(148 163 184)", unit: "usd", points: silver },
+    { key: "copper", i18nKey: "compare.s.copper", paneIndex: 17, color: "rgb(217 119 6)", unit: "usd", points: copper },
+    { key: "oil", i18nKey: "compare.s.oil", paneIndex: 18, color: "rgb(34 197 94)", unit: "usd", points: oil },
+    { key: "natgas", i18nKey: "compare.s.natgas", paneIndex: 18, color: "rgb(59 130 246)", unit: "usd", points: natgas },
 
-    { key: "nikkei", i18nKey: "compare.s.nikkei", paneIndex: 18, color: "rgb(220 38 38)", unit: "raw", points: nikkei },
-    { key: "hangseng", i18nKey: "compare.s.hangseng", paneIndex: 18, color: "rgb(245 158 11)", unit: "raw", points: hangseng },
+    { key: "nikkei", i18nKey: "compare.s.nikkei", paneIndex: 19, color: "rgb(220 38 38)", unit: "raw", points: nikkei },
+    { key: "hangseng", i18nKey: "compare.s.hangseng", paneIndex: 19, color: "rgb(245 158 11)", unit: "raw", points: hangseng },
   ]
 
   const series: SeriesSpec[] = specsRaw

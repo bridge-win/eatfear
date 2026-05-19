@@ -33,8 +33,7 @@ export function KpiStrip({ tiles, className }: KpiStripProps) {
   return (
     <div
       className={cn(
-        "flex gap-1.5 overflow-x-auto rounded-lg border bg-card/80 p-1.5 shadow-sm",
-        "scrollbar-thin",
+        "flex min-w-0 max-w-full flex-wrap gap-1.5 overflow-visible rounded-lg border bg-card/80 p-1.5 shadow-sm",
         className,
       )}
     >
@@ -62,7 +61,7 @@ function KpiTileCard({ tile }: { tile: KpiTile }) {
         : "rgb(100 116 139)"
 
   return (
-    <div className="flex min-w-[140px] flex-1 flex-col justify-between gap-0.5 rounded-md border bg-background/70 px-2.5 py-1.5">
+    <div className="flex min-w-0 flex-[1_1_9rem] flex-col justify-between gap-0.5 rounded-md border bg-background/70 px-2.5 py-1.5 sm:flex-[1_1_140px]">
       <div className="flex items-center justify-between gap-1.5">
         <span className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           {tile.label}

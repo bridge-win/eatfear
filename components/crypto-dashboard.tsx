@@ -8,7 +8,6 @@ import { CrashAlertBanner } from "@/components/crash-alert-banner"
 import { CryptoHistoryCompare } from "@/components/crypto-history-compare"
 import { CryptoPriceCard } from "@/components/crypto-price-card"
 import { CryptoRegimeScoreCard } from "@/components/crypto-regime-score-card"
-import { CryptoWatchlistPanel } from "@/components/crypto-watchlist-panel"
 import { DataSourceSelector, type DataSourceId, getDataSource } from "@/components/data-source-selector"
 import { FearGreedScoreCard } from "@/components/fear-greed-score-card"
 import { KpiStrip, type KpiTile } from "@/components/kpi-strip"
@@ -286,23 +285,18 @@ export function CryptoDashboard({
         />
       )}
 
-      {/* Relevance order: urgent alerts -> tradable KPIs -> regime context -> quant tabs -> research checklist. */}
-      <CrashAlertBanner crashes={crashes} />
-
-      <KpiStrip tiles={kpiTiles} />
-
-      <div className="flex flex-wrap gap-2">
-        <FearGreedScoreCard index={fearGreed} />
-        <CryptoRegimeScoreCard />
-      </div>
-
-      <Tabs defaultValue="volatility" className="w-full">
-        <TabsList className="grid h-auto w-full max-w-xl grid-cols-3">
-          <TabsTrigger value="volatility" className="text-xs">{t("crypto.tab.volatility")}</TabsTrigger>
-          <TabsTrigger value="markets" className="text-xs">{t("crypto.tab.markets")}</TabsTrigger>
-          <TabsTrigger value="compare" className="text-xs">{t("crypto.tab.compare")}</TabsTrigger>
+      <Tabs defaultValue="history" className="w-full">
+        <TabsList className="grid h-auto w-full max-w-xs grid-cols-2">
+          <TabsTrigger value="realtime" className="text-xs">{t("crypto.tab.realtime")}</TabsTrigger>
+          <TabsTrigger value="history" className="text-xs">{t("crypto.tab.history")}</TabsTrigger>
         </TabsList>
-        <TabsContent value="volatility" className="mt-3 space-y-3">
+        <TabsContent value="realtime" className="mt-3 space-y-3">
+          <CrashAlertBanner crashes={crashes} />
+          <KpiStrip tiles={kpiTiles} />
+          <div className="flex flex-wrap gap-2">
+            <FearGreedScoreCard index={fearGreed} />
+            <CryptoRegimeScoreCard />
+          </div>
           <BtcVolatilitySystem
             instId={instId}
             range={range}
@@ -311,29 +305,25 @@ export function CryptoDashboard({
           />
           <SmartMoneyTracker ccy={instId.split("-")[0] ?? "BTC"} range={range} />
           <MiningCostCard range={range} />
+          <div>
+            <h2 className="mb-2 text-sm font-semibold">{t("crypto.markets.heading")}</h2>
+            {cryptoArray.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {isLoadingMarkets ? t("crypto.markets.loading") : t("crypto.markets.empty")}
+              </p>
+            ) : (
+              <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                {cryptoArray.map((asset) => (
+                  <CryptoPriceCard key={asset.symbol} asset={asset} />
+                ))}
+              </div>
+            )}
+          </div>
         </TabsContent>
-        <TabsContent value="compare" className="mt-3">
+        <TabsContent value="history" className="mt-3">
           <CryptoHistoryCompare instId={instId} range={range} />
         </TabsContent>
-        <TabsContent value="markets" className="mt-3">
-          <h2 className="mb-2 text-sm font-semibold">{t("crypto.markets.heading")}</h2>
-          {cryptoArray.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {isLoadingMarkets ? t("crypto.markets.loading") : t("crypto.markets.empty")}
-            </p>
-          ) : (
-            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-              {cryptoArray.map((asset) => (
-                <CryptoPriceCard key={asset.symbol} asset={asset} />
-              ))}
-            </div>
-          )}
-        </TabsContent>
       </Tabs>
-
-      <CryptoWatchlistPanel
-        fearGreedSnippet={fearGreed ? `${fearGreed.value} (${fearGreed.classification})` : null}
-      />
     </DashboardFrame>
   )
 }

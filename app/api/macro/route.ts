@@ -25,6 +25,8 @@ const applyTransformToHistory = (history: MacroSeriesPoint[], meta: MacroIndicat
   return history.map((point) => ({ ...point, value: meta.transform!(point.value) }))
 }
 
+const getIndicatorSortRank = (indicator: MacroIndicator) => indicator.macroRank ?? 100 + (indicator.priority ?? 999)
+
 async function fetchByMeta(meta: MacroIndicatorMeta, range: TimeRangeOption): Promise<FetchOutcome | null> {
   const symbol = meta.providerSymbol ?? meta.symbol
 
@@ -87,6 +89,11 @@ async function buildIndicator(
     description: meta.description,
     audience: meta.audience,
     priority: meta.priority,
+    macroRank: meta.macroRank,
+    macroCategory: meta.macroCategory,
+    meaning: meta.meaning,
+    impact: meta.impact,
+    sourceNote: meta.sourceNote,
     frequency: meta.frequency,
   }
 }
@@ -105,7 +112,11 @@ export async function GET(request: Request) {
     }
   }
 
-  indicators.sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999))
+  indicators.sort((a, b) => {
+    const rankDelta = getIndicatorSortRank(a) - getIndicatorSortRank(b)
+    if (rankDelta !== 0) return rankDelta
+    return (a.priority ?? 999) - (b.priority ?? 999)
+  })
 
   return NextResponse.json(
     {

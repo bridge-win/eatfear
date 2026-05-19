@@ -79,7 +79,7 @@ export type MacroGroup =
   | "Sentiment"
   | "CrossAsset"
 
-export type MacroUnit = "index" | "percent" | "usd" | "ratio" | "count"
+export type MacroUnit = "index" | "percent" | "usd" | "cny" | "ratio" | "count"
 
 export type MacroDataSource =
   | "Yahoo Finance"
@@ -106,6 +106,16 @@ export interface MacroIndicator {
   audience?: string[]
   /** Lower number = more important. Used for sorting on the Macro dashboard. */
   priority?: number
+  /** Plain-language investor rank bucket, if this indicator maps to the macro priority playbook. */
+  macroRank?: number
+  /** Plain-language investor category, e.g. "1 利率 / 央行政策". */
+  macroCategory?: string
+  /** What the indicator is meant to explain for investors. */
+  meaning?: string
+  /** Typical asset-market direction when the indicator rises/falls. */
+  impact?: string
+  /** Extra source coverage note, such as lagged annual data or proxy coverage. */
+  sourceNote?: string
   /** Refresh frequency hint shown to users */
   frequency?: string
 }

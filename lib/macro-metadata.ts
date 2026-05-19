@@ -14,10 +14,227 @@ export interface MacroIndicatorMeta {
   description: string
   audience: string[]
   frequency: string
+  macroRank?: number
+  macroCategory?: string
+  meaning?: string
+  impact?: string
+  sourceNote?: string
   transform?: (value: number) => number
 }
 
 const dividedByTen = (value: number) => value / 10
+
+interface MacroPriorityCategory {
+  rank: number
+  label: string
+  symbols: readonly string[]
+  meaning: string
+  impact: string
+  sourceNote: string
+}
+
+export const MACRO_PRIORITY_CATEGORIES: readonly MacroPriorityCategory[] = [
+  {
+    rank: 1,
+    label: "1 利率 / 央行政策",
+    symbols: ["FRED:DFF", "FRED:DGS2", "FRED:DGS3MO", "FRED:T10Y2Y", "FRED:T10Y3M"],
+    meaning: "Fed funds and short-end Treasury rates show the policy-rate anchor and market-implied easing/tightening path.",
+    impact: "Rates up usually compress valuations and liquidity; rates down usually support duration assets, equities and crypto.",
+    sourceNote: "FRED covers U.S. policy-rate proxies; China LPR/MLF/RRR need a China-specific provider.",
+  },
+  {
+    rank: 2,
+    label: "2 10年期国债收益率",
+    symbols: ["FRED:DGS10", "FRED:DFII10", "FRED:DGS5", "FRED:DGS30", "ZN=F", "ZB=F", "TLT", "IEF", "TIP"],
+    meaning: "10Y nominal and real yields are the core discount-rate inputs for global asset valuation.",
+    impact: "Yield up pressures growth stocks, gold and BTC; yield down usually supports valuations and risk appetite.",
+    sourceNote: "FRED and Yahoo proxies; China 10Y yield is not available in the current stable stack.",
+  },
+  {
+    rank: 3,
+    label: "3 通胀数据",
+    symbols: ["FRED:CPIAUCSL", "FRED:CPILFESL", "FRED:PCEPI", "FRED:PCEPILFE", "FRED:PPIACO", "FRED:MICH", "FRED:T5YIE", "FRED:T10YIE"],
+    meaning: "CPI, core CPI, PCE, core PCE, PPI and inflation expectations decide whether central banks can ease.",
+    impact: "Hot inflation delays cuts and hurts long-duration assets; cooling inflation supports easing expectations.",
+    sourceNote: "FRED U.S. inflation stack.",
+  },
+  {
+    rank: 4,
+    label: "4 社融 / M2 / 信贷",
+    symbols: [
+      "FRED:M2SL",
+      "FRED:M1SL",
+      "FRED:M2REAL",
+      "FRED:M2V",
+      "FRED:BOGMBASE",
+      "FRED:MYAGM2CNM189N",
+      "FRED:MYAGM1CNM189N",
+      "FRED:TOTLL",
+      "FRED:WALCL",
+      "FRED:TOTRESNS",
+      "FRED:RRPONTSYD",
+      "FRED:WTREGEN",
+      "FRED:BAMLH0A0HYM2",
+      "FRED:BAMLC0A0CM",
+      "FRED:NFCI",
+    ],
+    meaning: "Money supply, bank credit, reserves and credit spreads describe liquidity and credit-cycle breadth.",
+    impact: "Credit and money expanding is usually risk-supportive; credit spreads or financial conditions rising is risk-negative.",
+    sourceNote: "U.S. data are current via FRED; China M1/M2 are FRED/IMF historical and lagged.",
+  },
+  {
+    rank: 5,
+    label: "5 PMI",
+    symbols: ["FRED:IPMAN"],
+    meaning:
+      "PMI is the preferred survey signal for expansion/contraction; this stable stack uses manufacturing production as the fallback activity proxy.",
+    impact: "PMI/proxy rising supports cyclicals and risk; falling warns on growth and manufacturing pressure.",
+    sourceNote: "FRED manufacturing hard-data proxy; live ISM and China PMI need ISM/S&P/China-specific providers.",
+  },
+  {
+    rank: 6,
+    label: "6 GDP增速",
+    symbols: ["FRED:GDPC1", "FRED:GDP", "FRED:GDPNOW"],
+    meaning: "Real GDP, nominal GDP and GDPNow show the broad growth direction and nowcast revisions.",
+    impact: "Growth acceleration supports earnings and cyclicals; sharp slowing raises recession and policy-easing odds.",
+    sourceNote: "FRED / Atlanta Fed.",
+  },
+  {
+    rank: 7,
+    label: "7 就业数据",
+    symbols: ["FRED:UNRATE", "FRED:PAYEMS", "FRED:ICSA", "FRED:CCSA", "FRED:JTSJOL", "FRED:CES0500000003"],
+    meaning: "Payrolls, unemployment, wages, job openings and claims drive Fed reaction and household income.",
+    impact: "Too-hot labor can delay cuts; weakening labor raises recession risk but can pull forward easing.",
+    sourceNote: "FRED U.S. labor-market stack.",
+  },
+  {
+    rank: 8,
+    label: "8 汇率",
+    symbols: ["DX-Y.NYB", "CNY=X", "USDCNH=X", "EURUSD=X", "USDJPY=X", "GBPUSD=X", "AUDUSD=X", "USDKRW=X"],
+    meaning: "DXY and key crosses show dollar liquidity, carry pressure and capital-flow stress.",
+    impact: "A stronger USD usually pressures commodities, EM, Hong Kong/China risk assets and crypto; weaker USD helps.",
+    sourceNote: "Yahoo Finance FX chart data.",
+  },
+  {
+    rank: 9,
+    label: "9 房地产数据",
+    symbols: ["FRED:MORTGAGE30US", "FRED:HSN1F", "FRED:PERMIT", "FRED:PRFI"],
+    meaning: "Mortgage rates, new home sales, permits and residential investment show rate-sensitive housing demand.",
+    impact: "Housing demand/investment up supports cyclicals; mortgage-rate spikes or weak sales pressure growth.",
+    sourceNote: "FRED U.S. housing proxies; China sales/investment need a China data provider.",
+  },
+  {
+    rank: 10,
+    label: "10 消费数据",
+    symbols: ["FRED:RSAFS", "FRED:DSPIC96", "FRED:UMCSENT"],
+    meaning: "Retail sales, real disposable income and consumer sentiment explain household spending power.",
+    impact: "Stronger consumption supports earnings; weak consumption hurts consumer, internet, travel and discretionary assets.",
+    sourceNote: "FRED U.S. consumption proxies.",
+  },
+  {
+    rank: 11,
+    label: "11 工业生产数据",
+    symbols: ["FRED:INDPRO", "FRED:IPMAN", "FRED:TCU", "FRED:DGORDER"],
+    meaning: "Industrial production, capacity utilization and durable orders track manufacturing and cyclical demand.",
+    impact: "Improvement supports industrials, materials and commodities; deterioration warns on cyclical slowdown.",
+    sourceNote: "FRED U.S. hard-data proxies.",
+  },
+  {
+    rank: 12,
+    label: "12 固定资产投资",
+    symbols: ["FRED:GPDI", "FRED:PNFI"],
+    meaning: "Private domestic and nonresidential fixed investment show capex strength.",
+    impact: "Investment up supports machinery, materials and semis; investment down warns on business-cycle pressure.",
+    sourceNote: "FRED U.S. investment proxies; China FAI needs a China data provider.",
+  },
+  {
+    rank: 13,
+    label: "13 企业盈利数据",
+    symbols: ["FRED:CP", "^GSPC", "SPY", "^NDX", "QQQ", "^FTW5000"],
+    meaning: "Corporate profits and broad equity indices connect macro conditions to the earnings cycle.",
+    impact: "Profits and margin trends up support equities; profit pressure usually caps rallies and raises credit risk.",
+    sourceNote: "FRED corporate profits plus Yahoo broad-market proxies; forward EPS needs paid data.",
+  },
+  {
+    rank: 14,
+    label: "14 市场资金流向",
+    symbols: ["DEFILLAMA:stablecoins-total", "IBIT", "FBTC", "HYG", "LQD", "EMB"],
+    meaning: "Public proxies for money moving into risk assets: stablecoin supply, crypto ETF proxies and credit ETFs.",
+    impact: "Inflows/proxy strength supports short- to medium-term risk appetite; outflows/proxy weakness warns on de-risking.",
+    sourceNote: "Public proxies only; ETF flow, northbound/southbound and margin-financing flow feeds need dedicated providers.",
+  },
+  {
+    rank: 15,
+    label: "15 成交额 / 换手率",
+    symbols: ["FRED:DDDM02USA156NWDB", "FRED:DDDM02CNA156NWDB", "FRED:DDDM01USA156NWDB", "FRED:DDDM01CNA156NWDB"],
+    meaning: "Stock value traded / GDP and market cap / GDP measure market activity and scale versus the real economy.",
+    impact: "Higher turnover/market-cap ratios imply stronger market heat; falling ratios imply lower risk appetite.",
+    sourceNote: "World Bank via FRED; annual and lagged.",
+  },
+  {
+    rank: 16,
+    label: "16 大宗商品价格",
+    symbols: ["CL=F", "BZ=F", "GC=F", "HG=F", "SI=F", "NG=F", "PL=F", "DBC", "ZC=F", "ZW=F", "ZS=F"],
+    meaning: "Oil, copper, gold and broad commodities show inflation pressure, industrial demand and safe-haven behavior.",
+    impact: "Oil/copper up can lift cyclicals but pressure inflation; gold up often reflects real-rate or risk stress.",
+    sourceNote: "Yahoo futures and ETF proxies.",
+  },
+  {
+    rank: 17,
+    label: "17 出口 / 贸易数据",
+    symbols: ["FRED:EXPGS", "FRED:IMPGS", "EEM", "AUDUSD=X", "USDKRW=X"],
+    meaning: "Exports/imports and trade-sensitive market proxies show external-demand strength.",
+    impact: "Export strength supports manufacturing and FX; weak trade pressures cyclicals and EM risk appetite.",
+    sourceNote: "FRED U.S. trade plus Yahoo market proxies; China trade data need a China data provider.",
+  },
+  {
+    rank: 18,
+    label: "18 财政政策数据",
+    symbols: ["FRED:FGEXPND", "FRED:GFDEGDQ188S", "FRED:WTREGEN"],
+    meaning: "Government spending, debt/GDP and Treasury cash balances show fiscal impulse and liquidity withdrawal/injection.",
+    impact: "Fiscal expansion supports demand but can lift yields; TGA rising withdraws liquidity, TGA falling releases liquidity.",
+    sourceNote: "FRED fiscal and Treasury-account proxies.",
+  },
+  {
+    rank: 19,
+    label: "19 行业景气数据",
+    symbols: ["^SOX", "SMH", "XLK", "XLE", "XLF", "KRE", "ARKK", "XLE", "^N225", "^KS11"],
+    meaning: "Sector and regional proxies reveal where the business cycle is strongest or weakest.",
+    impact: "Leadership in semis/tech/cyclicals signals risk appetite; bank or cyclical weakness warns on credit/growth stress.",
+    sourceNote: "Yahoo liquid index/ETF proxies; granular industry data need specialized feeds.",
+  },
+  {
+    rank: 20,
+    label: "20 政策 / 监管信号",
+    symbols: ["KWEB", "^HSI", "^HSCE", "000300.SS", "000001.SS", "399006.SZ", "EEM"],
+    meaning: "Policy-sensitive China/HK/EM assets act as liquid proxies for regulatory, property and capital-market policy tone.",
+    impact: "Policy easing or regulatory relief lifts these proxies; tightening, property stress or platform regulation hurts them.",
+    sourceNote: "Yahoo market proxies; direct policy/news classification is not part of the stable API stack.",
+  },
+]
+
+const PRIORITY_CATEGORY_BY_SYMBOL = new Map<string, MacroPriorityCategory>()
+for (const category of MACRO_PRIORITY_CATEGORIES) {
+  for (const symbol of category.symbols) {
+    if (!PRIORITY_CATEGORY_BY_SYMBOL.has(symbol)) {
+      PRIORITY_CATEGORY_BY_SYMBOL.set(symbol, category)
+    }
+  }
+}
+
+const withPriorityCategory = (meta: MacroIndicatorMeta): MacroIndicatorMeta => {
+  const category = PRIORITY_CATEGORY_BY_SYMBOL.get(meta.symbol)
+  if (!category) return meta
+
+  return {
+    ...meta,
+    macroRank: category.rank,
+    macroCategory: category.label,
+    meaning: category.meaning,
+    impact: category.impact,
+    sourceNote: category.sourceNote,
+  }
+}
 
 /**
  * Full indicator registry — covers ~85 series across rates / inflation / employment /
@@ -31,7 +248,7 @@ const dividedByTen = (value: number) => value / 10
  * Indicators marked FRED: require FRED_API_KEY env var. They are silently skipped if missing.
  * Indicators marked DefiLlama / Blockchain.com / Alternative.me / CoinGecko: free public endpoints.
  */
-export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
+const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   // ============================================================
   // TIER 1 — Critical daily watch (1-15)
   // ============================================================
@@ -150,6 +367,18 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Realtime",
     audience: ["股票", "量化"],
     description: "S&P 500 可交易 ETF。用于观察真实成交、期权、机构对冲和盘中风险偏好。",
+  },
+  {
+    symbol: "^FTW5000",
+    source: "Yahoo Finance",
+    name: "FT Wilshire 5000 Total Market",
+    group: "Equity",
+    unit: "index",
+    priority: 8.2,
+    frequency: "Realtime",
+    audience: ["股票", "宏观"],
+    description:
+      "FT Wilshire 5000 全市场指数，美股总市值表现的宽基代理。比 S&P 500 更接近美国上市股票整体市值周期。",
   },
   {
     symbol: "^VIX",
@@ -315,6 +544,86 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     audience: ["宏观"],
     description: "M1 短端货币（活期 + 现金），反映短期流动性。",
     transform: (value) => value * 1_000_000_000,
+  },
+  {
+    symbol: "FRED:TOTLL",
+    providerSymbol: "TOTLL",
+    source: "FRED",
+    name: "U.S. Loans & Leases",
+    group: "Credit",
+    unit: "usd",
+    priority: 21.05,
+    frequency: "Weekly",
+    audience: ["宏观", "信用"],
+    description: "美国商业银行贷款和租赁总额（十亿美元）。比 M2 更接近实体信用扩张。",
+    transform: (value) => value * 1_000_000_000,
+  },
+  {
+    symbol: "FRED:M2REAL",
+    providerSymbol: "M2REAL",
+    source: "FRED",
+    name: "U.S. Real M2 Money Supply",
+    group: "Liquidity",
+    unit: "usd",
+    priority: 21.1,
+    frequency: "Monthly",
+    audience: ["宏观", "加密"],
+    description:
+      "美国实际 M2（以 CPI 折算为 1982-84 年美元）。用于区分名义货币扩张和真实购买力扩张；实际 M2 上行通常代表真实流动性改善。",
+    transform: (value) => value * 1_000_000_000,
+  },
+  {
+    symbol: "FRED:M2V",
+    providerSymbol: "M2V",
+    source: "FRED",
+    name: "U.S. M2 Velocity",
+    group: "Liquidity",
+    unit: "ratio",
+    priority: 21.2,
+    frequency: "Quarterly",
+    audience: ["宏观"],
+    description:
+      "M2 流通速度（名义 GDP / M2）。上行代表货币周转加快，常与名义增长、通胀和信贷活跃度改善相关；下行说明货币更多停留在储蓄/金融体系。",
+  },
+  {
+    symbol: "FRED:BOGMBASE",
+    providerSymbol: "BOGMBASE",
+    source: "FRED",
+    name: "U.S. Monetary Base",
+    group: "Liquidity",
+    unit: "usd",
+    priority: 21.3,
+    frequency: "Monthly",
+    audience: ["宏观", "加密"],
+    description:
+      "美国货币基础（流通中现金 + 准备金余额，十亿美元）。与联储资产负债表、银行准备金共同观察基础流动性。",
+    transform: (value) => value * 1_000_000_000,
+  },
+  {
+    symbol: "FRED:MYAGM2CNM189N",
+    providerSymbol: "MYAGM2CNM189N",
+    source: "FRED",
+    name: "China M2 Money Supply (Historical)",
+    group: "Liquidity",
+    unit: "cny",
+    priority: 21.4,
+    frequency: "Monthly · historical to 2019",
+    audience: ["宏观", "中国", "加密"],
+    description:
+      "中国 M2 货币供应，IMF IFS 经 FRED 发布，单位为人民币。稳定 API 覆盖到 2019 年 8 月，作为历史周期参考；不是当前 PBoC 最新月度值。",
+  },
+  {
+    symbol: "FRED:MYAGM1CNM189N",
+    providerSymbol: "MYAGM1CNM189N",
+    source: "FRED",
+    name: "China M1 Money Supply (Historical)",
+    group: "Liquidity",
+    unit: "cny",
+    priority: 21.5,
+    frequency: "Monthly · historical to 2019",
+    audience: ["宏观", "中国"],
+    description:
+      "中国 M1 货币供应，IMF IFS 经 FRED 发布，单位为人民币。稳定 API 覆盖到 2019 年 8 月，适合看历史流动性结构，不代表最新 PBoC 数据。",
   },
   {
     symbol: "FRED:BAMLH0A0HYM2",
@@ -547,6 +856,58 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Realtime",
     audience: ["股票"],
     description: "MSCI 全球股票市场 ETF。全球风险偏好综合代理。",
+  },
+  {
+    symbol: "FRED:DDDM01USA156NWDB",
+    providerSymbol: "DDDM01USA156NWDB",
+    source: "FRED",
+    name: "U.S. Stock Market Cap / GDP",
+    group: "Equity",
+    unit: "percent",
+    priority: 35.1,
+    frequency: "Annual · lagged",
+    audience: ["宏观", "股票"],
+    description:
+      "美国上市股票总市值 / GDP（World Bank，经 FRED 发布）。常被称为 Buffett Indicator，用于观察股票整体估值与实体经济规模的关系；年度数据有明显滞后。",
+  },
+  {
+    symbol: "FRED:DDDM01CNA156NWDB",
+    providerSymbol: "DDDM01CNA156NWDB",
+    source: "FRED",
+    name: "China Stock Market Cap / GDP",
+    group: "Equity",
+    unit: "percent",
+    priority: 35.2,
+    frequency: "Annual · lagged",
+    audience: ["宏观", "中国", "股票"],
+    description:
+      "中国上市股票总市值 / GDP（World Bank，经 FRED 发布）。用于观察 A/H 股市场规模相对实体经济的变化；年度数据有明显滞后。",
+  },
+  {
+    symbol: "FRED:DDDM02USA156NWDB",
+    providerSymbol: "DDDM02USA156NWDB",
+    source: "FRED",
+    name: "U.S. Stock Value Traded / GDP",
+    group: "Equity",
+    unit: "percent",
+    priority: 35.3,
+    frequency: "Annual · lagged",
+    audience: ["宏观", "股票", "量化"],
+    description:
+      "美国股票成交总额 / GDP（World Bank，经 FRED 发布）。衡量市场换手与金融市场活跃度，年度数据有明显滞后。",
+  },
+  {
+    symbol: "FRED:DDDM02CNA156NWDB",
+    providerSymbol: "DDDM02CNA156NWDB",
+    source: "FRED",
+    name: "China Stock Value Traded / GDP",
+    group: "Equity",
+    unit: "percent",
+    priority: 35.4,
+    frequency: "Annual · lagged",
+    audience: ["宏观", "中国", "股票"],
+    description:
+      "中国股票成交总额 / GDP（World Bank，经 FRED 发布）。用于观察市场交易活跃度与实体经济规模的关系，年度数据有明显滞后。",
   },
   {
     symbol: "^HSI",
@@ -831,6 +1192,19 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     transform: (value) => value * 1_000_000,
   },
   {
+    symbol: "FRED:DSPIC96",
+    providerSymbol: "DSPIC96",
+    source: "FRED",
+    name: "Real Disposable Personal Income",
+    group: "Growth",
+    unit: "usd",
+    priority: 58.2,
+    frequency: "Monthly",
+    audience: ["宏观", "消费"],
+    description: "美国实际可支配个人收入（十亿 2017 链式美元，年化）。居民消费能力的收入端。",
+    transform: (value) => value * 1_000_000_000,
+  },
+  {
     symbol: "FRED:INDPRO",
     providerSymbol: "INDPRO",
     source: "FRED",
@@ -868,6 +1242,32 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     transform: (value) => value * 1_000_000,
   },
   {
+    symbol: "FRED:IPMAN",
+    providerSymbol: "IPMAN",
+    source: "FRED",
+    name: "Manufacturing Activity Proxy (IPMAN)",
+    group: "Growth",
+    unit: "index",
+    priority: 61.5,
+    frequency: "Monthly",
+    audience: ["宏观", "制造业"],
+    description:
+      "美国制造业工业生产指数（NAICS）。FRED 不再稳定提供 ISM PMI，本序列作为制造业景气的硬数据 proxy。",
+  },
+  {
+    symbol: "FRED:GDPC1",
+    providerSymbol: "GDPC1",
+    source: "FRED",
+    name: "U.S. Real GDP",
+    group: "Growth",
+    unit: "usd",
+    priority: 61.8,
+    frequency: "Quarterly",
+    audience: ["宏观"],
+    description: "美国实际 GDP（十亿 2017 链式美元，季度年化）。剔除通胀后的经济总量。",
+    transform: (value) => value * 1_000_000_000,
+  },
+  {
     symbol: "FRED:GDP",
     providerSymbol: "GDP",
     source: "FRED",
@@ -878,6 +1278,32 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Quarterly",
     audience: ["宏观"],
     description: "美国名义 GDP（十亿美元，季度）。经济总量周期。",
+    transform: (value) => value * 1_000_000_000,
+  },
+  {
+    symbol: "FRED:GPDI",
+    providerSymbol: "GPDI",
+    source: "FRED",
+    name: "Gross Private Domestic Investment",
+    group: "Growth",
+    unit: "usd",
+    priority: 62.1,
+    frequency: "Quarterly",
+    audience: ["宏观", "投资"],
+    description: "美国私人国内总投资（十亿美元，季度年化）。衡量资本开支和库存周期的总投资 proxy。",
+    transform: (value) => value * 1_000_000_000,
+  },
+  {
+    symbol: "FRED:PNFI",
+    providerSymbol: "PNFI",
+    source: "FRED",
+    name: "Private Nonresidential Fixed Investment",
+    group: "Growth",
+    unit: "usd",
+    priority: 62.2,
+    frequency: "Quarterly",
+    audience: ["宏观", "投资"],
+    description: "美国私人非住宅固定投资（十亿美元，季度年化）。企业资本开支和制造业投资强弱。",
     transform: (value) => value * 1_000_000_000,
   },
   {
@@ -942,6 +1368,19 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     description: "美国营建许可（千套，年化）。住宅建设的领先指标。",
     transform: (value) => value * 1000,
   },
+  {
+    symbol: "FRED:PRFI",
+    providerSymbol: "PRFI",
+    source: "FRED",
+    name: "Private Residential Fixed Investment",
+    group: "RealEstate",
+    unit: "usd",
+    priority: 65.5,
+    frequency: "Quarterly",
+    audience: ["地产", "宏观"],
+    description: "美国私人住宅固定投资（十亿美元，季度年化）。比房价更贴近地产投资对 GDP 的拖累/支撑。",
+    transform: (value) => value * 1_000_000_000,
+  },
 
   // ============================================================
   // TIER 5 — FX (66-75)
@@ -978,6 +1417,17 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Realtime",
     audience: ["FX", "中国"],
     description: "美元兑离岸人民币。中美利差 + 人民币市场化预期。",
+  },
+  {
+    symbol: "CNY=X",
+    source: "Yahoo Finance",
+    name: "USD/CNY (在岸人民币)",
+    group: "FX",
+    unit: "ratio",
+    priority: 68.1,
+    frequency: "Realtime",
+    audience: ["FX", "中国"],
+    description: "美元兑在岸人民币。与 USDCNH 联合观察人民币压力和内外盘价差。",
   },
   {
     symbol: "GBPUSD=X",
@@ -1162,6 +1612,19 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     description: "纳斯达克 100 期货 (NQ)。",
   },
   {
+    symbol: "FRED:CP",
+    providerSymbol: "CP",
+    source: "FRED",
+    name: "Corporate Profits After Tax",
+    group: "Equity",
+    unit: "usd",
+    priority: 84.5,
+    frequency: "Quarterly",
+    audience: ["股票", "宏观"],
+    description: "美国企业税后利润（十亿美元，季度）。利润周期最终决定股价长期趋势。",
+    transform: (value) => value * 1_000_000_000,
+  },
+  {
     symbol: "ZN=F",
     source: "Yahoo Finance",
     name: "10Y Treasury Note Futures",
@@ -1252,6 +1715,57 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Realtime",
     audience: ["新兴市场"],
     description: "新兴市场美元主权债 ETF。",
+  },
+  {
+    symbol: "FRED:EXPGS",
+    providerSymbol: "EXPGS",
+    source: "FRED",
+    name: "U.S. Exports of Goods & Services",
+    group: "Growth",
+    unit: "usd",
+    priority: 92.2,
+    frequency: "Quarterly",
+    audience: ["宏观", "贸易"],
+    description: "美国商品和服务出口（十亿美元，季度年化）。外需和全球贸易周期 proxy。",
+    transform: (value) => value * 1_000_000_000,
+  },
+  {
+    symbol: "FRED:IMPGS",
+    providerSymbol: "IMPGS",
+    source: "FRED",
+    name: "U.S. Imports of Goods & Services",
+    group: "Growth",
+    unit: "usd",
+    priority: 92.3,
+    frequency: "Quarterly",
+    audience: ["宏观", "贸易"],
+    description: "美国商品和服务进口（十亿美元，季度年化）。内需和全球供应链需求 proxy。",
+    transform: (value) => value * 1_000_000_000,
+  },
+  {
+    symbol: "FRED:FGEXPND",
+    providerSymbol: "FGEXPND",
+    source: "FRED",
+    name: "Federal Government Expenditures",
+    group: "Growth",
+    unit: "usd",
+    priority: 92.4,
+    frequency: "Quarterly",
+    audience: ["宏观", "财政"],
+    description: "美国联邦政府经常支出（十亿美元，季度年化）。财政托底和需求拉动 proxy。",
+    transform: (value) => value * 1_000_000_000,
+  },
+  {
+    symbol: "FRED:GFDEGDQ188S",
+    providerSymbol: "GFDEGDQ188S",
+    source: "FRED",
+    name: "U.S. Federal Debt / GDP",
+    group: "Credit",
+    unit: "percent",
+    priority: 92.5,
+    frequency: "Quarterly",
+    audience: ["宏观", "财政"],
+    description: "美国联邦债务 / GDP。观察财政空间、长期利率和期限溢价压力。",
   },
 
   // ============================================================
@@ -1440,6 +1954,8 @@ export const MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
 ]
 
+export const MACRO_INDICATORS: MacroIndicatorMeta[] = BASE_MACRO_INDICATORS.map(withPriorityCategory)
+
 // =====================================================================
 // Indicators we deliberately do NOT integrate (paid / unavailable APIs).
 // Listed here so the team has a single source of truth on coverage gaps.
@@ -1450,8 +1966,19 @@ export const SKIPPED_INDICATORS = [
     reason: "需要 CME Group 付费数据 (CME Direct / FedWatch API)",
   },
   { name: "CFTC Commitments of Traders (COT)", reason: "CFTC 提供周报 ZIP，需要单独解析与清洗" },
-  { name: "China M2 / TSF / New Loans / Credit", reason: "PBoC 无开放 JSON API，可走 akshare 等离线数据源" },
-  { name: "China NBS 数据（CPI/PPI/GDP/PMI/零售/进出口）", reason: "需要 akshare/Wind/同花顺等本地数据源" },
+  {
+    name: "China current PBoC M1/M2 / TSF / New Loans / Credit / LPR / MLF",
+    reason:
+      "稳定 API 只接入 FRED/IMF 历史 M1/M2；PBoC 最新月度、社融、新增贷款、LPR/MLF/降准需 akshare、Wind、同花顺或付费源",
+  },
+  {
+    name: "Live ISM / S&P Global PMI",
+    reason: "FRED 已不稳定提供 ISM PMI；当前用 FRED 制造业工业生产 IPMAN 作为稳定 proxy",
+  },
+  {
+    name: "China NBS 数据（CPI/PPI/GDP/PMI/零售/地产投资/进出口）",
+    reason: "需要 akshare/Wind/同花顺等本地数据源；当前稳定栈仅用美方/全球公开 proxy",
+  },
   { name: "Glassnode / CryptoQuant 高级链上 (MVRV、NUPL、SOPR、矿工储备、交易所余额)", reason: "全部付费 API" },
   { name: "Deribit BTC 期权 IV / Skew / Max Pain", reason: "Deribit API 限流 + 计算成本高" },
   { name: "BTC ETF 净流入 (Farside)", reason: "Farside 是 HTML 表格，已被反爬；BlackRock 13F 季度披露" },
@@ -1461,7 +1988,10 @@ export const SKIPPED_INDICATORS = [
   { name: "ICE MOVE Index", reason: "ICE BofA 付费；FRED 上没有；可用 ^TYX 波动率自算近似" },
   { name: "Goldman / Fed 金融条件指数 FCI", reason: "需 Bloomberg；可用 ChicagoFed FRED NFCI 近似" },
   { name: "美股 EPS 预期 / Forward PE / ERP", reason: "FactSet / Bloomberg 付费" },
-  { name: "ETF 资金流 / 共同基金资金流 / A股北向 / 港股南向", reason: "需要 ICI / 港交所付费源" },
+  {
+    name: "ETF 资金流 / 共同基金资金流 / A股北向 / 港股南向 / 两融余额",
+    reason: "需要 ICI / 港交所 / 交易所专门数据源；当前只展示可公开拉取的价格/市值/信用 proxy",
+  },
 ]
 
 export const MACRO_INDICATOR_MAP: Record<string, MacroIndicatorMeta> = Object.fromEntries(
