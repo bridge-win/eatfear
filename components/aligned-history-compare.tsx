@@ -20,7 +20,6 @@ import {
 
 import { InfoTooltip } from "@/components/info-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 export type AlignedHistoryUnit = "usd" | "pct" | "ratio" | "raw" | "count"
@@ -63,6 +62,27 @@ interface PaneChart {
   anchorSeries: ISeriesApi<"Line">
   seriesByKey: Map<string, ISeriesApi<"Line">>
   rawByKey: Map<string, Map<number, number>>
+  containerEl: HTMLDivElement
+}
+
+interface HoverState {
+  time: number
+  x: number
+}
+
+interface HoverPaneTooltipItem {
+  key: string
+  label: string
+  color: string
+  value: string
+}
+
+interface HoverPaneTooltip {
+  key: number
+  left: number
+  top: number
+  width: number
+  items: HoverPaneTooltipItem[]
 }
 
 export interface AlignedHistoryCompareProps {
@@ -81,6 +101,7 @@ export interface AlignedHistoryCompareProps {
 const toUtc = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp
 const LWC_VALUE_CAP = 8.9e13
 const COMPACT_WIDTH = 560
+const MAX_SERIES_PER_PANE = 2
 
 function formatRaw(value: number, unit: AlignedHistoryUnit): string {
   if (!Number.isFinite(value)) return "—"
@@ -172,6 +193,30 @@ function summarize(points: AlignedHistoryPoint[]): { first: number; last: number
   return { first, last, pct }
 }
 
+function getNearestValue(values: Map<number, number> | undefined, time: number): number | null {
+  if (!values || values.size === 0) return null
+  const exact = values.get(time)
+  if (exact !== undefined) return exact
+
+  let previousTime = -Infinity
+  let previousValue: number | null = null
+  let nextTime = Infinity
+  let nextValue: number | null = null
+
+  for (const [candidateTime, value] of values) {
+    if (candidateTime <= time && candidateTime > previousTime) {
+      previousTime = candidateTime
+      previousValue = value
+    }
+    if (candidateTime > time && candidateTime < nextTime) {
+      nextTime = candidateTime
+      nextValue = value
+    }
+  }
+
+  return previousValue ?? nextValue
+}
+
 function getTimeline(data: AlignedHistoryData): number[] {
   const timeline = new Set<number>(data.timeline ?? [])
   for (const group of data.groups) {
@@ -185,16 +230,22 @@ function getTimeline(data: AlignedHistoryData): number[] {
 }
 
 function getGroups(data: AlignedHistoryData): SeriesGroup[] {
-  return data.groups
-    .map((group, paneIndex) => ({
-      key: group.key,
-      label: group.label,
-      paneIndex,
-      specs: group.series.filter((series) =>
-        series.data.some((point) => point.value !== null && Number.isFinite(point.value)),
-      ),
-    }))
-    .filter((group) => group.specs.length > 0)
+  const groups: SeriesGroup[] = []
+  for (const group of data.groups) {
+    const specs = group.series.filter((series) =>
+      series.data.some((point) => point.value !== null && Number.isFinite(point.value)),
+    )
+    for (let index = 0; index < specs.length; index += MAX_SERIES_PER_PANE) {
+      const chunk = specs.slice(index, index + MAX_SERIES_PER_PANE)
+      groups.push({
+        key: `${group.key}-${index / MAX_SERIES_PER_PANE}`,
+        label: group.label,
+        paneIndex: groups.length,
+        specs: chunk,
+      })
+    }
+  }
+  return groups
 }
 
 function getTimelineRange(timeline: number[]): { from: UTCTimestamp; to: UTCTimestamp } | null {
@@ -220,13 +271,12 @@ export function AlignedHistoryCompare({
   seriesCountLabel,
   className,
 }: AlignedHistoryCompareProps) {
-  const { locale } = useI18n()
   const cardRef = useRef<HTMLDivElement | null>(null)
   const gridRef = useRef<HTMLDivElement | null>(null)
   const chartsRef = useRef<PaneChart[]>([])
   const hiddenRef = useRef<Set<string>>(new Set())
   const [hidden, setHidden] = useState<Set<string>>(new Set())
-  const [hoverTime, setHoverTime] = useState<number | null>(null)
+  const [hoverState, setHoverState] = useState<HoverState | null>(null)
   const [cardWidth, setCardWidth] = useState(0)
   const groups = useMemo(() => (data ? getGroups(data) : []), [data])
   const timeline = useMemo(() => (data ? getTimeline(data) : []), [data])
@@ -365,6 +415,7 @@ export function AlignedHistoryCompare({
         anchorSeries,
         seriesByKey,
         rawByKey,
+        containerEl,
       })
     })
     chartsRef.current = panes
@@ -392,8 +443,8 @@ export function AlignedHistoryCompare({
       for (const spec of pane.specs) {
         if (hiddenRef.current.has(spec.key)) continue
         const series = pane.seriesByKey.get(spec.key)
-        const value = pane.rawByKey.get(spec.key)?.get(time)
-        if (series && value !== undefined) return { series, value }
+        const value = getNearestValue(pane.rawByKey.get(spec.key), time)
+        if (series && value !== null) return { series, value }
       }
       return { series: pane.anchorSeries, value: 0 }
     }
@@ -401,15 +452,21 @@ export function AlignedHistoryCompare({
       if (crosshairSyncing) return
       crosshairSyncing = true
       try {
-        if (!param.time) {
-          setHoverTime(null)
+        if (!param.time || typeof param.time !== "number" || !param.point) {
+          setHoverState(null)
           for (let index = 0; index < panes.length; index += 1) {
             if (index === sourceIndex) continue
             panes[index].chart.clearCrosshairPosition()
           }
           return
         }
-        setHoverTime(param.time as number)
+        const sourcePane = panes[sourceIndex]
+        const gridRect = grid.getBoundingClientRect()
+        const paneRect = sourcePane.containerEl.getBoundingClientRect()
+        setHoverState({
+          time: param.time,
+          x: paneRect.left - gridRect.left + param.point.x,
+        })
         for (let index = 0; index < panes.length; index += 1) {
           if (index === sourceIndex) continue
           const seed = getCrosshairSeed(panes[index], param.time)
@@ -464,27 +521,6 @@ export function AlignedHistoryCompare({
     return out
   }, [data, groups])
 
-  const hoverRaws = useMemo(() => {
-    const out = new Map<string, number>()
-    if (hoverTime === null) return out
-    for (const pane of chartsRef.current) {
-      for (const spec of pane.specs) {
-        const value = pane.rawByKey.get(spec.key)?.get(hoverTime)
-        if (value !== undefined) out.set(spec.key, value)
-      }
-    }
-    return out
-  }, [hoverTime])
-
-  const hoverDateLabel = useMemo(() => {
-    if (hoverTime === null) return null
-    return new Date(hoverTime * 1000).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
-      year: "2-digit",
-      month: "short",
-      day: "2-digit",
-    })
-  }, [hoverTime, locale])
-
   const visibleSeriesCount = useMemo(() => {
     return groups.reduce(
       (count, group) =>
@@ -493,25 +529,60 @@ export function AlignedHistoryCompare({
     )
   }, [groups, hidden])
 
+  const hoverPaneTooltips = useMemo<HoverPaneTooltip[]>(() => {
+    const grid = gridRef.current
+    if (!hoverState || !grid) return []
+
+    const gridRect = grid.getBoundingClientRect()
+    const tooltipWidth = isCompact ? 172 : 220
+    const left = Math.min(Math.max(hoverState.x + 8, 4), Math.max(4, gridRect.width - tooltipWidth - 4))
+
+    return chartsRef.current.flatMap((pane) => {
+      const items: HoverPaneTooltipItem[] = pane.specs
+        .filter((spec) => !hidden.has(spec.key))
+        .map((spec) => {
+          const value = getNearestValue(pane.rawByKey.get(spec.key), hoverState.time)
+          return {
+            key: spec.key,
+            label: spec.label,
+            color: spec.color,
+            value: value === null ? "—" : formatRaw(value, spec.unit),
+          }
+        })
+
+      if (items.length === 0) return []
+
+      const paneRect = pane.containerEl.getBoundingClientRect()
+      return [
+        {
+          key: pane.paneIndex,
+          left,
+          top: Math.max(0, paneRect.top - gridRect.top + 2),
+          width: tooltipWidth,
+          items,
+        },
+      ]
+    })
+  }, [hidden, hoverState, isCompact])
+
   return (
-    <Card ref={cardRef} data-history-compare className={cn("py-2.5", className)}>
-      <CardHeader className="px-3 pb-1">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <CardTitle data-history-title className="text-sm">
+    <Card ref={cardRef} data-history-compare className={cn("gap-1 py-1.5", className)}>
+      <CardHeader className="px-2.5 pb-0">
+        <div className="grid h-5 grid-cols-[minmax(0,1fr)_7.75rem] items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_9rem]">
+          <div className="flex h-5 min-w-0 items-center gap-1">
+            <CardTitle data-history-title className="h-4 max-w-full truncate text-xs leading-4">
               {title}
             </CardTitle>
             <InfoTooltip title={title} description={infoDescription} source={infoSource} />
           </div>
           {data && seriesCount > 0 && (
-            <span className="text-[10px] text-muted-foreground">
-              {hoverDateLabel ? `${hoverDateLabel} · ` : ""}
+            <span className="h-4 w-[7.75rem] overflow-hidden truncate text-right text-[9px] leading-4 text-muted-foreground sm:w-36">
               {visibleSeriesCount}/{seriesCount} {seriesCountLabel}
             </span>
           )}
         </div>
       </CardHeader>
-      <CardContent className="px-3 pt-1">
+      <CardContent className="px-2.5 pt-0">
         {error ? (
           <p className="py-12 text-center text-xs text-destructive">{error}</p>
         ) : loading && !data ? (
@@ -519,27 +590,21 @@ export function AlignedHistoryCompare({
         ) : !data || seriesCount === 0 || timeline.length === 0 ? (
           <p className="py-12 text-center text-xs text-muted-foreground">{noDataLabel}</p>
         ) : (
-          <div ref={gridRef} className="flex flex-col gap-0.5 sm:gap-1">
+          <div ref={gridRef} className="relative flex flex-col gap-px sm:gap-0.5">
             {groups.map((group, groupIndex) => (
               <section
                 key={group.paneIndex}
                 data-history-group={group.key}
-                className="border-t border-border/60 pt-0.5 first:border-t-0 first:pt-0 sm:pt-1"
+                className="border-t border-border/50 pt-px first:border-t-0 first:pt-0 sm:pt-0.5"
               >
                 <div
                   data-history-pane-legend
-                  className="mb-0.5 flex min-h-4 snap-x flex-nowrap items-center gap-x-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:gap-x-2 sm:gap-y-0.5 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden"
+                  className="mb-px grid grid-cols-2 items-center gap-x-1.5 gap-y-px"
                 >
                   {group.specs.map((spec) => {
                     const summary = summaries.get(spec.key)
-                    const hoverRaw = hoverRaws.get(spec.key)
-                    const liveValue = hoverTime !== null ? hoverRaw : summary?.last
-                    const livePct =
-                      hoverTime !== null && hoverRaw === undefined
-                        ? undefined
-                        : hoverRaw !== undefined && summary && summary.first !== 0
-                          ? (hoverRaw / summary.first - 1) * 100
-                          : summary?.pct
+                    const liveValue = summary?.last
+                    const livePct = summary?.pct
                     const isHidden = hidden.has(spec.key)
                     const pctTone =
                       livePct === undefined
@@ -554,7 +619,7 @@ export function AlignedHistoryCompare({
                         onClick={() => toggle(spec.key)}
                         aria-pressed={!isHidden}
                         className={cn(
-                          "inline-flex max-w-[220px] shrink-0 snap-start items-baseline gap-0.5 truncate text-left tabular-nums transition-opacity hover:text-foreground sm:max-w-full sm:shrink sm:gap-1",
+                          "inline-grid h-3.5 min-w-0 grid-cols-[auto_minmax(0,1fr)_4.1rem_2.8rem] items-center gap-0.5 text-left tabular-nums transition-opacity hover:text-foreground sm:grid-cols-[auto_minmax(0,1fr)_4.5rem_3.2rem] sm:gap-1",
                           isHidden ? "opacity-35" : "opacity-100",
                         )}
                       >
@@ -562,13 +627,13 @@ export function AlignedHistoryCompare({
                           className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
                           style={{ background: spec.color }}
                         />
-                        <span className="truncate text-[10px] font-medium leading-none" title={spec.label}>
+                        <span className="min-w-0 truncate text-[9px] font-medium leading-none sm:text-[10px]" title={spec.label}>
                           {spec.label}
                         </span>
-                        <span className="shrink-0 text-[9px] font-semibold leading-none sm:text-[10px]">
+                        <span className="w-[4.1rem] overflow-hidden truncate text-right text-[8px] font-semibold leading-none sm:w-[4.5rem] sm:text-[10px]">
                           {liveValue !== undefined ? formatRaw(liveValue, spec.unit) : "—"}
                         </span>
-                        <span className={cn("shrink-0 text-[9px] leading-none", pctTone)}>
+                        <span className={cn("w-[2.8rem] overflow-hidden truncate text-right text-[8px] leading-none sm:w-[3.2rem] sm:text-[9px]", pctTone)}>
                           {livePct !== undefined ? formatPct(livePct) : ""}
                         </span>
                       </button>
@@ -579,10 +644,34 @@ export function AlignedHistoryCompare({
                   data-pane={group.paneIndex}
                   className={cn(
                     "w-full",
-                    groupIndex === groups.length - 1 ? "h-[86px] sm:h-[120px]" : "h-[74px] sm:h-[108px]",
+                    groupIndex === groups.length - 1 ? "h-[56px] sm:h-[78px]" : "h-[46px] sm:h-[68px]",
                   )}
                 />
               </section>
+            ))}
+            {hoverPaneTooltips.map((tooltip) => (
+              <div
+                key={tooltip.key}
+                data-history-hover-tooltip
+                data-history-hover-pane={tooltip.key}
+                className="pointer-events-none absolute z-20 rounded-md border bg-popover/95 px-1.5 py-1 text-[9px] text-popover-foreground shadow-md backdrop-blur sm:text-[10px]"
+                style={{ left: tooltip.left, top: tooltip.top, width: tooltip.width }}
+              >
+                <div className="space-y-px">
+                  {tooltip.items.map((item) => (
+                    <div
+                      key={item.key}
+                      data-history-hover-item
+                      className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-1"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: item.color }} />
+                      <span className="truncate font-semibold tabular-nums">
+                        {item.label}:{item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
