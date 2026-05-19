@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react"
 import {
   AlignedHistoryCompare,
   type AlignedHistoryData,
+  type AlignedHistoryGroup,
   type AlignedHistorySeries,
   type AlignedHistoryUnit,
 } from "@/components/aligned-history-compare"
@@ -65,17 +66,33 @@ export function CryptoHistoryCompare({ instId = "BTC-USDT-SWAP", range, classNam
 
   const data: AlignedHistoryData | null = useMemo(() => {
     if (!payload) return null
-    const series: AlignedHistorySeries[] = payload.series.map((spec) => ({
-      key: spec.key,
-      label: t(spec.i18nKey),
-      paneIndex: spec.paneIndex,
-      color: spec.color,
-      unit: spec.unit,
-      data: spec.data,
-    }))
+    const groupsByPane = new Map<number, AlignedHistorySeries[]>()
+    for (const spec of payload.series) {
+      const series: AlignedHistorySeries = {
+        key: spec.key,
+        label: t(spec.i18nKey),
+        color: spec.color,
+        unit: spec.unit,
+        data: spec.data,
+      }
+      const group = groupsByPane.get(spec.paneIndex)
+      if (group) {
+        group.push(series)
+      } else {
+        groupsByPane.set(spec.paneIndex, [series])
+      }
+    }
+
+    const groups: AlignedHistoryGroup[] = Array.from(groupsByPane.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([paneIndex, series]) => ({
+        key: `pane-${paneIndex}`,
+        series,
+      }))
+
     return {
       timeline: payload.timeline,
-      series,
+      groups,
     }
   }, [payload, t])
 

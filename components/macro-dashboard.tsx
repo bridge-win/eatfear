@@ -6,6 +6,7 @@ import { RefreshCw, TrendingDown, TrendingUp } from "lucide-react"
 import {
   AlignedHistoryCompare,
   type AlignedHistoryData,
+  type AlignedHistoryGroup,
   type AlignedHistorySeries,
   type AlignedHistoryUnit,
 } from "@/components/aligned-history-compare"
@@ -137,38 +138,45 @@ const toAlignedUnit = (unit: MacroIndicator["unit"]): AlignedHistoryUnit => {
 const buildMacroHistoryData = (indicators: MacroIndicator[]): AlignedHistoryData | null => {
   if (indicators.length === 0) return null
 
-  const timelineSet = new Set<number>()
   const sortedIndicators = [...indicators].sort((a, b) => {
     const groupDelta = getGroupPaneIndex(a.group) - getGroupPaneIndex(b.group)
     if (groupDelta !== 0) return groupDelta
     return (a.priority ?? 999) - (b.priority ?? 999)
   })
+  const grouped = new Map<MacroGroup, AlignedHistorySeries[]>()
 
-  const series: AlignedHistorySeries[] = sortedIndicators
-    .map((indicator, index) => {
-      const data = indicator.history
-        .filter((point) => Number.isFinite(point.value))
-        .map((point) => {
-          timelineSet.add(point.timestamp)
-          return { time: point.timestamp, value: point.value }
-        })
+  sortedIndicators.forEach((indicator, index) => {
+    const data = indicator.history
+      .filter((point) => Number.isFinite(point.timestamp) && Number.isFinite(point.value))
+      .map((point) => ({ time: point.timestamp, value: point.value }))
 
-      return {
-        key: indicator.symbol,
-        label: indicator.name,
-        paneIndex: getGroupPaneIndex(indicator.group),
-        color: getMacroSeriesColor(indicator, index),
-        unit: toAlignedUnit(indicator.unit),
-        data,
-      }
-    })
-    .filter((spec) => spec.data.length > 0)
+    if (data.length === 0) return
 
-  if (series.length === 0 || timelineSet.size === 0) return null
-  return {
-    timeline: Array.from(timelineSet).sort((a, b) => a - b),
-    series,
-  }
+    const series: AlignedHistorySeries = {
+      key: indicator.symbol,
+      label: indicator.name,
+      color: getMacroSeriesColor(indicator, index),
+      unit: toAlignedUnit(indicator.unit),
+      data,
+    }
+    const group = grouped.get(indicator.group)
+    if (group) {
+      group.push(series)
+    } else {
+      grouped.set(indicator.group, [series])
+    }
+  })
+
+  const groups: AlignedHistoryGroup[] = GROUP_ORDER.map((group) => {
+    const series = grouped.get(group) ?? []
+    return {
+      key: group,
+      label: group,
+      series,
+    }
+  }).filter((group) => group.series.length > 0)
+
+  return groups.length > 0 ? { groups } : null
 }
 
 export interface MacroDashboardProps {
