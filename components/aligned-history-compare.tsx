@@ -106,24 +106,49 @@ function formatPct(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`
 }
 
-function toLineData(points: AlignedHistoryPoint[]): LineData<Time>[] {
-  const out: LineData<Time>[] = []
-  let prev = -1
+type AlignedLineData = Array<LineData<Time> | WhitespaceData<Time>>
+interface PreparedLineSeries {
+  lineData: AlignedLineData
+  rawByTime: Map<number, number>
+}
+
+function getValidPointMap(points: AlignedHistoryPoint[]): Map<UTCTimestamp, number> {
+  const validPoints = new Map<UTCTimestamp, number>()
   for (const point of points) {
     if (point.value === null || !Number.isFinite(point.value) || Math.abs(point.value) >= LWC_VALUE_CAP) continue
-    const time = toUtc(point.time)
-    if (time === prev) {
-      out[out.length - 1] = { time, value: point.value }
-    } else {
-      out.push({ time, value: point.value })
-      prev = time
-    }
+    validPoints.set(toUtc(point.time), point.value)
   }
-  return out
+  return validPoints
+}
+
+function toLineData(points: AlignedHistoryPoint[], timeline: number[]): AlignedLineData {
+  const valuesByTime = getValidPointMap(points)
+  const timelineSeconds = Array.from(new Set([...timeline.map(toUtc), ...valuesByTime.keys()])).sort((a, b) => a - b)
+
+  if (timelineSeconds.length === 0) {
+    return Array.from(valuesByTime.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([time, value]) => ({ time, value }))
+  }
+
+  return timelineSeconds.map((time) => {
+    const value = valuesByTime.get(time)
+    return value === undefined ? { time } : { time, value }
+  })
+}
+
+function prepareLineSeries(points: AlignedHistoryPoint[], timeline: number[]): PreparedLineSeries {
+  const rawByTime = getValidPointMap(points)
+  return {
+    lineData: toLineData(points, timeline),
+    rawByTime,
+  }
 }
 
 function toTimelineAnchorData(timeline: number[]): WhitespaceData<Time>[] {
-  return timeline.map((time) => ({ time: toUtc(time) }))
+  return Array.from(new Set(timeline.map(toUtc)))
+    .sort((a, b) => a - b)
+    .map((time) => ({ time }))
 }
 
 function summarize(points: AlignedHistoryPoint[]): { first: number; last: number; pct: number } | null {
@@ -206,9 +231,10 @@ export function AlignedHistoryCompare({
         : null
 
     const panes: PaneChart[] = []
-    for (const group of groups) {
+    groups.forEach((group, groupIndex) => {
       const containerEl = grid.querySelector<HTMLDivElement>(`[data-pane="${group.paneIndex}"]`)
-      if (!containerEl) continue
+      if (!containerEl) return
+      const showsSharedXAxis = groupIndex === groups.length - 1
       const chart = createChart(containerEl, {
         autoSize: true,
         layout: {
@@ -226,7 +252,7 @@ export function AlignedHistoryCompare({
           minimumWidth: 84,
         },
         timeScale: {
-          visible: true,
+          visible: showsSharedXAxis,
           borderVisible: false,
           timeVisible,
           secondsVisible: false,
@@ -266,13 +292,10 @@ export function AlignedHistoryCompare({
             minMove: 0.0001,
           },
         })
-        const lineData = toLineData(spec.data)
-        series.setData(lineData)
+        const prepared = prepareLineSeries(spec.data, data.timeline)
+        series.setData(prepared.lineData)
         seriesByKey.set(spec.key, series)
-
-        const rawByTime = new Map<number, number>()
-        for (const point of lineData) rawByTime.set(point.time as number, point.value)
-        rawByKey.set(spec.key, rawByTime)
+        rawByKey.set(spec.key, prepared.rawByTime)
       }
 
       if (sharedRange) chart.timeScale().setVisibleRange(sharedRange)
@@ -290,7 +313,7 @@ export function AlignedHistoryCompare({
         seriesByKey,
         rawByKey,
       })
-    }
+    })
     chartsRef.current = panes
 
     let syncing = false
@@ -437,7 +460,7 @@ export function AlignedHistoryCompare({
           <p className="py-12 text-center text-xs text-muted-foreground">{noDataLabel}</p>
         ) : (
           <div ref={gridRef} className="flex flex-col gap-1">
-            {groups.map((group) => (
+            {groups.map((group, groupIndex) => (
               <section
                 key={group.paneIndex}
                 className="border-t border-border/60 pt-1 first:border-t-0 first:pt-0"
@@ -488,7 +511,10 @@ export function AlignedHistoryCompare({
                     )
                   })}
                 </div>
-                <div data-pane={group.paneIndex} className="h-[108px] w-full" />
+                <div
+                  data-pane={group.paneIndex}
+                  className={cn("w-full", groupIndex === groups.length - 1 ? "h-[120px]" : "h-[108px]")}
+                />
               </section>
             ))}
           </div>
