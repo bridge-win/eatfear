@@ -52,9 +52,19 @@ const formatUsd = (v: number) => {
 export interface MiningCostCardProps {
   range: TimeRangeId
   className?: string
+  variant?: "full" | "cards"
 }
 
-export function MiningCostCard({ range, className }: MiningCostCardProps) {
+function MiningMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border bg-background/70 px-2.5 py-2">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="mt-1 truncate text-sm font-semibold tabular-nums">{value}</p>
+    </div>
+  )
+}
+
+export function MiningCostCard({ range, className, variant = "full" }: MiningCostCardProps) {
   const t = useT()
   const { locale } = useI18n()
   const [payload, setPayload] = useState<MiningCostResponse | null>(null)
@@ -114,7 +124,59 @@ export function MiningCostCard({ range, className }: MiningCostCardProps) {
   const latestPrice = latest?.marketPriceUsd ?? null
   const latestElectricityCost = latest?.electricityUsdPerBtc ?? null
   const latestComprehensiveCost = latest?.comprehensiveUsdPerBtc ?? null
+  const latestElectricityMargin = latest?.electricityMarginPct ?? latest?.marginPct ?? null
   const latestComprehensiveMargin = latest?.comprehensiveMarginPct ?? null
+
+  if (variant === "cards") {
+    return (
+      <Card className={cn("py-2.5", className)}>
+        <CardHeader className="px-3 pb-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <CardTitle className="text-sm">{t("mining.title")}</CardTitle>
+              <InfoTooltip
+                title={t("mining.title")}
+                description={
+                  payload
+                    ? t("mining.info", {
+                        eff: payload.parameters.efficiencyJPerTh,
+                        rate: payload.parameters.electricityUsdPerKwh,
+                        multiplier: payload.parameters.comprehensiveMultiplier,
+                        reward: payload.parameters.blockReward,
+                      })
+                    : t("mining.info.fallback")
+                }
+                source="mempool.space + blockchain.info"
+              />
+            </div>
+            <span className="text-[10px] text-muted-foreground">{range}</span>
+          </div>
+        </CardHeader>
+        <CardContent className="px-3 pt-1">
+          {error ? (
+            <p className="text-xs text-destructive">{error}</p>
+          ) : loading && !latest ? (
+            <p className="text-xs text-muted-foreground">{t("mining.loading")}</p>
+          ) : !latest ? (
+            <p className="text-xs text-muted-foreground">{t("chart.noData")}</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <MiningMetric label={t("mining.kpi.electricityCost")} value={formatUsd(latestElectricityCost ?? 0)} />
+              <MiningMetric label={t("mining.kpi.comprehensiveCost")} value={formatUsd(latestComprehensiveCost ?? 0)} />
+              <MiningMetric
+                label={t("mining.kpi.margin")}
+                value={latestElectricityMargin !== null ? `${latestElectricityMargin >= 0 ? "+" : ""}${latestElectricityMargin.toFixed(0)}%` : "—"}
+              />
+              <MiningMetric
+                label={t("mining.kpi.comprehensiveMargin")}
+                value={latestComprehensiveMargin !== null ? `${latestComprehensiveMargin >= 0 ? "+" : ""}${latestComprehensiveMargin.toFixed(0)}%` : "—"}
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className={cn("py-2.5", className)}>

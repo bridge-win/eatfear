@@ -16,7 +16,7 @@ export interface MacroApiResponse {
   error?: string
 }
 
-const SYMBOL_PREFIX_PATTERN = /^(FRED|BLOCKCHAIN|DEFILLAMA|ALTERNATIVE):/
+const SYMBOL_PREFIX_PATTERN = /^FRED:/
 
 /** Strip the `SOURCE:` prefix from a registry symbol so we display the raw series id. */
 export const stripSymbolPrefix = (symbol: string): string => symbol.replace(SYMBOL_PREFIX_PATTERN, "")

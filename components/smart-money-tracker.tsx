@@ -56,9 +56,27 @@ export interface SmartMoneyTrackerProps {
   ccy?: string
   range: TimeRangeId
   className?: string
+  variant?: "full" | "cards"
 }
 
-export function SmartMoneyTracker({ ccy = "BTC", range, className }: SmartMoneyTrackerProps) {
+function SmartMoneyMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone?: string
+}) {
+  return (
+    <div className="rounded-md border bg-background/70 px-2.5 py-2">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={cn("mt-1 truncate text-sm font-semibold tabular-nums", tone)}>{value}</p>
+    </div>
+  )
+}
+
+export function SmartMoneyTracker({ ccy = "BTC", range, className, variant = "full" }: SmartMoneyTrackerProps) {
   const t = useT()
   const { locale } = useI18n()
   const [payload, setPayload] = useState<SmartMoneyResponse | null>(null)
@@ -126,6 +144,45 @@ export function SmartMoneyTracker({ ccy = "BTC", range, className }: SmartMoneyT
         : totals.net < 0
           ? "text-red-600 dark:text-red-400"
           : "text-muted-foreground"
+
+  if (variant === "cards") {
+    return (
+      <Card className={cn("py-2.5", className)}>
+        <CardHeader className="px-3 pb-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <CardTitle className="text-sm">{t("smart.title", { ccy })}</CardTitle>
+              <InfoTooltip
+                title={t("smart.title", { ccy })}
+                description={t("smart.info")}
+                source="OKX Rubik taker-volume (SWAP + SPOT)"
+              />
+            </div>
+            <span className="text-[10px] text-muted-foreground">{payload?.period ?? "..."}</span>
+          </div>
+        </CardHeader>
+        <CardContent className="px-3 pt-1">
+          {error ? (
+            <p className="text-xs text-destructive">{error}</p>
+          ) : loading && !totals ? (
+            <p className="text-xs text-muted-foreground">{t("smart.loading")}</p>
+          ) : !totals ? (
+            <p className="text-xs text-muted-foreground">{t("chart.noData")}</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <SmartMoneyMetric label={t("smart.kpi.buy")} value={formatCompact(totals.buy, ccy)} tone="text-green-600" />
+              <SmartMoneyMetric label={t("smart.kpi.sell")} value={formatCompact(totals.sell, ccy)} tone="text-red-600" />
+              <SmartMoneyMetric label={t("smart.kpi.net")} value={formatCompact(totals.net, ccy)} tone={netTone} />
+              <SmartMoneyMetric
+                label={t("smart.kpi.ratio")}
+                value={totals.ratio !== null ? totals.ratio.toFixed(2) : "—"}
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className={cn("py-2.5", className)}>
