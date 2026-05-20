@@ -2,21 +2,25 @@
  * Black Swan Opportunity Detector
  *
  * Identifies dip-buying setups during sharp wicks, capitulation, and
- * forced-liquidation flushes by combining: candle wick extremity, Fear & Greed,
- * funding/OI deleveraging, drawdown from 90d high, mean-reversion gaps, optional
- * VIX risk-off spikes, and volume climax confirmation.
+ * forced-liquidation flushes by combining 10 weighted factors:
+ * candle wick extremity, Fear & Greed, funding/OI deleveraging, drawdown from
+ * 90d high, mean-reversion gaps, VIX risk-off spikes, volume climax confirmation,
+ * Hash Ribbon miner capitulation, Mayer Multiple (200d SMA), and Puell Multiple.
  *
  * Pure function — no I/O. Caller assembles `BlackSwanMetrics` from upstreams.
  */
 
 export const BLACK_SWAN_WEIGHTS = {
-  wickCapitulation: 0.25,
-  fearExtreme: 0.2,
-  leverageFlush: 0.15,
-  drawdownMagnitude: 0.15,
-  meanReversion: 0.1,
-  macroRiskOff: 0.1,
+  wickCapitulation: 0.20,
+  fearExtreme: 0.18,
+  leverageFlush: 0.13,
+  drawdownMagnitude: 0.12,
+  meanReversion: 0.08,
+  macroRiskOff: 0.10,
   volumeClimax: 0.05,
+  hashRibbon: 0.07,
+  mayerMultiple: 0.04,
+  puellMultiple: 0.03,
 } as const
 
 export type BlackSwanFactorId = keyof typeof BLACK_SWAN_WEIGHTS
@@ -38,7 +42,7 @@ export interface BlackSwanCandle {
 }
 
 export interface BlackSwanMetrics {
-  /** Daily candles, oldest → newest. Recommended: last 90+ days. */
+  /** Daily candles, oldest → newest. Recommended: last 200+ days for Mayer Multiple. */
   candles: BlackSwanCandle[]
   /** Latest Fear & Greed (0–100, lower = more fear). */
   fearGreedValue: number | null
@@ -54,6 +58,10 @@ export interface BlackSwanMetrics {
   vixValue: number | null
   /** Optional VIX history. */
   vixRecent: number[]
+  /** Network hashrate series oldest→newest (daily EH/s). For Hash Ribbon (MA10/30/60). */
+  hashrateSeries?: number[]
+  /** Daily miner revenue in USD oldest→newest. For Puell Multiple (current / 365d avg). */
+  minerRevenueSeries?: number[]
 }
 
 export interface BlackSwanFactor {
@@ -466,6 +474,189 @@ function scoreVolumeClimax(m: BlackSwanMetrics): BlackSwanFactor {
   }
 }
 
+// ─── new SOTA factor scorers ──────────────────────────────────────────────
+
+function scoreHashRibbon(m: BlackSwanMetrics): BlackSwanFactor {
+  const lines: string[] = []
+  const series = m.hashrateSeries ?? []
+
+  if (series.length < 60) {
+    lines.push("Insufficient hashrate history for Hash Ribbon (need 60+ days)")
+    return {
+      id: "hashRibbon",
+      labelZh: "矿工哈希带",
+      labelEn: "Hash Ribbon",
+      score: 40,
+      weight: BLACK_SWAN_WEIGHTS.hashRibbon,
+      weighted: 40 * BLACK_SWAN_WEIGHTS.hashRibbon,
+      lines,
+    }
+  }
+
+  const tail = series.slice(-90)
+  const ma60 = tail.slice(-60).reduce((s, v) => s + v, 0) / 60
+  const ma30Arr = tail.slice(-30)
+  const ma30 = ma30Arr.reduce((s, v) => s + v, 0) / 30
+  const ma10Arr = tail.slice(-10)
+  const ma10 = ma10Arr.reduce((s, v) => s + v, 0) / 10
+
+  const toEh = (v: number) => (v / 1e18).toFixed(1)
+  lines.push(`MA10 ${toEh(ma10)} EH/s · MA30 ${toEh(ma30)} EH/s · MA60 ${toEh(ma60)} EH/s`)
+
+  const ma30VsMa60 = ma60 > 0 ? (ma30 - ma60) / ma60 : 0
+  const ma10VsMa30 = ma30 > 0 ? (ma10 - ma30) / ma30 : 0
+
+  let score: number
+  if (ma30VsMa60 < -0.01) {
+    // Capitulation phase: 30d MA below 60d MA
+    if (ma10VsMa30 > 0.005) {
+      // Recovery signal: MA10 crossing back above MA30 during cap = strongest buy
+      score = 90
+      lines.push(`Hash Ribbon recovery signal · MA10 crossing above MA30 during capitulation`)
+    } else {
+      const depth = Math.abs(ma30VsMa60) * 100
+      score = clamp(55 + depth * 3, 55, 78)
+      lines.push(`Miner capitulation · MA30 below MA60 by ${depth.toFixed(1)}%`)
+    }
+  } else if (ma30VsMa60 < 0.01) {
+    // Near crossover — watch zone
+    score = 50
+    lines.push(`Hash Ribbon at crossover zone · watch for capitulation confirmation`)
+  } else {
+    // Healthy: 30d > 60d
+    const gap = ma30VsMa60 * 100
+    score = clamp(38 - gap * 1.2, 5, 38)
+    lines.push(`Miners healthy · MA30 above MA60 by ${gap.toFixed(1)}%`)
+  }
+
+  return {
+    id: "hashRibbon",
+    labelZh: "矿工哈希带",
+    labelEn: "Hash Ribbon",
+    score: clamp(score, 0, 100),
+    weight: BLACK_SWAN_WEIGHTS.hashRibbon,
+    weighted: clamp(score, 0, 100) * BLACK_SWAN_WEIGHTS.hashRibbon,
+    lines,
+  }
+}
+
+function scoreMayerMultiple(m: BlackSwanMetrics): BlackSwanFactor {
+  const lines: string[] = []
+  const candles = m.candles
+
+  if (candles.length < 60) {
+    lines.push("Insufficient candles for Mayer Multiple")
+    return {
+      id: "mayerMultiple",
+      labelZh: "Mayer 倍数",
+      labelEn: "Mayer Multiple",
+      score: 40,
+      weight: BLACK_SWAN_WEIGHTS.mayerMultiple,
+      weighted: 40 * BLACK_SWAN_WEIGHTS.mayerMultiple,
+      lines,
+    }
+  }
+
+  const closes = candles.map((c) => c.close)
+  const currentClose = closes[closes.length - 1]
+  const smaLen = Math.min(closes.length, 200)
+  const smaWindow = closes.slice(-smaLen)
+  const sma200 = smaWindow.reduce((s, v) => s + v, 0) / smaLen
+  const mayer = sma200 > 0 ? currentClose / sma200 : null
+
+  if (!mayer || !Number.isFinite(mayer)) {
+    lines.push("Mayer Multiple calculation failed")
+    return {
+      id: "mayerMultiple",
+      labelZh: "Mayer 倍数",
+      labelEn: "Mayer Multiple",
+      score: 40,
+      weight: BLACK_SWAN_WEIGHTS.mayerMultiple,
+      weighted: 40 * BLACK_SWAN_WEIGHTS.mayerMultiple,
+      lines,
+    }
+  }
+
+  const smaLabel = smaLen >= 200 ? "SMA200" : `SMA${smaLen}`
+  lines.push(`Mayer ${mayer.toFixed(3)}× · Close $${currentClose.toFixed(0)} / ${smaLabel} $${sma200.toFixed(0)}`)
+
+  let score: number
+  if (mayer < 0.6) { score = 100; lines.push("Extreme buy zone · historically < 1% of all time") }
+  else if (mayer < 0.8) { score = 88; lines.push("Major accumulation zone · deep below 200d MA") }
+  else if (mayer < 1.0) { score = 65; lines.push("Below 200-day MA · discounted price") }
+  else if (mayer < 1.5) { score = 35; lines.push("Fair value territory") }
+  else if (mayer < 2.4) { score = 12; lines.push("Elevated · approaching historic overbought") }
+  else { score = 3; lines.push("Extreme overvaluation · cycle top territory") }
+
+  return {
+    id: "mayerMultiple",
+    labelZh: "Mayer 倍数",
+    labelEn: "Mayer Multiple",
+    score,
+    weight: BLACK_SWAN_WEIGHTS.mayerMultiple,
+    weighted: score * BLACK_SWAN_WEIGHTS.mayerMultiple,
+    lines,
+  }
+}
+
+function scorePuellMultiple(m: BlackSwanMetrics): BlackSwanFactor {
+  const lines: string[] = []
+  const rev = m.minerRevenueSeries ?? []
+
+  if (rev.length < 30) {
+    lines.push("Insufficient miner revenue history for Puell Multiple (need 30+ days)")
+    return {
+      id: "puellMultiple",
+      labelZh: "Puell 倍数",
+      labelEn: "Puell Multiple",
+      score: 40,
+      weight: BLACK_SWAN_WEIGHTS.puellMultiple,
+      weighted: 40 * BLACK_SWAN_WEIGHTS.puellMultiple,
+      lines,
+    }
+  }
+
+  const current = rev[rev.length - 1]
+  const maLen = Math.min(rev.length, 365)
+  const ma365 = rev.slice(-maLen).reduce((s, v) => s + v, 0) / maLen
+  const puell = ma365 > 0 ? current / ma365 : null
+
+  if (!puell || !Number.isFinite(puell)) {
+    lines.push("Puell Multiple calculation failed")
+    return {
+      id: "puellMultiple",
+      labelZh: "Puell 倍数",
+      labelEn: "Puell Multiple",
+      score: 40,
+      weight: BLACK_SWAN_WEIGHTS.puellMultiple,
+      weighted: 40 * BLACK_SWAN_WEIGHTS.puellMultiple,
+      lines,
+    }
+  }
+
+  lines.push(
+    `Puell ${puell.toFixed(3)} · daily $${(current / 1e6).toFixed(1)}M / ${maLen}d avg $${(ma365 / 1e6).toFixed(1)}M`,
+  )
+
+  let score: number
+  if (puell < 0.3) { score = 100; lines.push("Extreme miner distress · cycle bottom zone") }
+  else if (puell < 0.5) { score = 85; lines.push("Strong buy zone · miner capitulation confirmed") }
+  else if (puell < 0.7) { score = 65; lines.push("Accumulation zone · miners under pressure") }
+  else if (puell < 1.0) { score = 45; lines.push("Slightly below avg · neutral to positive") }
+  else if (puell < 2.0) { score = 22; lines.push("Above avg · elevated miner revenue") }
+  else { score = 5; lines.push("Historically high miner revenue · cycle top signal") }
+
+  return {
+    id: "puellMultiple",
+    labelZh: "Puell 倍数",
+    labelEn: "Puell Multiple",
+    score,
+    weight: BLACK_SWAN_WEIGHTS.puellMultiple,
+    weighted: score * BLACK_SWAN_WEIGHTS.puellMultiple,
+    lines,
+  }
+}
+
 // ─── wick event extraction ────────────────────────────────────────────────
 
 export function extractRecentWicks(candles: BlackSwanCandle[], lookback = 60): BlackSwanWickEvent[] {
@@ -582,6 +773,48 @@ function deriveActiveSignals(m: BlackSwanMetrics, factors: BlackSwanFactor[]): B
     })
   }
 
+  // Hash Ribbon signals
+  const hashFactor = factors.find((f) => f.id === "hashRibbon")
+  if (hashFactor) {
+    if (hashFactor.score >= 85) {
+      out.push({
+        code: "HASH_RIBBON_RECOVERY",
+        severity: "alert",
+        labelZh: `哈希带复苏信号 · 矿工底部确认`,
+        labelEn: `Hash Ribbon recovery · miner bottom confirmed`,
+      })
+    } else if (hashFactor.score >= 60) {
+      out.push({
+        code: "HASH_RIBBON_CAPITULATION",
+        severity: "warn",
+        labelZh: `矿工算力投降中 · 历史底部区间`,
+        labelEn: `Miner hashrate capitulation · historic bottom zone`,
+      })
+    }
+  }
+
+  // Mayer Multiple signal
+  const mayerFactor = factors.find((f) => f.id === "mayerMultiple")
+  if (mayerFactor && mayerFactor.score >= 80) {
+    out.push({
+      code: "MAYER_EXTREME_BUY",
+      severity: "warn",
+      labelZh: `Mayer 倍数极端低位 · 深度折价`,
+      labelEn: `Mayer Multiple extreme low · deep discount vs 200d MA`,
+    })
+  }
+
+  // Puell Multiple signal
+  const puellFactor = factors.find((f) => f.id === "puellMultiple")
+  if (puellFactor && puellFactor.score >= 75) {
+    out.push({
+      code: "PUELL_CAPITULATION",
+      severity: "warn",
+      labelZh: `Puell 倍数极低 · 矿工盈利萎缩`,
+      labelEn: `Puell Multiple extreme low · miner revenue collapse`,
+    })
+  }
+
   return out
 }
 
@@ -596,6 +829,9 @@ export function computeBlackSwanOpportunity(m: BlackSwanMetrics): BlackSwanCompu
     scoreMeanReversion(m),
     scoreMacroRiskOff(m),
     scoreVolumeClimax(m),
+    scoreHashRibbon(m),
+    scoreMayerMultiple(m),
+    scorePuellMultiple(m),
   ]
 
   let total = factors.reduce((s, f) => s + f.weighted, 0)
