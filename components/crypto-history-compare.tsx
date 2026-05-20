@@ -12,20 +12,23 @@ import {
 import { useT } from "@/lib/i18n"
 import { type TimeRangeId } from "@/lib/time-range"
 
-interface ApiSeries {
+export interface CryptoHistorySeries {
   key: string
   i18nKey: string
+  infoI18nKey: string
+  order: number
   paneIndex: number
   color: string
+  source: string
   unit: AlignedHistoryUnit
   data: { time: number; value: number | null }[]
 }
 
-interface ApiResponse {
+export interface CryptoHistoryPayload {
   range: string
   ccy: string
   timeline: number[]
-  series: ApiSeries[]
+  series: CryptoHistorySeries[]
   paneCount: number
   updatedAt: number
 }
@@ -33,24 +36,38 @@ interface ApiResponse {
 export interface CryptoHistoryCompareProps {
   instId?: string
   range: TimeRangeId
+  payload?: CryptoHistoryPayload | null
+  loading?: boolean
+  error?: string | null
   className?: string
 }
 
-export function CryptoHistoryCompare({ instId = "BTC-USDT-SWAP", range, className }: CryptoHistoryCompareProps) {
-  const t = useT()
-  const [payload, setPayload] = useState<ApiResponse | null>(null)
+export function useCryptoHistoryPayload(
+  instId = "BTC-USDT-SWAP",
+  range: TimeRangeId,
+  enabled = true,
+): {
+  payload: CryptoHistoryPayload | null
+  loading: boolean
+  error: string | null
+} {
+  const [payload, setPayload] = useState<CryptoHistoryPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const ccy = instId.split("-")[0] ?? "BTC"
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false)
+      return
+    }
     let active = true
     setLoading(true)
     fetch(`/api/crypto/history-compare?ccy=${encodeURIComponent(ccy)}&range=${range}`)
       .then((response) => response.json())
       .then((json) => {
         if (!active) return
-        setPayload(json as ApiResponse)
+        setPayload(json as CryptoHistoryPayload)
         setError(null)
       })
       .catch((requestError) => {
@@ -62,7 +79,24 @@ export function CryptoHistoryCompare({ instId = "BTC-USDT-SWAP", range, classNam
     return () => {
       active = false
     }
-  }, [ccy, range])
+  }, [ccy, enabled, range])
+
+  return { payload, loading, error }
+}
+
+export function CryptoHistoryCompare({
+  instId = "BTC-USDT-SWAP",
+  range,
+  payload: controlledPayload,
+  loading: controlledLoading,
+  error: controlledError,
+  className,
+}: CryptoHistoryCompareProps) {
+  const t = useT()
+  const fetched = useCryptoHistoryPayload(instId, range, controlledPayload === undefined)
+  const payload = controlledPayload === undefined ? fetched.payload : controlledPayload
+  const loading = controlledLoading ?? fetched.loading
+  const error = controlledError ?? fetched.error
 
   const data: AlignedHistoryData | null = useMemo(() => {
     if (!payload) return null
@@ -70,10 +104,16 @@ export function CryptoHistoryCompare({ instId = "BTC-USDT-SWAP", range, classNam
     for (const spec of payload.series) {
       const series: AlignedHistorySeries = {
         key: spec.key,
+        order: spec.order,
         label: t(spec.i18nKey),
         color: spec.color,
         unit: spec.unit,
         data: spec.data,
+        info: {
+          title: `#${String(spec.order).padStart(2, "0")} ${t(spec.i18nKey)}`,
+          description: t(spec.infoI18nKey),
+          source: spec.source,
+        },
       }
       const group = groupsByPane.get(spec.paneIndex)
       if (group) {

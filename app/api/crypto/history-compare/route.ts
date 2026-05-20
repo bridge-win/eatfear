@@ -189,13 +189,73 @@ function buildDailySignalScores({
 interface SeriesSpec {
   key: string
   i18nKey: string
+  infoI18nKey: string
+  order: number
   paneIndex: number
   color: string
+  source: string
   unit: "usd" | "pct" | "ratio" | "raw" | "count" | "cny"
   data: { time: number; value: number | null }[]
 }
 
 const DAY_MS = 86_400_000
+
+const CRYPTO_SERIES_SOURCE_BY_KEY: Record<string, string> = {
+  btcPrice: "blockchain.info / OKX",
+  miningElectricityCost: "mempool.space / blockchain.info",
+  miningComprehensiveCost: "mempool.space / blockchain.info",
+  ethPrice: "OKX",
+  solPrice: "OKX",
+  xrpPrice: "OKX",
+  bnbPrice: "OKX",
+  dogePrice: "OKX",
+  btcReturnZ: "OKX / computed",
+  btcVolumeZ: "OKX / computed",
+  btcVolumeUsd: "OKX",
+  basis: "OKX / computed",
+  upperWick: "OKX / computed",
+  lowerWick: "OKX / computed",
+  signalBuyScore: "OKX / computed",
+  signalSellScore: "OKX / computed",
+  signalRiskScore: "OKX / computed",
+  signalDirection: "OKX / computed",
+  stablecoinMcap: "DefiLlama",
+  defiTvl: "DefiLlama",
+  oi: "OKX",
+  oiReturnZ: "OKX / computed",
+  funding: "OKX",
+  ls: "OKX",
+  contractLs: "OKX",
+  topTraderAccount: "OKX",
+  topTraderPosition: "OKX",
+  smartBuy: "OKX",
+  smartSell: "OKX",
+  smartNet: "OKX / computed",
+  smartCum: "OKX / computed",
+  fng: "alternative.me",
+  dvol: "Deribit",
+  hashRate: "blockchain.info",
+  difficulty: "blockchain.info",
+  nTxs: "blockchain.info",
+  activeAddrs: "blockchain.info",
+  mempool: "blockchain.info",
+  txFeesUsd: "blockchain.info",
+  avgBlockSize: "blockchain.info",
+  dxy: "Yahoo Finance",
+  us10y: "Yahoo Finance",
+  us2y: "Yahoo Finance",
+  vix: "Yahoo Finance",
+  sp500: "Yahoo Finance",
+  nasdaq: "Yahoo Finance",
+  russell: "Yahoo Finance",
+  gold: "Yahoo Finance",
+  silver: "Yahoo Finance",
+  copper: "Yahoo Finance",
+  oil: "Yahoo Finance",
+  natgas: "Yahoo Finance",
+  nikkei: "Yahoo Finance",
+  hangseng: "Yahoo Finance",
+}
 
 /* Build a daily UTC timeline covering the lookback window. */
 function buildTimeline(days: number, anchorMs: number): number[] {
@@ -620,7 +680,7 @@ export async function GET(request: Request) {
 
   /* Build the series specs. paneIndex grouping is curated to keep visually
      comparable units together; the order also drives the on-screen stack. */
-  const specsRaw: Array<Omit<SeriesSpec, "data"> & { points: RawPoint[] }> = [
+  const specsRaw: Array<Omit<SeriesSpec, "data" | "infoI18nKey" | "order" | "source"> & { points: RawPoint[] }> = [
     { key: "btcPrice", i18nKey: "compare.s.price", paneIndex: 0, color: "rgb(99 102 241)", unit: "usd", points: btcPrice },
     { key: "miningElectricityCost", i18nKey: "compare.s.miningElectricityCost", paneIndex: 0, color: "rgb(245 158 11)", unit: "usd", points: miningElectricityCost },
     { key: "miningComprehensiveCost", i18nKey: "compare.s.miningComprehensiveCost", paneIndex: 0, color: "rgb(217 119 6)", unit: "usd", points: miningComprehensiveCost },
@@ -699,12 +759,16 @@ export async function GET(request: Request) {
       return [{
         key: spec.key,
         i18nKey: spec.i18nKey,
+        infoI18nKey: `compare.info.${spec.key}`,
+        order: 0,
         paneIndex: spec.paneIndex,
         color: spec.color,
+        source: CRYPTO_SERIES_SOURCE_BY_KEY[spec.key] ?? "Public market APIs",
         unit: spec.unit,
         data: timeline.map((t, i) => ({ time: t, value: aligned[i] })),
       }]
     })
+    .map((spec, index) => ({ ...spec, order: index + 1 }))
 
   return NextResponse.json({
     range: range.id,

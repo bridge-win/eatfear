@@ -31,6 +31,7 @@ export interface AlignedHistoryPoint {
 
 export interface AlignedHistorySeries {
   key: string
+  order?: number
   label: string
   color: string
   unit: AlignedHistoryUnit
@@ -77,6 +78,7 @@ interface HoverState {
 
 interface HoverPaneTooltipItem {
   key: string
+  order?: number
   label: string
   color: string
   value: string
@@ -567,6 +569,7 @@ export function AlignedHistoryCompare({
           const value = getNearestValue(pane.rawByKey.get(spec.key), hoverState.time)
           return {
             key: spec.key,
+            order: spec.order,
             label: spec.label,
             color: spec.color,
             value: value === null ? "—" : formatRaw(value, spec.unit),
@@ -643,6 +646,8 @@ export function AlignedHistoryCompare({
                     return (
                       <div
                         key={spec.key}
+                        data-history-series-key={spec.key}
+                        data-history-series-order={spec.order}
                         className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-0.5"
                       >
                         <button
@@ -650,10 +655,13 @@ export function AlignedHistoryCompare({
                           onClick={() => toggle(spec.key)}
                           aria-pressed={!isHidden}
                           className={cn(
-                            "inline-grid h-3.5 min-w-0 grid-cols-[auto_minmax(0,1fr)_4.1rem_2.8rem] items-center gap-0.5 text-left tabular-nums transition-opacity hover:text-foreground sm:grid-cols-[auto_minmax(0,1fr)_4.5rem_3.2rem] sm:gap-1",
+                            "inline-grid h-3.5 min-w-0 grid-cols-[1.35rem_auto_minmax(0,1fr)_4.1rem_2.8rem] items-center gap-0.5 text-left tabular-nums transition-opacity hover:text-foreground sm:grid-cols-[1.55rem_auto_minmax(0,1fr)_4.5rem_3.2rem] sm:gap-1",
                             isHidden ? "opacity-35" : "opacity-100",
                           )}
                         >
+                          <span className="text-[8px] font-semibold leading-none text-muted-foreground sm:text-[9px]">
+                            {spec.order ? `#${String(spec.order).padStart(2, "0")}` : ""}
+                          </span>
                           <span
                             className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
                             style={{ background: spec.color }}
@@ -707,7 +715,7 @@ export function AlignedHistoryCompare({
                     >
                       <span className="h-1.5 w-1.5 rounded-full" style={{ background: item.color }} />
                       <span className="truncate font-semibold tabular-nums">
-                        {item.label}:{item.value}
+                        {item.order ? `#${String(item.order).padStart(2, "0")} ` : ""}{item.label}:{item.value}
                       </span>
                     </div>
                   ))}
