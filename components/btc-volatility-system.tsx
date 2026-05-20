@@ -187,6 +187,16 @@ const formatCompactUsd = (value: number) => {
   return `${sign}$${abs.toFixed(2)}`
 }
 
+const formatCompactUnit = (value: number, unit: string) => {
+  const sign = value < 0 ? "-" : ""
+  const abs = Math.abs(value)
+  if (abs >= 1e12) return `${sign}${(abs / 1e12).toFixed(2)}T ${unit}`
+  if (abs >= 1e9) return `${sign}${(abs / 1e9).toFixed(2)}B ${unit}`
+  if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(2)}M ${unit}`
+  if (abs >= 1e3) return `${sign}${(abs / 1e3).toFixed(2)}K ${unit}`
+  return `${sign}${abs.toFixed(2)} ${unit}`
+}
+
 const formatPercent = (value: number, digits = 2) => `${value >= 0 ? "+" : ""}${value.toFixed(digits)}%`
 
 const clampScore = (value: number) => Math.max(0, Math.min(100, Math.round(value)))
@@ -551,6 +561,7 @@ export function BtcVolatilitySystem({
   const [dataError, setDataError] = useState<string | null>(null)
   const [price, setPrice] = useState(0)
   const [priceChange24h, setPriceChange24h] = useState(0)
+  const [volume24hBase, setVolume24hBase] = useState(0)
   const [oneMinuteKlines, setOneMinuteKlines] = useState<KlinePoint[]>([])
   const [fiveMinuteKlines, setFiveMinuteKlines] = useState<KlinePoint[]>([])
   const [rangeKlines, setRangeKlines] = useState<KlinePoint[]>([])
@@ -605,6 +616,7 @@ export function BtcVolatilitySystem({
         setDataSourceLabel(payload.source)
         setPrice(payload.ticker?.price ?? 0)
         setPriceChange24h(payload.ticker?.changePercent24h ?? 0)
+        setVolume24hBase(payload.ticker?.volume24hUsd ?? 0)
         setOneMinuteKlines((payload.oneMinuteKlines ?? []).slice(-MAX_KLINES))
         setFiveMinuteKlines((payload.fiveMinuteKlines ?? []).slice(-MAX_KLINES))
         setRangeKlines(payload.rangeKlines ?? [])
@@ -702,6 +714,153 @@ export function BtcVolatilitySystem({
       ].slice(0, 12),
     )
   }, [currentSignal, price])
+
+  const realtimeAccountRatio = longShortAccountRatioHistory.at(-1)?.ratio ?? 0
+  const realtimeContractRatio = contractLongShortRatioHistory.at(-1)?.ratio ?? 0
+  const realtimeTopTraderAccountRatio = topTraderPositionHistory.at(-1)?.longShortAccountRatio ?? 0
+  const realtimeTopTraderPositionRatio = topTraderPositionHistory.at(-1)?.longShortPositionRatio ?? 0
+  const realtimeCvd = takerVolumeHistory.at(-1)?.cvd ?? 0
+  const latestNetVolume = takerVolumeHistory.at(-1)?.netVolume ?? 0
+
+  return (
+    <section className="space-y-2">
+      <Card className="py-2.5">
+        <CardHeader className="px-3 pb-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                <Badge variant={connectionStatus === "live" ? "default" : "secondary"} className="h-5 px-2 text-[10px]">
+                  {connectionStatus === "live" ? "Live" : connectionStatus}
+                </Badge>
+                <span className="text-[10px] text-muted-foreground">
+                  {dataSourceLabel} · {instId} · {rangeOption.label}
+                </span>
+              </div>
+              <CardTitle className="text-sm">{t("vol.title", { base })}</CardTitle>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">{t("vol.subtitle")}</p>
+              {dataError && <p className="mt-1 text-[11px] text-destructive">{dataError}</p>}
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-muted-foreground">{base} Price</p>
+              <p className="text-lg font-semibold tabular-nums">{price ? formatUsd(price, 2) : "..."}</p>
+              <p className={priceChange24h >= 0 ? "text-[11px] text-green-600" : "text-[11px] text-red-600"}>
+                24h {formatPercent(priceChange24h)}
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        <Card className="py-2.5 xl:col-span-2">
+          <CardHeader className="px-3 pb-1">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Current Signal</p>
+                <CardTitle className="mt-0.5 text-sm">{currentSignal.headline}</CardTitle>
+              </div>
+              <SignalBadge direction={currentSignal.direction} />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2 px-3 pt-1">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <ScoreBar label="Buy Score" value={currentSignal.buyScore} />
+              <ScoreBar label="Sell Score" value={currentSignal.sellScore} />
+              <ScoreBar label={`Risk (${currentSignal.riskLevel})`} value={currentSignal.riskScore} />
+            </div>
+            <div className="grid gap-2 text-[11px] md:grid-cols-2">
+              <div className="rounded-md border bg-background/70 p-2">
+                <p className="mb-1 font-medium">{t("vol.triggerReasons")}</p>
+                <p className="text-muted-foreground">{currentSignal.triggerReasons.slice(0, 2).join(" · ")}</p>
+              </div>
+              <div className="rounded-md border bg-background/70 p-2">
+                <p className="mb-1 font-medium">{t("vol.invalidationRules")}</p>
+                <p className="text-muted-foreground">{currentSignal.invalidationRules.slice(0, 2).join(" · ")}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <MetricCard
+          label={t("vol.metric.5mZ.label")}
+          value={fiveMinuteReturnZScore.toFixed(2)}
+          helper={t("vol.metric.5mZ.helper", { pct: formatPercent(latest5m?.changePercent ?? 0) })}
+          tone={fiveMinuteReturnZScore > 2.5 ? "green" : fiveMinuteReturnZScore < -2.5 ? "red" : "default"}
+          info={{ title: t("vol.metric.5mZ.title"), description: t("vol.metric.5mZ.info") }}
+        />
+        <MetricCard
+          label={t("vol.metric.volZ.label")}
+          value={volumeZScore.toFixed(2)}
+          helper={t("vol.metric.volZ.helper", {
+            vol: ((latest1m?.volume ?? 0) / 1000).toFixed(2),
+            base,
+          })}
+          tone={volumeZScore > 2.5 ? "amber" : "default"}
+          info={{ description: t("vol.metric.volZ.info") }}
+        />
+        <MetricCard
+          label={t("vol.metric.wick.label")}
+          value={`↑${(((latest5m?.upperWickRatio ?? 0) * 100)).toFixed(0)}% / ↓${(((latest5m?.lowerWickRatio ?? 0) * 100)).toFixed(0)}%`}
+          helper={t("vol.metric.wick.helper")}
+          tone={(latest5m?.upperWickRatio ?? 0) > 0.55 || (latest5m?.lowerWickRatio ?? 0) > 0.55 ? "amber" : "default"}
+          info={{ description: t("vol.metric.wick.info") }}
+        />
+        <MetricCard
+          label={t("vol.metric.oi.label")}
+          value={`${formatPercent(oiChangeRate)} / ${fundingRate.toFixed(4)}%`}
+          helper={`OI ${formatCompactUsd(openInterestUsd)} / ${formatCompactUnit(openInterest, base)}`}
+          tone={oiChangeRate < -2 ? "green" : oiChangeRate > 0.2 ? "red" : "default"}
+          info={{ description: t("vol.metric.oi.info") }}
+        />
+        <MetricCard
+          label={t("vol.metric.basis.label")}
+          value={`${perpPremium >= 0 ? "+" : ""}${perpPremium.toFixed(4)}%`}
+          helper={t("vol.metric.basis.helper", { spot: spotPrice > 0 ? formatUsd(spotPrice, 2) : "..." })}
+          tone={perpPremium > 0.05 ? "green" : perpPremium < -0.05 ? "red" : "default"}
+          info={{ title: "Perp Premium / Basis", description: t("vol.metric.basis.info") }}
+        />
+        <MetricCard
+          label={t("vol.metric.lsAcct.label")}
+          value={realtimeAccountRatio ? realtimeAccountRatio.toFixed(2) : "..."}
+          helper={t("vol.metric.lsAcct.helper", { ratio: realtimeContractRatio ? realtimeContractRatio.toFixed(2) : "..." })}
+          tone="amber"
+          info={{ description: t("vol.metric.lsAcct.info") }}
+        />
+        <MetricCard
+          label={t("vol.metric.topAcct.label")}
+          value={realtimeTopTraderAccountRatio ? realtimeTopTraderAccountRatio.toFixed(2) : "..."}
+          helper="Top Trader Account L/S"
+          tone={realtimeTopTraderAccountRatio > 1.5 ? "green" : realtimeTopTraderAccountRatio < 0.7 ? "red" : "default"}
+          info={{ description: t("vol.metric.topAcct.info") }}
+        />
+        {realtimeTopTraderPositionRatio > 0 && (
+          <MetricCard
+            label={t("vol.metric.topPos.label")}
+            value={realtimeTopTraderPositionRatio.toFixed(2)}
+            helper="Top Trader Position L/S"
+            tone={realtimeTopTraderPositionRatio > 1.5 ? "green" : realtimeTopTraderPositionRatio < 0.7 ? "red" : "default"}
+            info={{ description: t("vol.metric.topPos.info") }}
+          />
+        )}
+        {takerVolumeHistory.length > 0 && (
+          <MetricCard
+            label={t("vol.metric.cvd.label")}
+            value={formatCompactUnit(realtimeCvd, base)}
+            helper={`${t("vol.metric.cvd.helper")} · net ${formatCompactUnit(latestNetVolume, base)}`}
+            tone={realtimeCvd > 0 ? "green" : realtimeCvd < 0 ? "red" : "default"}
+            info={{ title: "Cumulative Volume Delta", description: t("vol.metric.cvd.info") }}
+          />
+        )}
+        <MetricCard
+          label={t("kpi.vol")}
+          value={formatCompactUnit(volume24hBase, base)}
+          helper="OKX 24h ticker volume"
+          tone="default"
+          info={{ description: t("kpi.vol.info") }}
+        />
+      </div>
+    </section>
+  )
 
   const volumeChartData = oneMinuteKlines.slice(-40).map((kline) => ({ time: kline.label, volume: kline.volume }))
 

@@ -74,8 +74,6 @@ export type MacroGroup =
   | "Commodity"
   | "Growth"
   | "RealEstate"
-  | "Crypto"
-  | "OnChain"
   | "Sentiment"
   | "CrossAsset"
 
@@ -84,12 +82,6 @@ export type MacroUnit = "index" | "percent" | "usd" | "cny" | "ratio" | "count"
 export type MacroDataSource =
   | "Yahoo Finance"
   | "FRED"
-  | "CoinGecko"
-  | "DefiLlama"
-  | "Blockchain.com"
-  | "Alternative.me"
-  | "OKX"
-  | "Computed"
 
 export interface MacroIndicator {
   symbol: string

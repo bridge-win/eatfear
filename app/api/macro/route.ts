@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server"
 
-import { fetchFearGreedHistory } from "@/lib/data-sources/alternative"
-import { fetchBlockchainSeries } from "@/lib/data-sources/blockchain"
-import { fetchDefiTvl, fetchStablecoinMarketCap } from "@/lib/data-sources/defillama"
 import { fetchFredSeries } from "@/lib/data-sources/fred"
 import { fetchYahooSeries } from "@/lib/data-sources/yahoo"
 import { MACRO_INDICATORS, type MacroIndicatorMeta } from "@/lib/macro-metadata"
@@ -36,18 +33,6 @@ async function fetchByMeta(meta: MacroIndicatorMeta, range: TimeRangeOption): Pr
     }
     case "FRED": {
       return fetchFredSeries(symbol, range)
-    }
-    case "Blockchain.com": {
-      return fetchBlockchainSeries(symbol, range)
-    }
-    case "DefiLlama": {
-      if (symbol === "stablecoins-total") return fetchStablecoinMarketCap(range)
-      if (symbol === "tvl-defi") return fetchDefiTvl(range)
-      return null
-    }
-    case "Alternative.me": {
-      if (symbol === "fng") return fetchFearGreedHistory(range)
-      return null
     }
     default:
       return null

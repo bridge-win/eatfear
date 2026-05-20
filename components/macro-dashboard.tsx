@@ -45,8 +45,6 @@ const GROUP_ORDER: MacroGroup[] = [
   "Credit",
   "Commodity",
   "Volatility",
-  "Crypto",
-  "OnChain",
   "Sentiment",
   "CrossAsset",
 ]
@@ -63,8 +61,6 @@ const GROUP_KEY: Record<MacroGroup, string> = {
   Commodity: "macro.group.Commodity",
   Growth: "macro.group.Growth",
   RealEstate: "macro.group.RealEstate",
-  Crypto: "macro.group.Crypto",
-  OnChain: "macro.group.OnChain",
   Sentiment: "macro.group.Sentiment",
   CrossAsset: "macro.group.CrossAsset",
 }
@@ -313,7 +309,7 @@ export function MacroDashboard({
               data={macroHistoryData}
               title={t("macro.historyCompare.title")}
               infoDescription={t("macro.historyCompare.info")}
-              infoSource="FRED · IMF/World Bank via FRED · Yahoo Finance · CoinGecko · DefiLlama · Blockchain.com · Alternative.me · TradingView Lightweight Charts"
+              infoSource="FRED · IMF/World Bank via FRED · Yahoo Finance · TradingView Lightweight Charts"
               loading={isLoading}
               error={error}
               loadingLabel={t("macro.loading")}

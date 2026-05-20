@@ -39,7 +39,7 @@ export const MACRO_PRIORITY_CATEGORIES: readonly MacroPriorityCategory[] = [
     label: "1 利率 / 央行政策",
     symbols: ["FRED:DFF", "FRED:DGS2", "FRED:DGS3MO", "FRED:T10Y2Y", "FRED:T10Y3M"],
     meaning: "Fed funds and short-end Treasury rates show the policy-rate anchor and market-implied easing/tightening path.",
-    impact: "Rates up usually compress valuations and liquidity; rates down usually support duration assets, equities and crypto.",
+    impact: "Rates up usually compress valuations and liquidity; rates down usually support duration assets and equities.",
     sourceNote: "FRED covers U.S. policy-rate proxies; China LPR/MLF/RRR need a China-specific provider.",
   },
   {
@@ -47,7 +47,7 @@ export const MACRO_PRIORITY_CATEGORIES: readonly MacroPriorityCategory[] = [
     label: "2 10年期国债收益率",
     symbols: ["FRED:DGS10", "FRED:DFII10", "FRED:DGS5", "FRED:DGS30", "ZN=F", "ZB=F", "TLT", "IEF", "TIP"],
     meaning: "10Y nominal and real yields are the core discount-rate inputs for global asset valuation.",
-    impact: "Yield up pressures growth stocks, gold and BTC; yield down usually supports valuations and risk appetite.",
+    impact: "Yield up pressures growth stocks and gold; yield down usually supports valuations and risk appetite.",
     sourceNote: "FRED and Yahoo proxies; China 10Y yield is not available in the current stable stack.",
   },
   {
@@ -112,7 +112,7 @@ export const MACRO_PRIORITY_CATEGORIES: readonly MacroPriorityCategory[] = [
     label: "8 汇率",
     symbols: ["DX-Y.NYB", "CNY=X", "USDCNH=X", "EURUSD=X", "USDJPY=X", "GBPUSD=X", "AUDUSD=X", "USDKRW=X"],
     meaning: "DXY and key crosses show dollar liquidity, carry pressure and capital-flow stress.",
-    impact: "A stronger USD usually pressures commodities, EM, Hong Kong/China risk assets and crypto; weaker USD helps.",
+    impact: "A stronger USD usually pressures commodities, EM and Hong Kong/China risk assets; weaker USD helps.",
     sourceNote: "Yahoo Finance FX chart data.",
   },
   {
@@ -158,10 +158,10 @@ export const MACRO_PRIORITY_CATEGORIES: readonly MacroPriorityCategory[] = [
   {
     rank: 14,
     label: "14 市场资金流向",
-    symbols: ["DEFILLAMA:stablecoins-total", "IBIT", "FBTC", "HYG", "LQD", "EMB"],
-    meaning: "Public proxies for money moving into risk assets: stablecoin supply, crypto ETF proxies and credit ETFs.",
-    impact: "Inflows/proxy strength supports short- to medium-term risk appetite; outflows/proxy weakness warns on de-risking.",
-    sourceNote: "Public proxies only; ETF flow, northbound/southbound and margin-financing flow feeds need dedicated providers.",
+    symbols: ["HYG", "LQD", "EMB", "ARKK", "KWEB", "EEM"],
+    meaning: "Public proxies for money moving into equity and credit risk assets.",
+    impact: "Proxy strength supports short- to medium-term risk appetite; proxy weakness warns on de-risking.",
+    sourceNote: "Public market proxies only; ETF flow, northbound/southbound and margin-financing feeds need dedicated providers.",
   },
   {
     rank: 15,
@@ -239,14 +239,13 @@ const withPriorityCategory = (meta: MacroIndicatorMeta): MacroIndicatorMeta => {
 /**
  * Full indicator registry — covers ~85 series across rates / inflation / employment /
  * liquidity / credit / equity / volatility / FX / commodity / growth / real-estate /
- * crypto / on-chain / sentiment / cross-asset.
+ * sentiment / cross-asset.
  *
  * Priority is hand-tuned for the "什么最重要" view used in macro analysis combining
- *股票 / 量化 / 期货 / 加密 best practices.
+ *股票 / 量化 / 期货 best practices.
  *
  * Indicators marked Yahoo Finance: free, no key.
  * Indicators marked FRED: require FRED_API_KEY env var. They are silently skipped if missing.
- * Indicators marked DefiLlama / Blockchain.com / Alternative.me / CoinGecko: free public endpoints.
  */
 const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   // ============================================================
@@ -261,9 +260,9 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "percent",
     priority: 1,
     frequency: "Daily",
-    audience: ["宏观", "股票", "加密", "期货"],
+    audience: ["宏观", "股票", "期货"],
     description:
-      "美联储有效联邦基金利率，全球无风险利率的锚。\n直接决定贴现率，对美股估值、BTC、黄金和美元定价影响最大。\n上行：紧缩；下行：放水。",
+      "美联储有效联邦基金利率，全球无风险利率的锚。\n直接决定贴现率，对美股估值、黄金和美元定价影响最大。\n上行：紧缩；下行：放水。",
   },
   {
     symbol: "FRED:DGS10",
@@ -274,9 +273,9 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "percent",
     priority: 2,
     frequency: "Daily",
-    audience: ["宏观", "股票", "加密"],
+    audience: ["宏观", "股票"],
     description:
-      "美国 10 年期国债收益率，全球资产定价的核心折现率。\n上行通常压制成长股 / BTC，支撑美元；下行反之。",
+      "美国 10 年期国债收益率，全球资产定价的核心折现率。\n上行通常压制成长股，支撑美元；下行反之。",
   },
   {
     symbol: "FRED:DGS2",
@@ -287,7 +286,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "percent",
     priority: 3,
     frequency: "Daily",
-    audience: ["宏观", "债券", "加密"],
+    audience: ["宏观", "债券"],
     description: "2 年期国债收益率，对市场加息/降息预期最敏感的端点，常用于看 Fed 路径定价。",
   },
   {
@@ -299,8 +298,8 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "percent",
     priority: 4,
     frequency: "Daily",
-    audience: ["宏观", "加密", "黄金"],
-    description: "通胀挂钩国债（TIPS）10 年期实际利率。\n实际利率上行 = 非生息资产（黄金 / BTC）压制；下行 = 利好。",
+    audience: ["宏观", "黄金"],
+    description: "通胀挂钩国债（TIPS）10 年期实际利率。\n实际利率上行 = 非生息资产（黄金）压制；下行 = 利好。",
   },
   {
     symbol: "DX-Y.NYB",
@@ -310,8 +309,8 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "index",
     priority: 5,
     frequency: "Realtime",
-    audience: ["宏观", "FX", "加密"],
-    description: "美元对一篮子主要货币的加权指数。美元走强通常压制 BTC、黄金、新兴市场和大宗商品。",
+    audience: ["宏观", "FX"],
+    description: "美元对一篮子主要货币的加权指数。美元走强通常压制黄金、新兴市场和大宗商品。",
   },
   {
     symbol: "^IXIC",
@@ -321,8 +320,8 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "index",
     priority: 6,
     frequency: "Realtime",
-    audience: ["股票", "加密"],
-    description: "纳斯达克综合指数，科技股权重最大。与 BTC、高 Beta 资产的相关系数常超过 0.7。",
+    audience: ["股票"],
+    description: "纳斯达克综合指数，科技股权重最大，是高 Beta 风险偏好的核心代理。",
   },
   {
     symbol: "^NDX",
@@ -332,8 +331,8 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "index",
     priority: 7,
     frequency: "Realtime",
-    audience: ["股票", "加密"],
-    description: "纳斯达克 100，100 只非金融大型成长公司的市值加权指数。BTC 同向相关度极高。",
+    audience: ["股票"],
+    description: "纳斯达克 100，100 只非金融大型成长公司的市值加权指数。",
   },
   {
     symbol: "QQQ",
@@ -388,7 +387,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "index",
     priority: 9,
     frequency: "Realtime",
-    audience: ["宏观", "股票", "加密"],
+    audience: ["宏观", "股票"],
     description: "S&P 500 隐含波动率（恐慌指数）。\n>30 高度恐慌；20-30 警戒；<15 极度乐观。",
   },
   {
@@ -400,7 +399,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "index",
     priority: 10,
     frequency: "Monthly",
-    audience: ["宏观", "债券", "加密"],
+    audience: ["宏观", "债券"],
     description: "美国 CPI 总体指数（季调）。每月公布，是市场对 Fed 政策路径定价的核心变量之一。",
   },
   {
@@ -476,7 +475,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "usd",
     priority: 16,
     frequency: "Weekly",
-    audience: ["宏观", "加密"],
+    audience: ["宏观"],
     description: "联储总资产规模（百万美元）。QE 扩张时增长，QT 时收缩。直接驱动全球美元流动性。",
     transform: (value) => value * 1_000_000, // FRED reports in millions
   },
@@ -502,7 +501,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "usd",
     priority: 18,
     frequency: "Daily",
-    audience: ["宏观", "加密"],
+    audience: ["宏观"],
     description: "纽约联储隔夜逆回购余额。RRP 下降 = 货币市场基金释放美元到银行体系（放水）。",
     transform: (value) => value * 1_000_000_000, // FRED reports in billions
   },
@@ -515,7 +514,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "usd",
     priority: 19,
     frequency: "Weekly",
-    audience: ["宏观", "加密"],
+    audience: ["宏观"],
     description: "美国财政部在联储的现金账户余额（百万美元）。TGA 上升 = 财政部抽水；下降 = 放水。",
     transform: (value) => value * 1_000_000,
   },
@@ -528,7 +527,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "usd",
     priority: 20,
     frequency: "Monthly",
-    audience: ["宏观", "加密"],
+    audience: ["宏观"],
     description: "美国 M2 货币供应（十亿美元）。宽货币周期对风险资产中长期支撑。",
     transform: (value) => value * 1_000_000_000,
   },
@@ -567,7 +566,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "usd",
     priority: 21.1,
     frequency: "Monthly",
-    audience: ["宏观", "加密"],
+    audience: ["宏观"],
     description:
       "美国实际 M2（以 CPI 折算为 1982-84 年美元）。用于区分名义货币扩张和真实购买力扩张；实际 M2 上行通常代表真实流动性改善。",
     transform: (value) => value * 1_000_000_000,
@@ -594,7 +593,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "usd",
     priority: 21.3,
     frequency: "Monthly",
-    audience: ["宏观", "加密"],
+    audience: ["宏观"],
     description:
       "美国货币基础（流通中现金 + 准备金余额，十亿美元）。与联储资产负债表、银行准备金共同观察基础流动性。",
     transform: (value) => value * 1_000_000_000,
@@ -608,7 +607,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "cny",
     priority: 21.4,
     frequency: "Monthly · historical to 2019",
-    audience: ["宏观", "中国", "加密"],
+    audience: ["宏观", "中国"],
     description:
       "中国 M2 货币供应，IMF IFS 经 FRED 发布，单位为人民币。稳定 API 覆盖到 2019 年 8 月，作为历史周期参考；不是当前 PBoC 最新月度值。",
   },
@@ -634,7 +633,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "percent",
     priority: 22,
     frequency: "Daily",
-    audience: ["宏观", "信用", "加密"],
+    audience: ["宏观", "信用"],
     description:
       "ICE BofA 美国高收益债期权调整利差（OAS）。\n上行 = 信用风险走差，常领先股市下跌；< 3% 风险偏好高。",
   },
@@ -696,7 +695,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     priority: 27,
     frequency: "Daily",
     audience: ["宏观"],
-    description: "5 年期国债收益率。反映 5 年内通胀和增长预期，加密 + 金融条件中点。",
+    description: "5 年期国债收益率。反映 5 年内通胀、增长预期和金融条件中点。",
   },
   {
     symbol: "FRED:DGS30",
@@ -756,7 +755,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     priority: 31,
     frequency: "Realtime",
     audience: ["股票", "科技"],
-    description: "费城半导体指数，AI / 科技 / BTC 风险偏好的核心代理，领先纳指。",
+    description: "费城半导体指数，AI / 科技风险偏好的核心代理，领先纳指。",
   },
   {
     symbol: "SMH",
@@ -821,8 +820,8 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "usd",
     priority: 32,
     frequency: "Realtime",
-    audience: ["股票", "加密"],
-    description: "高 Beta 创新 / 成长股 ETF，BTC 同步性强；流动性边际信号。",
+    audience: ["股票"],
+    description: "高 Beta 创新 / 成长股 ETF，是流动性边际和风险偏好的高敏感代理。",
   },
   {
     symbol: "KWEB",
@@ -844,7 +843,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     priority: 34,
     frequency: "Realtime",
     audience: ["股票", "宏观"],
-    description: "新兴市场 ETF，对美元/美债收益率敏感；BTC 的风险偏好镜像。",
+    description: "新兴市场 ETF，对美元/美债收益率敏感，是全球风险偏好的镜像。",
   },
   {
     symbol: "ACWI",
@@ -1019,7 +1018,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     priority: 45,
     frequency: "Realtime",
     audience: ["波动率", "科技"],
-    description: "纳指 100 隐含波动率，对科技股 / BTC 风险更敏感。",
+    description: "纳指 100 隐含波动率，对科技股风险更敏感。",
   },
   {
     symbol: "^VVIX",
@@ -1151,7 +1150,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "percent",
     priority: 56.5,
     frequency: "Daily",
-    audience: ["宏观", "债券", "加密"],
+    audience: ["宏观", "债券"],
     description: "5 年期隐含通胀预期（名义国债 - TIPS 实际利率）。\n上升 = 市场预期通胀走高；下降 = 通胀预期回落。",
   },
   {
@@ -1327,7 +1326,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     unit: "index",
     priority: 22.5,
     frequency: "Weekly",
-    audience: ["宏观", "信用", "加密"],
+    audience: ["宏观", "信用"],
     description: "芝加哥联储国家金融条件指数。\n负值 = 金融条件宽松；正值 = 金融条件紧张。\n> 0 通常压制风险资产。",
   },
   {
@@ -1768,190 +1767,6 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     description: "美国联邦债务 / GDP。观察财政空间、长期利率和期限溢价压力。",
   },
 
-  // ============================================================
-  // TIER 8 — Crypto / On-chain (93-130)
-  // ============================================================
-  {
-    symbol: "BTC-USD",
-    source: "Yahoo Finance",
-    name: "Bitcoin Spot (Yahoo)",
-    group: "Crypto",
-    unit: "usd",
-    priority: 93,
-    frequency: "Realtime",
-    audience: ["加密"],
-    description: "比特币现货，Yahoo 24/7 数据；可与传统资产同界面比较。",
-  },
-  {
-    symbol: "ETH-USD",
-    source: "Yahoo Finance",
-    name: "Ethereum Spot",
-    group: "Crypto",
-    unit: "usd",
-    priority: 94,
-    frequency: "Realtime",
-    audience: ["加密"],
-    description: "以太坊现货。ETH/BTC 比反映山寨季强度。",
-  },
-  {
-    symbol: "IBIT",
-    source: "Yahoo Finance",
-    name: "iShares Bitcoin Trust (IBIT)",
-    group: "Crypto",
-    unit: "usd",
-    priority: 95,
-    frequency: "Realtime",
-    audience: ["机构加密"],
-    description: "BlackRock 现货 BTC ETF。机构买盘强弱代理。",
-  },
-  {
-    symbol: "FBTC",
-    source: "Yahoo Finance",
-    name: "Fidelity Bitcoin ETF (FBTC)",
-    group: "Crypto",
-    unit: "usd",
-    priority: 96,
-    frequency: "Realtime",
-    audience: ["机构加密"],
-    description: "Fidelity 现货 BTC ETF。",
-  },
-  {
-    symbol: "GBTC",
-    source: "Yahoo Finance",
-    name: "Grayscale Bitcoin Trust (GBTC)",
-    group: "Crypto",
-    unit: "usd",
-    priority: 97,
-    frequency: "Realtime",
-    audience: ["机构加密"],
-    description: "Grayscale BTC 信托，历史抛压来源。",
-  },
-  {
-    symbol: "ETHE",
-    source: "Yahoo Finance",
-    name: "Grayscale Ethereum Trust (ETHE)",
-    group: "Crypto",
-    unit: "usd",
-    priority: 98,
-    frequency: "Realtime",
-    audience: ["机构加密"],
-    description: "Grayscale ETH 信托。",
-  },
-
-  // On-chain via Blockchain.com
-  {
-    symbol: "BLOCKCHAIN:hash-rate",
-    providerSymbol: "hash-rate",
-    source: "Blockchain.com",
-    name: "BTC Hash Rate",
-    group: "OnChain",
-    unit: "count",
-    priority: 110,
-    frequency: "Daily",
-    audience: ["加密", "矿工"],
-    description: "比特币全网算力（TH/s）。网络安全和矿工健康度。\n大幅下降常对应矿难或硬件迁徙。",
-  },
-  {
-    symbol: "BLOCKCHAIN:difficulty",
-    providerSymbol: "difficulty",
-    source: "Blockchain.com",
-    name: "BTC Mining Difficulty",
-    group: "OnChain",
-    unit: "count",
-    priority: 111,
-    frequency: "Bi-weekly",
-    audience: ["加密", "矿工"],
-    description: "比特币挖矿难度。每 2016 个区块（约 2 周）调整一次。",
-  },
-  {
-    symbol: "BLOCKCHAIN:n-unique-addresses",
-    providerSymbol: "n-unique-addresses",
-    source: "Blockchain.com",
-    name: "BTC Active Addresses",
-    group: "OnChain",
-    unit: "count",
-    priority: 112,
-    frequency: "Daily",
-    audience: ["加密"],
-    description: "每日唯一活跃地址数。网络真实使用度。",
-  },
-  {
-    symbol: "BLOCKCHAIN:n-transactions",
-    providerSymbol: "n-transactions",
-    source: "Blockchain.com",
-    name: "BTC Transactions/day",
-    group: "OnChain",
-    unit: "count",
-    priority: 113,
-    frequency: "Daily",
-    audience: ["加密"],
-    description: "每日链上交易笔数。",
-  },
-  {
-    symbol: "BLOCKCHAIN:estimated-transaction-volume-usd",
-    providerSymbol: "estimated-transaction-volume-usd",
-    source: "Blockchain.com",
-    name: "BTC On-chain Volume (USD)",
-    group: "OnChain",
-    unit: "usd",
-    priority: 114,
-    frequency: "Daily",
-    audience: ["加密"],
-    description: "每日链上估计转账总额（美元）。大额转移和网络活跃度。",
-  },
-  {
-    symbol: "BLOCKCHAIN:market-cap",
-    providerSymbol: "market-cap",
-    source: "Blockchain.com",
-    name: "BTC Market Cap (History)",
-    group: "Crypto",
-    unit: "usd",
-    priority: 115,
-    frequency: "Daily",
-    audience: ["加密"],
-    description: "BTC 历史市值曲线（USD）。",
-  },
-
-  // Stablecoin liquidity via DefiLlama
-  {
-    symbol: "DEFILLAMA:stablecoins-total",
-    providerSymbol: "stablecoins-total",
-    source: "DefiLlama",
-    name: "Stablecoin Total Market Cap",
-    group: "Crypto",
-    unit: "usd",
-    priority: 116,
-    frequency: "Daily",
-    audience: ["加密", "流动性"],
-    description:
-      '加密市场"场内美元"总额。下行 = 流出；上行 = 流入。\nBTC 牛熊周期常领先于 stablecoin 总市值变化。',
-  },
-  {
-    symbol: "DEFILLAMA:tvl-defi",
-    providerSymbol: "tvl-defi",
-    source: "DefiLlama",
-    name: "Total DeFi TVL",
-    group: "Crypto",
-    unit: "usd",
-    priority: 117,
-    frequency: "Daily",
-    audience: ["加密", "DeFi"],
-    description: "DeFi 协议总锁仓量（USD）。链上资金活跃度。",
-  },
-
-  // Sentiment
-  {
-    symbol: "ALTERNATIVE:fng",
-    providerSymbol: "fng",
-    source: "Alternative.me",
-    name: "Crypto Fear & Greed",
-    group: "Sentiment",
-    unit: "index",
-    priority: 130,
-    frequency: "Daily",
-    audience: ["加密", "情绪"],
-    description: "Alternative.me 综合波动率、动量、社交、调查的恐慌贪婪指数（0-100）。",
-  },
 ]
 
 export const MACRO_INDICATORS: MacroIndicatorMeta[] = BASE_MACRO_INDICATORS.map(withPriorityCategory)
@@ -1979,9 +1794,6 @@ export const SKIPPED_INDICATORS = [
     name: "China NBS 数据（CPI/PPI/GDP/PMI/零售/地产投资/进出口）",
     reason: "需要 akshare/Wind/同花顺等本地数据源；当前稳定栈仅用美方/全球公开 proxy",
   },
-  { name: "Glassnode / CryptoQuant 高级链上 (MVRV、NUPL、SOPR、矿工储备、交易所余额)", reason: "全部付费 API" },
-  { name: "Deribit BTC 期权 IV / Skew / Max Pain", reason: "Deribit API 限流 + 计算成本高" },
-  { name: "BTC ETF 净流入 (Farside)", reason: "Farside 是 HTML 表格，已被反爬；BlackRock 13F 季度披露" },
   { name: "Bloomberg / Reuters NLP 新闻情绪", reason: "需要 Bloomberg/Reuters 终端订阅" },
   { name: "X / Reddit / Google Trends / 百度指数", reason: "API 付费或速率限制严" },
   { name: "美股 Put/Call Ratio / Cboe 期权数据", reason: "Cboe DataShop 付费" },
