@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 
 import { CryptoHistoryCompare, useCryptoHistoryPayload } from "@/components/crypto-history-compare"
+import { CryptoIndicatorDetail } from "@/components/crypto-indicator-detail"
 import { CryptoRealtimeCards } from "@/components/crypto-realtime-cards"
 import { DashboardFrame } from "@/components/page-frame"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
@@ -35,6 +36,7 @@ export function CryptoDashboard({
   )
   const [instId, setInstId] = useState<string>("BTC-USDT-SWAP")
   const [range, setRange] = useState<TimeRangeId>(CRYPTO_DEFAULT_RANGE)
+  const [selectedSeriesKey, setSelectedSeriesKey] = useState<string | null>(null)
   const cryptoHistory = useCryptoHistoryPayload(instId, range)
   const t = useT()
 
@@ -86,11 +88,20 @@ export function CryptoDashboard({
           <TabsTrigger value="history" className="text-xs">{t("crypto.tab.history")}</TabsTrigger>
         </TabsList>
         <TabsContent value="realtime" className="mt-3">
-          <CryptoRealtimeCards
-            payload={cryptoHistory.payload}
-            loading={cryptoHistory.loading}
-            error={cryptoHistory.error}
-          />
+          {selectedSeriesKey && cryptoHistory.payload ? (
+            <CryptoIndicatorDetail
+              payload={cryptoHistory.payload}
+              selectedKey={selectedSeriesKey}
+              onBack={() => setSelectedSeriesKey(null)}
+            />
+          ) : (
+            <CryptoRealtimeCards
+              payload={cryptoHistory.payload}
+              loading={cryptoHistory.loading}
+              error={cryptoHistory.error}
+              onSelectSeries={setSelectedSeriesKey}
+            />
+          )}
         </TabsContent>
         <TabsContent value="history" className="mt-3">
           <CryptoHistoryCompare

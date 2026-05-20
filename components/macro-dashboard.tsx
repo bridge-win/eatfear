@@ -1,69 +1,27 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { RefreshCw, TrendingDown, TrendingUp } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { RefreshCw } from "lucide-react"
 
 import {
   AlignedHistoryCompare,
   type AlignedHistoryData,
-  type AlignedHistoryGroup,
   type AlignedHistorySeries,
   type AlignedHistoryUnit,
 } from "@/components/aligned-history-compare"
-import { Badge } from "@/components/ui/badge"
+import { MarketIndicatorCards, type MarketIndicatorItem } from "@/components/market-indicator-cards"
+import { MarketIndicatorDetail } from "@/components/market-indicator-detail"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { InfoTooltip } from "@/components/info-tooltip"
 import { DashboardFrame } from "@/components/page-frame"
-import { formatValue as formatSeriesValue, type SeriesChartUnit } from "@/components/series-chart"
 import { TimeRangeSelector } from "@/components/time-range-selector"
-import {
-  buildIndicatorInfo,
-  formatPercentDelta,
-  getDeltaTone,
-  stripSymbolPrefix,
-  type MacroApiResponse,
-} from "@/lib/dashboard-shared"
+import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-shared"
+import { DEFAULT_MACRO_INDICATOR_REFRESH_MS } from "@/lib/macro-indicator-config"
 import { useT } from "@/lib/i18n"
 import { type TimeRangeId } from "@/lib/time-range"
-import type { MacroGroup, MacroIndicator } from "@/lib/types"
-import { cn } from "@/lib/utils"
+import type { MacroIndicator } from "@/lib/types"
 
 const MACRO_DEFAULT_RANGE: TimeRangeId = "10y"
-
-const REFRESH_INTERVAL_MS = 5 * 60 * 1000
-
-const GROUP_ORDER: MacroGroup[] = [
-  "Rates",
-  "Inflation",
-  "Liquidity",
-  "Growth",
-  "Employment",
-  "FX",
-  "RealEstate",
-  "Equity",
-  "Credit",
-  "Commodity",
-  "Volatility",
-  "Sentiment",
-  "CrossAsset",
-]
-
-const GROUP_KEY: Record<MacroGroup, string> = {
-  Rates: "macro.group.Rates",
-  Inflation: "macro.group.Inflation",
-  Employment: "macro.group.Employment",
-  Liquidity: "macro.group.Liquidity",
-  Credit: "macro.group.Credit",
-  Equity: "macro.group.Equity",
-  Volatility: "macro.group.Volatility",
-  FX: "macro.group.FX",
-  Commodity: "macro.group.Commodity",
-  Growth: "macro.group.Growth",
-  RealEstate: "macro.group.RealEstate",
-  Sentiment: "macro.group.Sentiment",
-  CrossAsset: "macro.group.CrossAsset",
-}
 
 const MACRO_SERIES_COLORS = [
   "#2563eb",
@@ -83,12 +41,8 @@ const MACRO_SERIES_COLORS = [
   "#db2777",
 ] as const
 
-const getGroupPaneIndex = (group: MacroGroup) => {
-  const index = GROUP_ORDER.findIndex((groupId) => groupId === group)
-  return index === -1 ? GROUP_ORDER.length : index
-}
-
-const getMacroSortRank = (indicator: MacroIndicator) => indicator.macroRank ?? 100 + getGroupPaneIndex(indicator.group)
+const getMacroSortRank = (indicator: MacroIndicator) =>
+  indicator.displayOrder ?? indicator.macroRank ?? 100_000 + (indicator.priority ?? 999)
 
 const sortMacroIndicators = (a: MacroIndicator, b: MacroIndicator) => {
   const rankDelta = getMacroSortRank(a) - getMacroSortRank(b)
@@ -96,14 +50,8 @@ const sortMacroIndicators = (a: MacroIndicator, b: MacroIndicator) => {
   return (a.priority ?? 999) - (b.priority ?? 999)
 }
 
-const getMacroSectionKey = (indicator: MacroIndicator) => indicator.macroCategory ?? indicator.group
-
-const getMacroSectionOrder = (indicator: MacroIndicator) => getMacroSortRank(indicator)
-
-const getMacroSectionLabel = (indicator: MacroIndicator, t: (key: string) => string) =>
-  indicator.macroCategory ?? t(GROUP_KEY[indicator.group])
-
 const getMacroSeriesColor = (indicator: MacroIndicator, index: number) => {
+  if (indicator.color) return indicator.color
   const seed = [...indicator.symbol].reduce((sum, char) => sum + char.charCodeAt(0), index)
   return MACRO_SERIES_COLORS[seed % MACRO_SERIES_COLORS.length]
 }
@@ -124,49 +72,48 @@ const toAlignedUnit = (unit: MacroIndicator["unit"]): AlignedHistoryUnit => {
   }
 }
 
-const buildMacroHistoryData = (indicators: MacroIndicator[]): AlignedHistoryData | null => {
-  if (indicators.length === 0) return null
-
-  const sortedIndicators = [...indicators].sort(sortMacroIndicators)
-  const grouped = new Map<string, { label: string; order: number; series: AlignedHistorySeries[] }>()
-
-  sortedIndicators.forEach((indicator, index) => {
+const buildMacroItems = (indicators: MacroIndicator[]): MarketIndicatorItem[] => {
+  return [...indicators].sort(sortMacroIndicators).flatMap((indicator, index) => {
     const data = indicator.history
       .filter((point) => Number.isFinite(point.timestamp) && Number.isFinite(point.value))
       .map((point) => ({ time: point.timestamp, value: point.value }))
 
-    if (data.length === 0) return
+    if (data.length === 0) return []
 
-    const series: AlignedHistorySeries = {
+    const info = buildIndicatorInfo(indicator)
+    return [{
       key: indicator.symbol,
+      order: index + 1,
       label: indicator.name,
       color: getMacroSeriesColor(indicator, index),
       unit: toAlignedUnit(indicator.unit),
+      value: Number.isFinite(indicator.value) ? indicator.value : null,
+      changePercent: Number.isFinite(indicator.changePercent) ? indicator.changePercent : null,
+      timestamp: indicator.lastUpdate,
+      source: info?.source ?? `${indicator.source}${indicator.frequency ? ` · ${indicator.frequency}` : ""}`,
+      description: info?.description ?? indicator.description ?? "Macro indicator.",
       data,
-      info: buildIndicatorInfo(indicator),
-    }
-    const groupKey = getMacroSectionKey(indicator)
-    const group = grouped.get(groupKey)
-    if (group) {
-      group.series.push(series)
-    } else {
-      grouped.set(groupKey, {
-        label: indicator.macroCategory ?? indicator.group,
-        order: getMacroSectionOrder(indicator),
-        series: [series],
-      })
-    }
-  })
+    }]
+  }).map((item, index) => ({ ...item, order: index + 1 }))
+}
 
-  const groups: AlignedHistoryGroup[] = Array.from(grouped.entries())
-    .sort(([, a], [, b]) => a.order - b.order)
-    .map(([key, group]) => ({
-      key,
-      label: group.label,
-      series: group.series,
-    }))
+const buildMacroHistoryData = (items: MarketIndicatorItem[]): AlignedHistoryData | null => {
+  if (items.length === 0) return null
+  const series: AlignedHistorySeries[] = items.map((item) => ({
+    key: item.key,
+    order: item.order,
+    label: item.label,
+    color: item.color,
+    unit: item.unit,
+    data: item.data,
+    info: {
+      title: `#${String(item.order).padStart(2, "0")} ${item.label}`,
+      description: item.description,
+      source: item.source,
+    },
+  }))
 
-  return groups.length > 0 ? { groups } : null
+  return { groups: [{ key: "macro", series }] }
 }
 
 export interface MacroDashboardProps {
@@ -189,11 +136,14 @@ export function MacroDashboard({
   const [fredEnabled, setFredEnabled] = useState<boolean | null>(initialFredEnabled)
   const [range, setRange] = useState<TimeRangeId>(MACRO_DEFAULT_RANGE)
   const [meta, setMeta] = useState<{ requested: number; returned: number } | null>(initialMeta)
+  const [selectedIndicatorKey, setSelectedIndicatorKey] = useState<string | null>(null)
+  const refreshMsRef = useRef(DEFAULT_MACRO_INDICATOR_REFRESH_MS)
   const t = useT()
 
   useEffect(() => {
     let isActive = true
     const controller = new AbortController()
+    let timer: ReturnType<typeof setTimeout> | null = null
     setIsLoading(true)
 
     async function loadMacroData() {
@@ -209,46 +159,30 @@ export function MacroDashboard({
         setUpdatedAt(payload.updatedAt)
         setFredEnabled(payload.fredEnabled ?? null)
         setMeta({ requested: payload.requested ?? 0, returned: payload.returned ?? 0 })
+        refreshMsRef.current = payload.refreshMs ?? DEFAULT_MACRO_INDICATOR_REFRESH_MS
         setError(null)
       } catch (requestError) {
         if (isActive && (requestError as Error).name !== "AbortError") {
           setError(requestError instanceof Error ? requestError.message : "Failed to load macro data")
         }
       } finally {
-        if (isActive) setIsLoading(false)
+        if (!isActive) return
+        setIsLoading(false)
+        timer = setTimeout(loadMacroData, refreshMsRef.current)
       }
     }
 
     loadMacroData()
-    const interval = setInterval(loadMacroData, REFRESH_INTERVAL_MS)
 
     return () => {
       isActive = false
       controller.abort()
-      clearInterval(interval)
+      if (timer) clearTimeout(timer)
     }
   }, [range])
 
-  const indicatorSections = useMemo(() => {
-    const sections = new Map<string, { key: string; label: string; order: number; indicators: MacroIndicator[] }>()
-    for (const indicator of [...indicators].sort(sortMacroIndicators)) {
-      const key = getMacroSectionKey(indicator)
-      const section = sections.get(key)
-      if (section) {
-        section.indicators.push(indicator)
-      } else {
-        sections.set(key, {
-          key,
-          label: getMacroSectionLabel(indicator, t),
-          order: getMacroSectionOrder(indicator),
-          indicators: [indicator],
-        })
-      }
-    }
-    return Array.from(sections.values()).sort((a, b) => a.order - b.order)
-  }, [indicators, t])
-
-  const macroHistoryData = useMemo(() => buildMacroHistoryData(indicators), [indicators])
+  const macroItems = useMemo(() => buildMacroItems(indicators), [indicators])
+  const macroHistoryData = useMemo(() => buildMacroHistoryData(macroItems), [macroItems])
 
   return (
     <DashboardFrame>
@@ -297,11 +231,34 @@ export function MacroDashboard({
           </TabsList>
 
           <TabsContent value="realtime" className="mt-3">
-            <IndicatorSections
-              sections={indicatorSections}
-              renderIndicator={(indicator) => <RealtimeTile key={indicator.symbol} indicator={indicator} />}
-              gridClassName="grid gap-1.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6"
-            />
+            {selectedIndicatorKey && macroItems.length > 0 ? (
+              <MarketIndicatorDetail
+                items={macroItems}
+                selectedKey={selectedIndicatorKey}
+                backLabel={t("macro.detail.back")}
+                subtitle={t("macro.detail.subtitle")}
+                searchPlaceholder={t("macro.detail.search")}
+                emptyMessage={t("macro.detail.empty")}
+                addCompareLabel={t("macro.detail.addCompare")}
+                chartTitle={t("macro.detail.chartTitle")}
+                chartInfo={t("macro.detail.chartInfo")}
+                chartInfoSource="FRED · IMF/World Bank via FRED · Yahoo Finance · aligned timeline"
+                loadingLabel={t("macro.loading")}
+                noDataLabel={t("chart.noData")}
+                seriesCountLabel={t("compare.seriesCount")}
+                onBack={() => setSelectedIndicatorKey(null)}
+              />
+            ) : (
+              <MarketIndicatorCards
+                items={macroItems}
+                loading={isLoading}
+                error={error}
+                loadingLabel={t("macro.loading")}
+                noDataLabel={t("chart.noData")}
+                onSelectItem={setSelectedIndicatorKey}
+                dataPrefix="macro"
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="history" className="mt-3">
@@ -332,71 +289,5 @@ function FredHint() {
         <p className="mt-0.5 leading-relaxed">{t("macro.fredHint.body")}</p>
       </CardContent>
     </Card>
-  )
-}
-
-interface IndicatorSectionsProps {
-  sections: Array<{ key: string; label: string; indicators: MacroIndicator[] }>
-  renderIndicator: (indicator: MacroIndicator) => React.ReactNode
-  gridClassName: string
-}
-
-function IndicatorSections({ sections, renderIndicator, gridClassName }: IndicatorSectionsProps) {
-  return (
-    <div className="space-y-3">
-      {sections.map((section) => {
-        return (
-          <section key={section.key} className="space-y-1.5">
-            <header className="flex items-center justify-between">
-              <h2 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {section.label}
-              </h2>
-              <Badge variant="secondary" className="h-4 px-1.5 text-[9px] font-normal">
-                {section.indicators.length}
-              </Badge>
-            </header>
-            <div className={gridClassName}>{section.indicators.map(renderIndicator)}</div>
-          </section>
-        )
-      })}
-    </div>
-  )
-}
-
-function RealtimeTile({ indicator }: { indicator: MacroIndicator }) {
-  const isPositive = indicator.change >= 0
-  const info = buildIndicatorInfo(indicator)
-  return (
-    <div className="rounded-md border bg-card/80 px-2.5 py-1.5 shadow-sm">
-      <div className="flex items-start justify-between gap-1.5">
-        <div className="min-w-0">
-          <p className="truncate text-[11px] font-medium text-foreground">{indicator.name}</p>
-          <p className="truncate text-[9px] text-muted-foreground">
-            {stripSymbolPrefix(indicator.symbol)} · <span className="opacity-80">{indicator.source}</span>
-          </p>
-        </div>
-        {info && (
-          <InfoTooltip
-            title={info.title}
-            description={info.description}
-            source={info.source}
-          />
-        )}
-      </div>
-      <div className="mt-1 flex items-baseline justify-between gap-2">
-        <span className="truncate text-sm font-semibold tabular-nums">
-          {formatSeriesValue(indicator.value, indicator.unit as SeriesChartUnit, true)}
-        </span>
-        <span
-          className={cn(
-            "flex shrink-0 items-center gap-0.5 text-[10px] font-medium tabular-nums",
-            isPositive ? "text-green-600" : "text-red-600",
-          )}
-        >
-          {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-          {formatPercentDelta(indicator.changePercent)}
-        </span>
-      </div>
-    </div>
   )
 }

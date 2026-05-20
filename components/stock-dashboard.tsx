@@ -5,111 +5,30 @@ import { useEffect, useMemo, useState } from "react"
 import {
   AlignedHistoryCompare,
   type AlignedHistoryData,
-  type AlignedHistoryGroup,
   type AlignedHistorySeries,
   type AlignedHistoryUnit,
 } from "@/components/aligned-history-compare"
 import { CrashAlertBanner } from "@/components/crash-alert-banner"
-import { CrashLeaderboard } from "@/components/crash-leaderboard"
-import { KpiStrip, type KpiTile } from "@/components/kpi-strip"
+import { MarketIndicatorCards, type MarketIndicatorItem } from "@/components/market-indicator-cards"
+import { MarketIndicatorDetail } from "@/components/market-indicator-detail"
 import { DashboardFrame } from "@/components/page-frame"
-import { formatValue as formatSeriesValue, type SeriesChartUnit } from "@/components/series-chart"
-import { StockPriceCard } from "@/components/stock-price-card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TimeRangeSelector } from "@/components/time-range-selector"
-import {
-  buildIndicatorInfo,
-  formatPercentDelta,
-  getDeltaTone,
-  type MacroApiResponse,
-} from "@/lib/dashboard-shared"
+import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-shared"
 import { CrashDetector } from "@/lib/crash-detector"
 import { useT } from "@/lib/i18n"
-import { calculateCrashLeaderboard, fetchStockData, STOCK_CATEGORIES } from "@/lib/stock-service"
+import {
+  DEFAULT_STOCK_MACRO_REFRESH_MS,
+  DEFAULT_STOCK_REFRESH_MS,
+  getEnabledStockIndicators,
+  getEnabledStockSymbols,
+} from "@/lib/stock-indicator-config"
+import { fetchStockData } from "@/lib/stock-service"
 import { getRangeDays, getTimeRange, type TimeRangeId } from "@/lib/time-range"
 import type { CrashAlert, MacroIndicator, StockAsset } from "@/lib/types"
 
 const STOCK_DEFAULT_RANGE: TimeRangeId = "1y"
 
-const STOCK_KPI_SYMBOLS = [
-  "ES=F",
-  "NQ=F",
-  "^GSPC",
-  "^NDX",
-  "^IXIC",
-  "^RUT",
-  "^SOX",
-  "SMH",
-  "XLK",
-  "XLF",
-  "KRE",
-  "XLE",
-  "^VIX",
-  "^VXN",
-  "^VVIX",
-  "^SKEW",
-  "FRED:DGS10",
-  "FRED:DGS2",
-  "FRED:T10Y2Y",
-  "FRED:DFII10",
-  "FRED:BAMLH0A0HYM2",
-  "FRED:NFCI",
-  "DX-Y.NYB",
-  "HYG",
-  "LQD",
-  "TLT",
-  "^DJI",
-  "^HSI",
-  "^N225",
-  "GC=F",
-  "CL=F",
-  "HG=F",
-]
-
-const US_STOCK_DISPLAY_PRIORITY = [
-  "SPY",
-  "QQQ",
-  "DIA",
-  "NVDA",
-  "TSLA",
-  "AAPL",
-  "MSFT",
-  "META",
-  "AMZN",
-  "GOOGL",
-  "AMD",
-  "AVGO",
-  "JPM",
-  "GS",
-  "XOM",
-  "CAT",
-] as const
-
-const HK_STOCK_DISPLAY_PRIORITY = [
-  "0700.HK",
-  "9988.HK",
-  "3690.HK",
-  "0388.HK",
-  "1299.HK",
-  "0005.HK",
-  "0941.HK",
-  "0883.HK",
-] as const
-
-const VIETNAM_STOCK_DISPLAY_PRIORITY = [
-  "VNM",
-  "FUTU",
-  "BABA",
-  "PDD",
-  "JD",
-  "LI",
-  "NIO",
-  "XPEV",
-] as const
-
-const KPI_SPARK_POINTS = 30
-const STOCK_REFRESH_MS = 60 * 1000
-const MACRO_REFRESH_MS = 5 * 60 * 1000
 const STOCK_HISTORY_COLORS = [
   "#2563eb",
   "#dc2626",
@@ -125,19 +44,21 @@ const STOCK_HISTORY_COLORS = [
   "#ca8a04",
 ] as const
 
-const sortStockAssets = <T extends readonly string[]>(assets: StockAsset[], priority: T) => {
-  const order = new Map<string, number>(priority.map((symbol, index) => [symbol, index]))
-  return assets
-    .map((asset, index) => ({ asset, index }))
-    .sort((a, b) => {
-      const priorityDelta =
-        (order.get(a.asset.symbol) ?? Number.MAX_SAFE_INTEGER) -
-        (order.get(b.asset.symbol) ?? Number.MAX_SAFE_INTEGER)
-      if (priorityDelta !== 0) return priorityDelta
-      return a.index - b.index
-    })
-    .map(({ asset }) => asset)
-}
+const STOCK_INDICATORS = getEnabledStockIndicators()
+const STOCK_DATA_REFRESH_MS = Math.max(
+  30_000,
+  Math.min(
+    ...STOCK_INDICATORS.filter((entry) => entry.kind === "stock").map((entry) => entry.refreshMs),
+    DEFAULT_STOCK_REFRESH_MS,
+  ),
+)
+const STOCK_MACRO_DATA_REFRESH_MS = Math.max(
+  30_000,
+  Math.min(
+    ...STOCK_INDICATORS.filter((entry) => entry.kind === "macro").map((entry) => entry.refreshMs),
+    DEFAULT_STOCK_MACRO_REFRESH_MS,
+  ),
+)
 
 const getStockSeriesColor = (symbol: string, index: number) => {
   const seed = [...symbol].reduce((sum, char) => sum + char.charCodeAt(0), index)
@@ -160,93 +81,91 @@ const toAlignedUnit = (unit: MacroIndicator["unit"]): AlignedHistoryUnit => {
   }
 }
 
-const stockSparklineToSeries = (
-  asset: StockAsset,
-  range: TimeRangeId,
-  color: string,
-): AlignedHistorySeries | null => {
+const stockSparklineToData = (asset: StockAsset, range: TimeRangeId) => {
   const values = asset.sparkline?.filter((value) => Number.isFinite(value)) ?? []
-  if (values.length < 2) return null
+  if (values.length < 2) return []
 
   const now = Date.now()
   const days = getRangeDays(range)
   const start = now - days * 86_400_000
   const step = values.length > 1 ? (now - start) / (values.length - 1) : 0
 
-  return {
-    key: `stock:${asset.symbol}`,
-    label: `${asset.symbol} · ${asset.name}`,
-    color,
-    unit: "usd",
-    data: values.map((value, index) => ({
-      time: Math.round(start + step * index),
-      value,
-    })),
-    info: {
-      title: `${asset.symbol} · ${asset.name}`,
-      description: "意义：股票/ETF 历史价格用于观察趋势、相对强弱和风险偏好。\n影响方向：价格上行代表该资产资金偏好改善；下行代表该资产承压。",
-      source: "Yahoo Finance",
-    },
-  }
+  return values.map((value, index) => ({
+    time: Math.round(start + step * index),
+    value,
+  }))
 }
 
-const buildStockHistoryData = ({
+const buildStockIndicatorItems = ({
   range,
   macroIndicators,
-  usStocks,
-  hkStocks,
-  vietnamStocks,
+  stockAssets,
 }: {
   range: TimeRangeId
   macroIndicators: MacroIndicator[]
-  usStocks: StockAsset[]
-  hkStocks: StockAsset[]
-  vietnamStocks: StockAsset[]
-}): AlignedHistoryData | null => {
+  stockAssets: Map<string, StockAsset>
+}): MarketIndicatorItem[] => {
   const macroBySymbol = new Map(macroIndicators.map((indicator) => [indicator.symbol, indicator]))
-  const macroSeries = STOCK_KPI_SYMBOLS.map((symbol, index): AlignedHistorySeries | null => {
-    const indicator = macroBySymbol.get(symbol)
-    if (!indicator || indicator.history.length === 0) return null
-    return {
-      key: `macro:${indicator.symbol}`,
-      label: indicator.name,
-      color: getStockSeriesColor(indicator.symbol, index),
-      unit: toAlignedUnit(indicator.unit),
-      data: indicator.history.map((point) => ({ time: point.timestamp, value: point.value })),
-      info: buildIndicatorInfo(indicator),
+  return STOCK_INDICATORS.flatMap((config, index): MarketIndicatorItem[] => {
+    const color = getStockSeriesColor(config.key, index)
+    if (config.kind === "macro") {
+      const indicator = macroBySymbol.get(config.symbol)
+      if (!indicator || indicator.history.length === 0) return []
+      const info = buildIndicatorInfo(indicator)
+      return [{
+        key: config.key,
+        order: index + 1,
+        label: config.label ?? indicator.name,
+        color,
+        unit: toAlignedUnit(indicator.unit),
+        value: Number.isFinite(indicator.value) ? indicator.value : null,
+        changePercent: Number.isFinite(indicator.changePercent) ? indicator.changePercent : null,
+        timestamp: indicator.lastUpdate,
+        source: info?.source ?? `${indicator.source}${indicator.frequency ? ` · ${indicator.frequency}` : ""}`,
+        description: config.description ?? info?.description ?? indicator.description ?? "Equity macro factor.",
+        data: indicator.history.map((point) => ({ time: point.timestamp, value: point.value })),
+      }]
     }
-  }).filter((series): series is AlignedHistorySeries => series !== null)
 
-  const stockGroups: AlignedHistoryGroup[] = [
-    {
-      key: "stock-macro",
-      label: "Equity macro factors",
-      series: macroSeries,
-    },
-    {
-      key: "us-stocks",
-      label: "US stocks",
-      series: usStocks
-        .map((asset, index) => stockSparklineToSeries(asset, range, getStockSeriesColor(asset.symbol, index)))
-        .filter((series): series is AlignedHistorySeries => series !== null),
-    },
-    {
-      key: "hk-stocks",
-      label: "HK stocks",
-      series: hkStocks
-        .map((asset, index) => stockSparklineToSeries(asset, range, getStockSeriesColor(asset.symbol, index)))
-        .filter((series): series is AlignedHistorySeries => series !== null),
-    },
-    {
-      key: "vietnam-stocks",
-      label: "Vietnam-themed",
-      series: vietnamStocks
-        .map((asset, index) => stockSparklineToSeries(asset, range, getStockSeriesColor(asset.symbol, index)))
-        .filter((series): series is AlignedHistorySeries => series !== null),
-    },
-  ].filter((group) => group.series.length > 0)
+    const asset = stockAssets.get(config.symbol)
+    if (!asset) return []
+    const data = stockSparklineToData(asset, range)
+    if (data.length === 0) return []
+    return [{
+      key: config.key,
+      order: index + 1,
+      label: config.label ? `${config.symbol} · ${config.label}` : `${asset.symbol} · ${asset.name}`,
+      color,
+      unit: "usd",
+      value: Number.isFinite(asset.price) ? asset.price : null,
+      changePercent: Number.isFinite(asset.changePercentToday) ? asset.changePercentToday : null,
+      timestamp: asset.lastUpdate,
+      source: config.source ?? "Yahoo Finance",
+      description:
+        config.description ??
+        "意义：股票/ETF 历史价格用于观察趋势、相对强弱和风险偏好。\n影响方向：价格上行代表该资产资金偏好改善；下行代表该资产承压。",
+      data,
+    }]
+  }).map((item, index) => ({ ...item, order: index + 1 }))
+}
 
-  return stockGroups.length > 0 ? { groups: stockGroups } : null
+const buildStockHistoryData = (items: MarketIndicatorItem[]): AlignedHistoryData | null => {
+  if (items.length === 0) return null
+  const series: AlignedHistorySeries[] = items.map((item) => ({
+    key: item.key,
+    order: item.order,
+    label: item.label,
+    color: item.color,
+    unit: item.unit,
+    data: item.data,
+    info: {
+      title: `#${String(item.order).padStart(2, "0")} ${item.label}`,
+      description: item.description,
+      source: item.source,
+    },
+  }))
+
+  return { groups: [{ key: "stock", series }] }
 }
 
 export interface StockDashboardProps {
@@ -277,6 +196,7 @@ export function StockDashboard({
   )
   const [macroIndicators, setMacroIndicators] = useState<MacroIndicator[]>(initialMacroIndicators ?? [])
   const [range, setRange] = useState<TimeRangeId>(STOCK_DEFAULT_RANGE)
+  const [selectedIndicatorKey, setSelectedIndicatorKey] = useState<string | null>(null)
   const t = useT()
 
   useEffect(() => {
@@ -284,16 +204,19 @@ export function StockDashboard({
     const rangeOption = getTimeRange(range)
 
     async function loadStockData() {
+      const usSymbols = getEnabledStockSymbols("us")
+      const hkSymbols = getEnabledStockSymbols("hk")
+      const vietnamSymbols = getEnabledStockSymbols("vietnam")
       const [usData, hkData, vietnamData] = await Promise.all([
-        fetchStockData(STOCK_CATEGORIES.us.stocks.map((stock) => stock.symbol), {
+        fetchStockData(usSymbols, {
           sparkRange: rangeOption.yahooRange,
           sparkInterval: rangeOption.yahooInterval,
         }),
-        fetchStockData(STOCK_CATEGORIES.hk.stocks.map((stock) => stock.symbol), {
+        fetchStockData(hkSymbols, {
           sparkRange: rangeOption.yahooRange,
           sparkInterval: rangeOption.yahooInterval,
         }),
-        fetchStockData(STOCK_CATEGORIES.vietnam.stocks.map((stock) => stock.symbol), {
+        fetchStockData(vietnamSymbols, {
           sparkRange: rangeOption.yahooRange,
           sparkInterval: rangeOption.yahooInterval,
         }),
@@ -325,7 +248,7 @@ export function StockDashboard({
     }
 
     loadStockData()
-    const stockInterval = setInterval(loadStockData, STOCK_REFRESH_MS)
+    const stockInterval = setInterval(loadStockData, STOCK_DATA_REFRESH_MS)
     return () => clearInterval(stockInterval)
   }, [range])
 
@@ -345,7 +268,7 @@ export function StockDashboard({
     }
 
     loadMacro()
-    const interval = setInterval(loadMacro, MACRO_REFRESH_MS)
+    const interval = setInterval(loadMacro, STOCK_MACRO_DATA_REFRESH_MS)
     return () => {
       isActive = false
       controller.abort()
@@ -353,47 +276,17 @@ export function StockDashboard({
     }
   }, [range])
 
-  const kpiTiles: KpiTile[] = useMemo(() => {
-    const map = new Map(macroIndicators.map((indicator) => [indicator.symbol, indicator]))
-    return STOCK_KPI_SYMBOLS.map((symbol): KpiTile | null => {
-      const indicator = map.get(symbol)
-      if (!indicator) return null
-      return {
-        id: indicator.symbol,
-        label: indicator.name,
-        value: formatSeriesValue(indicator.value, indicator.unit as SeriesChartUnit, true),
-        delta: formatPercentDelta(indicator.changePercent),
-        deltaTone: getDeltaTone(indicator.change),
-        helper: indicator.symbol,
-        sparkline: indicator.history.slice(-KPI_SPARK_POINTS).map((point) => point.value),
-        info: buildIndicatorInfo(indicator),
-      }
-    }).filter((tile): tile is KpiTile => tile !== null)
-  }, [macroIndicators])
-
-  const usStockArray = useMemo(
-    () => sortStockAssets(Array.from(usStockAssets.values()), US_STOCK_DISPLAY_PRIORITY),
-    [usStockAssets],
+  const stockAssets = useMemo(
+    () => new Map([...usStockAssets, ...hkStockAssets, ...vietnamStockAssets]),
+    [usStockAssets, hkStockAssets, vietnamStockAssets],
   )
-  const hkStockArray = useMemo(
-    () => sortStockAssets(Array.from(hkStockAssets.values()), HK_STOCK_DISPLAY_PRIORITY),
-    [hkStockAssets],
+  const stockItems = useMemo(
+    () => buildStockIndicatorItems({ range, macroIndicators, stockAssets }),
+    [range, macroIndicators, stockAssets],
   )
-  const vietnamStockArray = useMemo(
-    () => sortStockAssets(Array.from(vietnamStockAssets.values()), VIETNAM_STOCK_DISPLAY_PRIORITY),
-    [vietnamStockAssets],
-  )
-  const crashLeaderboard = calculateCrashLeaderboard([...usStockArray, ...hkStockArray, ...vietnamStockArray])
   const stockHistoryData = useMemo(
-    () =>
-      buildStockHistoryData({
-        range,
-        macroIndicators,
-        usStocks: usStockArray,
-        hkStocks: hkStockArray,
-        vietnamStocks: vietnamStockArray,
-      }),
-    [range, macroIndicators, usStockArray, hkStockArray, vietnamStockArray],
+    () => buildStockHistoryData(stockItems),
+    [stockItems],
   )
 
   return (
@@ -413,32 +306,34 @@ export function StockDashboard({
         </TabsList>
         <TabsContent value="realtime" className="mt-3 space-y-3">
           <CrashAlertBanner crashes={crashes} />
-          <KpiStrip tiles={kpiTiles} />
-          <CrashLeaderboard stocks={crashLeaderboard} />
-          <StockGrid
-            title={t("stock.tab.us")}
-            description={t("stock.us.desc")}
-            stocks={usStockArray}
-            isLoading={isLoading}
-            loadingLabel={t("stock.loading")}
-            emptyLabel={t("stock.empty")}
-          />
-          <StockGrid
-            title={t("stock.tab.hk")}
-            description={t("stock.hk.desc")}
-            stocks={hkStockArray}
-            isLoading={isLoading}
-            loadingLabel={t("stock.loading")}
-            emptyLabel={t("stock.empty")}
-          />
-          <StockGrid
-            title={t("stock.tab.vietnam")}
-            description={t("stock.vietnam.desc")}
-            stocks={vietnamStockArray}
-            isLoading={isLoading}
-            loadingLabel={t("stock.loading")}
-            emptyLabel={t("stock.empty")}
-          />
+          {selectedIndicatorKey && stockItems.length > 0 ? (
+            <MarketIndicatorDetail
+              items={stockItems}
+              selectedKey={selectedIndicatorKey}
+              backLabel={t("stock.detail.back")}
+              subtitle={t("stock.detail.subtitle")}
+              searchPlaceholder={t("stock.detail.search")}
+              emptyMessage={t("stock.detail.empty")}
+              addCompareLabel={t("stock.detail.addCompare")}
+              chartTitle={t("stock.detail.chartTitle")}
+              chartInfo={t("stock.detail.chartInfo")}
+              chartInfoSource="Yahoo Finance · FRED · aligned timeline"
+              loadingLabel={t("stock.loading")}
+              noDataLabel={t("chart.noData")}
+              seriesCountLabel={t("compare.seriesCount")}
+              onBack={() => setSelectedIndicatorKey(null)}
+            />
+          ) : (
+            <MarketIndicatorCards
+              items={stockItems}
+              loading={isLoading}
+              error={null}
+              loadingLabel={t("stock.loading")}
+              noDataLabel={t("stock.empty")}
+              onSelectItem={setSelectedIndicatorKey}
+              dataPrefix="stock"
+            />
+          )}
         </TabsContent>
         <TabsContent value="history" className="mt-3">
           <AlignedHistoryCompare
@@ -455,37 +350,5 @@ export function StockDashboard({
         </TabsContent>
       </Tabs>
     </DashboardFrame>
-  )
-}
-
-function StockGrid({
-  title,
-  description,
-  stocks,
-  isLoading,
-  loadingLabel,
-  emptyLabel,
-}: {
-  title: string
-  description: string
-  stocks: StockAsset[]
-  isLoading: boolean
-  loadingLabel: string
-  emptyLabel: string
-}) {
-  return (
-    <div>
-      <h2 className="mb-0.5 text-base font-semibold">{title}</h2>
-      <p className="mb-2 text-[11px] text-muted-foreground">{description}</p>
-      {stocks.length === 0 ? (
-        <p className="text-xs text-muted-foreground">{isLoading ? loadingLabel : emptyLabel}</p>
-      ) : (
-        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {stocks.map((asset) => (
-            <StockPriceCard key={asset.symbol} asset={asset} />
-          ))}
-        </div>
-      )}
-    </div>
   )
 }

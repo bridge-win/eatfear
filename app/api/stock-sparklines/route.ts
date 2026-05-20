@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
 
+import { fetchYahooSeries } from "@/lib/data-sources/yahoo"
+import { getTimeRange } from "@/lib/time-range"
+
 // Bulk sparkline endpoint — Yahoo /v8/finance/spark accepts comma-separated
 // symbols and returns close arrays. One request per chunk of ~50 symbols
 // replaces a per-symbol fan-out.
@@ -13,6 +16,18 @@ interface YahooSparkResult {
     timestamp?: number[]
     indicators?: { quote?: Array<{ close?: Array<number | null> }> }
   }>
+}
+
+async function fetchChartFallback(symbols: string[], range: string, interval: string): Promise<Record<string, number[]>> {
+  const rangeOption = getTimeRange(range)
+  const rows = await Promise.all(
+    symbols.map(async (symbol) => {
+      const result = await fetchYahooSeries(symbol, rangeOption, interval, revalidate)
+      const values = result?.history.map((point) => point.value).filter((value) => Number.isFinite(value)) ?? []
+      return values.length > 0 ? ([symbol, values] as const) : null
+    }),
+  )
+  return Object.fromEntries(rows.filter((row): row is readonly [string, number[]] => row !== null))
 }
 
 export async function GET(request: Request) {
@@ -45,6 +60,10 @@ export async function GET(request: Request) {
     })
 
     if (!response.ok) {
+      const fallback = await fetchChartFallback(symbols, range, interval)
+      if (Object.keys(fallback).length > 0) {
+        return NextResponse.json({ series: fallback, fallback: "Yahoo chart" }, { headers: { "Cache-Control": CACHE_HEADER } })
+      }
       return NextResponse.json({ error: "Sparkline data unavailable" }, { status: response.status === 404 ? 404 : 502 })
     }
 
@@ -57,6 +76,13 @@ export async function GET(request: Request) {
       const closes = entry?.response?.[0]?.indicators?.quote?.[0]?.close ?? []
       const points = closes.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
       if (points.length > 0) series[sym] = points
+    }
+
+    if (Object.keys(series).length === 0) {
+      const fallback = await fetchChartFallback(symbols, range, interval)
+      if (Object.keys(fallback).length > 0) {
+        return NextResponse.json({ series: fallback, fallback: "Yahoo chart" }, { headers: { "Cache-Control": CACHE_HEADER } })
+      }
     }
 
     return NextResponse.json({ series }, { headers: { "Cache-Control": CACHE_HEADER } })

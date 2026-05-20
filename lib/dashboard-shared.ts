@@ -9,6 +9,7 @@ export interface MacroApiResponse {
   updatedAt: number
   range: TimeRangeId
   interval: string
+  refreshMs?: number
   fredEnabled?: boolean
   indicators: MacroIndicator[]
   requested?: number

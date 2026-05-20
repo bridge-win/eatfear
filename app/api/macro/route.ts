@@ -2,7 +2,12 @@ import { NextResponse } from "next/server"
 
 import { fetchFredSeries } from "@/lib/data-sources/fred"
 import { fetchYahooSeries } from "@/lib/data-sources/yahoo"
-import { MACRO_INDICATORS, type MacroIndicatorMeta } from "@/lib/macro-metadata"
+import {
+  DEFAULT_MACRO_INDICATOR_REFRESH_MS,
+  getConfiguredMacroIndicatorMetas,
+  type ConfiguredMacroIndicatorMeta,
+} from "@/lib/macro-indicator-config"
+import type { MacroIndicatorMeta } from "@/lib/macro-metadata"
 import { DEFAULT_TIME_RANGE, getTimeRange, type TimeRangeOption } from "@/lib/time-range"
 import type { MacroIndicator, MacroSeriesPoint } from "@/lib/types"
 
@@ -22,7 +27,8 @@ const applyTransformToHistory = (history: MacroSeriesPoint[], meta: MacroIndicat
   return history.map((point) => ({ ...point, value: meta.transform!(point.value) }))
 }
 
-const getIndicatorSortRank = (indicator: MacroIndicator) => indicator.macroRank ?? 100 + (indicator.priority ?? 999)
+const getIndicatorSortRank = (indicator: MacroIndicator) =>
+  indicator.displayOrder ?? indicator.macroRank ?? 100 + (indicator.priority ?? 999)
 
 async function fetchByMeta(meta: MacroIndicatorMeta, range: TimeRangeOption): Promise<FetchOutcome | null> {
   const symbol = meta.providerSymbol ?? meta.symbol
@@ -40,7 +46,7 @@ async function fetchByMeta(meta: MacroIndicatorMeta, range: TimeRangeOption): Pr
 }
 
 async function buildIndicator(
-  meta: MacroIndicatorMeta,
+  meta: ConfiguredMacroIndicatorMeta,
   range: TimeRangeOption,
 ): Promise<MacroIndicator | null> {
   const outcome = await fetchByMeta(meta, range)
@@ -74,6 +80,9 @@ async function buildIndicator(
     description: meta.description,
     audience: meta.audience,
     priority: meta.priority,
+    displayOrder: meta.displayOrder,
+    refreshMs: meta.refreshMs,
+    color: meta.color,
     macroRank: meta.macroRank,
     macroCategory: meta.macroCategory,
     meaning: meta.meaning,
@@ -87,8 +96,9 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const rangeParam = url.searchParams.get("range") ?? DEFAULT_TIME_RANGE
   const range = getTimeRange(rangeParam)
+  const configuredIndicators = getConfiguredMacroIndicatorMetas()
 
-  const results = await Promise.allSettled(MACRO_INDICATORS.map((meta) => buildIndicator(meta, range)))
+  const results = await Promise.allSettled(configuredIndicators.map((meta) => buildIndicator(meta, range)))
 
   const indicators: MacroIndicator[] = []
   for (const result of results) {
@@ -102,15 +112,20 @@ export async function GET(request: Request) {
     if (rankDelta !== 0) return rankDelta
     return (a.priority ?? 999) - (b.priority ?? 999)
   })
+  const refreshMs =
+    indicators.length === 0
+      ? DEFAULT_MACRO_INDICATOR_REFRESH_MS
+      : Math.max(30_000, Math.min(...indicators.map((indicator) => indicator.refreshMs ?? DEFAULT_MACRO_INDICATOR_REFRESH_MS)))
 
   return NextResponse.json(
     {
       updatedAt: Date.now(),
       range: range.id,
       interval: range.yahooInterval,
+      refreshMs,
       fredEnabled: Boolean(process.env.FRED_API_KEY ?? process.env.NEXT_PUBLIC_FRED_API_KEY),
       indicators,
-      requested: MACRO_INDICATORS.length,
+      requested: configuredIndicators.length,
       returned: indicators.length,
     },
     { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },

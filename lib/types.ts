@@ -98,6 +98,12 @@ export interface MacroIndicator {
   audience?: string[]
   /** Lower number = more important. Used for sorting on the Macro dashboard. */
   priority?: number
+  /** Lower number = visible display order after dashboard config is applied. */
+  displayOrder?: number
+  /** Polling interval requested by the dashboard config. */
+  refreshMs?: number
+  /** Optional dashboard color override. */
+  color?: string
   /** Plain-language investor rank bucket, if this indicator maps to the macro priority playbook. */
   macroRank?: number
   /** Plain-language investor category, e.g. "1 利率 / 央行政策". */

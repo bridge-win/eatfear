@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import {
   AlignedHistoryCompare,
@@ -11,6 +11,7 @@ import {
 } from "@/components/aligned-history-compare"
 import { useT } from "@/lib/i18n"
 import { type TimeRangeId } from "@/lib/time-range"
+import { DEFAULT_CRYPTO_HISTORY_REFRESH_MS } from "@/lib/crypto-indicator-config"
 
 export interface CryptoHistorySeries {
   key: string
@@ -29,6 +30,7 @@ export interface CryptoHistoryPayload {
   ccy: string
   timeline: number[]
   series: CryptoHistorySeries[]
+  refreshMs: number
   paneCount: number
   updatedAt: number
 }
@@ -54,6 +56,7 @@ export function useCryptoHistoryPayload(
   const [payload, setPayload] = useState<CryptoHistoryPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const refreshMsRef = useRef(DEFAULT_CRYPTO_HISTORY_REFRESH_MS)
   const ccy = instId.split("-")[0] ?? "BTC"
 
   useEffect(() => {
@@ -62,22 +65,31 @@ export function useCryptoHistoryPayload(
       return
     }
     let active = true
+    let timer: ReturnType<typeof setTimeout> | null = null
     setLoading(true)
-    fetch(`/api/crypto/history-compare?ccy=${encodeURIComponent(ccy)}&range=${range}`)
-      .then((response) => response.json())
-      .then((json) => {
+
+    async function load() {
+      try {
+        const response = await fetch(`/api/crypto/history-compare?ccy=${encodeURIComponent(ccy)}&range=${range}`)
+        if (!response.ok) throw new Error(`history-compare ${response.status}`)
+        const json = (await response.json()) as CryptoHistoryPayload
         if (!active) return
-        setPayload(json as CryptoHistoryPayload)
+        refreshMsRef.current = json.refreshMs || DEFAULT_CRYPTO_HISTORY_REFRESH_MS
+        setPayload(json)
         setError(null)
-      })
-      .catch((requestError) => {
+      } catch (requestError) {
         if (active) setError(requestError instanceof Error ? requestError.message : "load failed")
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
+      } finally {
+        if (!active) return
+        setLoading(false)
+        timer = setTimeout(load, refreshMsRef.current)
+      }
+    }
+
+    load()
     return () => {
       active = false
+      if (timer) clearTimeout(timer)
     }
   }, [ccy, enabled, range])
 
