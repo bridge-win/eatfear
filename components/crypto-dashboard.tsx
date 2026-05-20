@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react"
 
+import { BlackSwanOpportunityCard } from "@/components/black-swan-opportunity-card"
 import { CryptoHistoryCompare, useCryptoHistoryPayload } from "@/components/crypto-history-compare"
 import { CryptoIndicatorDetail } from "@/components/crypto-indicator-detail"
 import { CryptoRealtimeCards } from "@/components/crypto-realtime-cards"
+import { CryptoRegimeScoreCard } from "@/components/crypto-regime-score-card"
 import { DashboardFrame } from "@/components/page-frame"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -81,6 +83,11 @@ export function CryptoDashboard({
           <TimeRangeSelector value={range} onChange={setRange} />
         </div>
       </header>
+
+      <div className="flex flex-wrap items-stretch gap-2">
+        <BlackSwanOpportunityCard className="flex-1 min-w-[12rem]" />
+        <CryptoRegimeScoreCard className="flex-1 min-w-[12rem]" />
+      </div>
 
       <Tabs defaultValue="history" className="w-full">
         <TabsList className="grid h-auto w-full max-w-xs grid-cols-2">
