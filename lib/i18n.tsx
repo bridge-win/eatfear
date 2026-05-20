@@ -114,6 +114,22 @@ const DICT: Dict = {
   "fng.band.greed": { zh: "贪婪", en: "Greed" },
   "fng.band.extremeGreed": { zh: "极度贪婪", en: "Extreme Greed" },
 
+  // Black Swan opportunity card
+  "blackSwan.label": { zh: "黑天鹅机会", en: "Black Swan Opportunity" },
+  "blackSwan.aria.loading": { zh: "黑天鹅机会指数载入中", en: "Black-swan opportunity loading" },
+  "blackSwan.aria.value": { zh: "黑天鹅机会指数 {value}", en: "Black-swan opportunity {value}" },
+  "blackSwan.aria.idle": { zh: "黑天鹅机会指数", en: "Black-swan opportunity" },
+  "blackSwan.hover.aria": {
+    zh: "悬停查看：当前激活信号、分项权重与近期插针事件",
+    en: "Hover for active signals, factor weights, and recent wick events",
+  },
+  "blackSwan.hover.loading": { zh: "载入中…", en: "Loading…" },
+  "blackSwan.hover.refreshHint": { zh: "约 60 秒自动刷新", en: "Auto-refresh every 60s" },
+  "blackSwan.hover.activeTitle": { zh: "当前触发信号", en: "Active signals" },
+  "blackSwan.hover.factorsTitle": { zh: "分项实时值与权重", en: "Live factor values & weights" },
+  "blackSwan.hover.wicksTitle": { zh: "近期下影线事件 + 24h 反弹", en: "Recent lower-wick events · 24h rebound" },
+  "blackSwan.hover.modelTitle": { zh: "评分模型说明", en: "Scoring model notes" },
+
   // KPI labels
   "kpi.btc": { zh: "BTC 现货", en: "BTC Spot" },
   "kpi.eth": { zh: "ETH 现货", en: "ETH Spot" },
