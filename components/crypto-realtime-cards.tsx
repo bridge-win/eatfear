@@ -2,8 +2,9 @@
 
 import { RefreshCw } from "lucide-react"
 
+import { getCryptoIndicatorDescription } from "@/components/crypto-indicator-info"
 import type { CryptoHistoryPayload, CryptoHistorySeries } from "@/components/crypto-history-compare"
-import { InfoTooltip } from "@/components/info-tooltip"
+import { InfoPopover } from "@/components/info-popover"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -11,6 +12,7 @@ interface CryptoRealtimeCardsProps {
   payload: CryptoHistoryPayload | null
   loading: boolean
   error: string | null
+  onSelectSeries?: (key: string) => void
   className?: string
 }
 
@@ -80,7 +82,13 @@ function formatPct(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`
 }
 
-export function CryptoRealtimeCards({ payload, loading, error, className }: CryptoRealtimeCardsProps) {
+export function CryptoRealtimeCards({
+  payload,
+  loading,
+  error,
+  onSelectSeries,
+  className,
+}: CryptoRealtimeCardsProps) {
   const t = useT()
 
   if (error) {
@@ -127,14 +135,27 @@ export function CryptoRealtimeCards({ payload, loading, error, className }: Cryp
             : summary.pct >= 0
               ? "text-emerald-600 dark:text-emerald-400"
               : "text-red-600 dark:text-red-400"
-        const infoDescription = t(series.infoI18nKey)
+        const fullInfoDescription = getCryptoIndicatorDescription({ payload, series, t })
         return (
           <article
             key={series.key}
             data-crypto-realtime-card
             data-series-key={series.key}
             data-series-order={series.order}
-            className="min-w-0 rounded-md border bg-card/80 px-2.5 py-2 shadow-sm"
+            role={onSelectSeries ? "button" : undefined}
+            tabIndex={onSelectSeries ? 0 : undefined}
+            onClick={() => onSelectSeries?.(series.key)}
+            onKeyDown={(event) => {
+              if (!onSelectSeries) return
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault()
+                onSelectSeries(series.key)
+              }
+            }}
+            className={cn(
+              "min-w-0 rounded-md border bg-card/80 px-2.5 py-2 shadow-sm",
+              onSelectSeries && "cursor-pointer transition-colors hover:border-foreground/30 hover:bg-muted/30",
+            )}
           >
             <header className="flex min-w-0 items-start justify-between gap-1.5">
               <div className="min-w-0">
@@ -148,15 +169,16 @@ export function CryptoRealtimeCards({ payload, loading, error, className }: Cryp
                   </h3>
                 </div>
               </div>
-              <InfoTooltip
-                title={`#${String(series.order).padStart(2, "0")} ${label}`}
-                description={
-                  infoDescription === series.infoI18nKey ? t("compare.info.default", { label }) : infoDescription
-                }
-                source={series.source}
-                className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                iconClassName="h-3 w-3"
-              />
+              <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                <InfoPopover
+                  title={`#${String(series.order).padStart(2, "0")} ${label}`}
+                  description={fullInfoDescription}
+                  source={series.source}
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                  iconClassName="h-3 w-3"
+                  contentClassName="w-[30rem]"
+                />
+              </span>
             </header>
 
             <div className="mt-2 flex items-end justify-between gap-1.5">

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
 
+import { fetchYahooSeries } from "@/lib/data-sources/yahoo"
+import { getTimeRange } from "@/lib/time-range"
+
 // Bulk Yahoo /v7/finance/quote — one HTTP round-trip for many symbols.
 export const revalidate = 30
 
@@ -24,6 +27,31 @@ interface StockQuoteRow {
   changePercentToday: number
   volume: number
   lastUpdate: number
+}
+
+async function fetchChartFallback(symbols: string[]): Promise<StockQuoteRow[]> {
+  const range = getTimeRange("5d")
+  const rows = await Promise.all(
+    symbols.map(async (symbol) => {
+      const result = await fetchYahooSeries(symbol, range, undefined, revalidate)
+      const latest = result?.history.at(-1)
+      if (!result || !latest) return null
+      const price = result.currentValue ?? latest.value
+      const previousValue = result.previousValue ?? result.history.at(-2)?.value ?? price
+      const changeToday = price - previousValue
+      const changePercentToday = previousValue === 0 ? 0 : (changeToday / previousValue) * 100
+      return {
+        symbol,
+        name: symbol,
+        price,
+        changeToday,
+        changePercentToday,
+        volume: 0,
+        lastUpdate: result.lastUpdate,
+      }
+    }),
+  )
+  return rows.filter((row): row is StockQuoteRow => row !== null)
 }
 
 export async function GET(request: Request) {
@@ -54,6 +82,13 @@ export async function GET(request: Request) {
     })
 
     if (!response.ok) {
+      const fallback = await fetchChartFallback(symbols)
+      if (fallback.length > 0) {
+        return NextResponse.json(
+          { quotes: fallback, lastUpdate: Date.now(), fallback: "Yahoo chart" },
+          { headers: { "Cache-Control": CACHE_HEADER } },
+        )
+      }
       return NextResponse.json({ error: "Stock data unavailable" }, { status: response.status === 404 ? 404 : 502 })
     }
 
@@ -77,6 +112,16 @@ export async function GET(request: Request) {
         lastUpdate: now,
       }
     })
+
+    if (quotes.length === 0) {
+      const fallback = await fetchChartFallback(symbols)
+      if (fallback.length > 0) {
+        return NextResponse.json(
+          { quotes: fallback, lastUpdate: now, fallback: "Yahoo chart" },
+          { headers: { "Cache-Control": CACHE_HEADER } },
+        )
+      }
+    }
 
     return NextResponse.json(
       { quotes, lastUpdate: now },

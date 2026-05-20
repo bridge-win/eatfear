@@ -61,7 +61,7 @@ export function SymbolSelector({
           className={cn("h-8 min-w-[180px] justify-between gap-2 text-xs font-medium", className)}
         >
           <span className="truncate">
-            {current ? current.label : value}
+            {current ? current.label : value || placeholder}
           </span>
           <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
         </Button>

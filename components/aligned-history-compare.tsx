@@ -102,6 +102,7 @@ export interface AlignedHistoryCompareProps {
   loadingLabel: string
   noDataLabel: string
   seriesCountLabel: string
+  maxSeriesPerPane?: number
   className?: string
 }
 
@@ -254,16 +255,16 @@ function getTimeline(data: AlignedHistoryData): number[] {
   return Array.from(timeline).sort((a, b) => a - b)
 }
 
-function getGroups(data: AlignedHistoryData): SeriesGroup[] {
+function getGroups(data: AlignedHistoryData, maxSeriesPerPane: number): SeriesGroup[] {
   const groups: SeriesGroup[] = []
   for (const group of data.groups) {
     const specs = group.series.filter((series) =>
       series.data.some((point) => point.value !== null && Number.isFinite(point.value)),
     )
-    for (let index = 0; index < specs.length; index += MAX_SERIES_PER_PANE) {
-      const chunk = specs.slice(index, index + MAX_SERIES_PER_PANE)
+    for (let index = 0; index < specs.length; index += maxSeriesPerPane) {
+      const chunk = specs.slice(index, index + maxSeriesPerPane)
       groups.push({
-        key: `${group.key}-${index / MAX_SERIES_PER_PANE}`,
+        key: `${group.key}-${index / maxSeriesPerPane}`,
         label: group.label,
         paneIndex: groups.length,
         specs: chunk,
@@ -294,6 +295,7 @@ export function AlignedHistoryCompare({
   loadingLabel,
   noDataLabel,
   seriesCountLabel,
+  maxSeriesPerPane = MAX_SERIES_PER_PANE,
   className,
 }: AlignedHistoryCompareProps) {
   const cardRef = useRef<HTMLDivElement | null>(null)
@@ -303,7 +305,7 @@ export function AlignedHistoryCompare({
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [hoverState, setHoverState] = useState<HoverState | null>(null)
   const [cardWidth, setCardWidth] = useState(0)
-  const groups = useMemo(() => (data ? getGroups(data) : []), [data])
+  const groups = useMemo(() => (data ? getGroups(data, maxSeriesPerPane) : []), [data, maxSeriesPerPane])
   const timeline = useMemo(() => (data ? getTimeline(data) : []), [data])
   const isCompact = cardWidth > 0 && cardWidth < COMPACT_WIDTH
   const seriesCount = useMemo(() => groups.reduce((count, group) => count + group.specs.length, 0), [groups])
