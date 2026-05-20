@@ -6,6 +6,8 @@ import {
   type BlackSwanMetrics,
 } from "@/lib/black-swan-detector"
 import { fetchFearGreedHistory } from "@/lib/data-sources/alternative"
+import { fetchBlockchainInfoSeries } from "@/lib/data-sources/blockchain-info-charts"
+import { fetchBtcHashrateSeries } from "@/lib/data-sources/mempool-hashrate"
 import { fetchYahooSeries } from "@/lib/data-sources/yahoo"
 import { getTimeRange } from "@/lib/time-range"
 
@@ -72,6 +74,8 @@ export async function GET() {
     oiRows,
     fgr,
     vix,
+    hashrateSeries,
+    minerRevRaw,
   ] = await Promise.all([
     okxPublic<string[]>(`/api/v5/market/candles?instId=${BTC_INST}&bar=1D&limit=300`),
     okxPublic<OkxFundingPoint>(`/api/v5/public/funding-rate-history?instId=${BTC_INST}&limit=200`),
@@ -79,6 +83,8 @@ export async function GET() {
     okxPublic<string[]>(`/api/v5/rubik/stat/contracts/open-interest-volume?ccy=BTC&period=1H&limit=200`),
     fetchFearGreedHistory(range, 1800),
     fetchYahooSeries("^VIX", range, "1d", 600),
+    fetchBtcHashrateSeries(600),
+    fetchBlockchainInfoSeries("miners-revenue", "2years", 1800),
   ])
 
   const candles = normalizeDailyCandles(dailyCandles)
@@ -107,6 +113,8 @@ export async function GET() {
   const vixRecent = vixHistoryAll.slice(-20)
   const vixValue = vix?.currentValue ?? (vixRecent.length > 0 ? vixRecent[vixRecent.length - 1] : null)
 
+  const minerRevenueSeries = minerRevRaw.map((p) => p.value)
+
   const metrics: BlackSwanMetrics = {
     candles,
     fearGreedValue: Number.isFinite(fearGreedValue ?? NaN) ? (fearGreedValue as number) : null,
@@ -116,6 +124,8 @@ export async function GET() {
     oiUsdSeries,
     vixValue: Number.isFinite(vixValue ?? NaN) ? (vixValue as number) : null,
     vixRecent,
+    hashrateSeries: hashrateSeries ?? undefined,
+    minerRevenueSeries: minerRevenueSeries.length > 0 ? minerRevenueSeries : undefined,
   }
 
   const scored = computeBlackSwanOpportunity(metrics)
@@ -148,15 +158,20 @@ export async function GET() {
       funding: fundingHistory.length > 0 ? "OKX funding-rate-history" : "OKX funding unavailable",
       openInterest: oiUsdSeries.length > 0 ? "OKX Rubik OI-USD (1H)" : "OKX OI unavailable",
       vix: vix ? "Yahoo Finance ^VIX (daily)" : "VIX unavailable",
+      hashrate: hashrateSeries ? `mempool.space hashrate · ${hashrateSeries.length} daily bars` : "mempool hashrate unavailable",
+      minerRevenue: minerRevenueSeries.length > 0 ? `blockchain.info miners-revenue · ${minerRevenueSeries.length} bars` : "miner revenue unavailable",
     },
     weights: {
-      wickCapitulation: "25%",
-      fearExtreme: "20%",
-      leverageFlush: "15%",
-      drawdownMagnitude: "15%",
-      meanReversion: "10%",
+      wickCapitulation: "20%",
+      fearExtreme: "18%",
+      leverageFlush: "13%",
+      drawdownMagnitude: "12%",
+      meanReversion: "8%",
       macroRiskOff: "10%",
       volumeClimax: "5%",
+      hashRibbon: "7%",
+      mayerMultiple: "4%",
+      puellMultiple: "3%",
     },
   })
 }
