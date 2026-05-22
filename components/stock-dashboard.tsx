@@ -235,17 +235,24 @@ export function StockDashboard({
     let isActive = true
     const crashDetector = new CrashDetector()
     const rangeOption = getTimeRange(range)
+    setUsStockAssets(new Map())
+    setHkStockAssets(new Map())
+    setVietnamStockAssets(new Map())
+    setCrashes([])
+    setIsLoading(true)
 
     function applyStockData({
       usData,
       hkData,
       vietnamData,
       merge,
+      finishLoading,
     }: {
       usData: Map<string, StockAsset>
       hkData: Map<string, StockAsset>
       vietnamData: Map<string, StockAsset>
       merge: boolean
+      finishLoading: boolean
     }) {
       if (merge) {
         setUsStockAssets((current) => mergeStockAssetMaps(current, usData))
@@ -256,7 +263,7 @@ export function StockDashboard({
         setHkStockAssets(hkData)
         setVietnamStockAssets(vietnamData)
       }
-      setIsLoading(false)
+      if (finishLoading) setIsLoading(false)
 
       const allStockData = new Map([...usData, ...hkData, ...vietnamData])
       allStockData.forEach((stock) => {
@@ -304,12 +311,12 @@ export function StockDashboard({
       ])
 
       if (!isActive) return
-      applyStockData({ usData, hkData, vietnamData, merge: staged })
+      applyStockData({ usData, hkData, vietnamData, merge: staged, finishLoading: !staged })
     }
 
     async function loadStagedStockData() {
-      setIsLoading(true)
       await loadStockData(true)
+      if (!isActive) return
       await loadStockData(false)
     }
 
@@ -326,6 +333,7 @@ export function StockDashboard({
   useEffect(() => {
     let isActive = true
     const controller = new AbortController()
+    setMacroIndicators([])
 
     async function fetchMacro(symbols?: string[]): Promise<MacroApiResponse> {
       const response = await fetch(buildMacroApiUrl(range, symbols), { signal: controller.signal })
@@ -344,6 +352,7 @@ export function StockDashboard({
 
     async function loadStagedMacro() {
       await loadMacro(STOCK_PRIORITY_MACRO_SYMBOLS)
+      if (!isActive) return
       await loadMacro()
     }
 

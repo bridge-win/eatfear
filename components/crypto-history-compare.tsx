@@ -98,10 +98,10 @@ export function useCryptoHistoryPayload(
       setError(null)
     }
 
-    async function load() {
-      let hasRenderedPayload = false
+    async function load(staged: boolean) {
+      let hasRenderedPayload = Boolean(payloadRef.current)
       try {
-        if (initialLimit > 0) {
+        if (staged && initialLimit > 0) {
           const priorityJson = await fetchPayload(initialLimit)
           if (!active) return
           applyPayload(priorityJson)
@@ -128,11 +128,13 @@ export function useCryptoHistoryPayload(
       } finally {
         if (!active) return
         setLoading(false)
-        timer = setTimeout(load, refreshMsRef.current)
+        timer = setTimeout(() => {
+          void load(false)
+        }, refreshMsRef.current)
       }
     }
 
-    void load()
+    void load(true)
     return () => {
       active = false
       controller.abort()

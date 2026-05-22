@@ -154,6 +154,10 @@ export function MacroDashboard({
     let isActive = true
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout> | null = null
+    indicatorsRef.current = []
+    setIndicators([])
+    setUpdatedAt(null)
+    setMeta(null)
     setIsLoading(true)
     setError(null)
 
@@ -175,14 +179,16 @@ export function MacroDashboard({
       setError(null)
     }
 
-    async function loadMacroData() {
-      let hasRenderedPayload = false
+    async function loadMacroData(staged: boolean) {
+      let hasRenderedPayload = indicatorsRef.current.length > 0
       try {
-        const priorityPayload = await fetchMacroData(MACRO_INITIAL_HISTORY_LIMIT)
-        if (!isActive) return
-        applyMacroData(priorityPayload)
-        hasRenderedPayload = true
-        setIsLoading(false)
+        if (staged) {
+          const priorityPayload = await fetchMacroData(MACRO_INITIAL_HISTORY_LIMIT)
+          if (!isActive) return
+          applyMacroData(priorityPayload)
+          hasRenderedPayload = true
+          setIsLoading(false)
+        }
       } catch (requestError) {
         if (!isActive || (requestError as Error).name === "AbortError") return
       }
@@ -200,11 +206,13 @@ export function MacroDashboard({
       } finally {
         if (!isActive) return
         setIsLoading(false)
-        timer = setTimeout(loadMacroData, refreshMsRef.current)
+        timer = setTimeout(() => {
+          void loadMacroData(false)
+        }, refreshMsRef.current)
       }
     }
 
-    void loadMacroData()
+    void loadMacroData(true)
 
     return () => {
       isActive = false

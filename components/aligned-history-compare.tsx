@@ -351,10 +351,9 @@ export function AlignedHistoryCompare({
         : null
 
     const panes: PaneChart[] = []
-    groups.forEach((group, groupIndex) => {
+    groups.forEach((group) => {
       const containerEl = grid.querySelector<HTMLDivElement>(`[data-pane="${group.paneIndex}"]`)
       if (!containerEl) return
-      const showsSharedXAxis = groupIndex === groups.length - 1
       const chart = createChart(containerEl, {
         autoSize: true,
         layout: {
@@ -372,7 +371,7 @@ export function AlignedHistoryCompare({
           minimumWidth: isCompact ? 52 : 84,
         },
         timeScale: {
-          visible: showsSharedXAxis,
+          visible: true,
           borderVisible: false,
           timeVisible,
           secondsVisible: false,
@@ -619,7 +618,7 @@ export function AlignedHistoryCompare({
           <p className="py-12 text-center text-xs text-muted-foreground">{noDataLabel}</p>
         ) : (
           <div ref={gridRef} className="relative flex flex-col gap-px sm:gap-0.5">
-            {groups.map((group, groupIndex) => (
+            {groups.map((group) => (
               <section
                 key={group.paneIndex}
                 data-history-group={group.key}
@@ -693,10 +692,7 @@ export function AlignedHistoryCompare({
                 </div>
                 <div
                   data-pane={group.paneIndex}
-                  className={cn(
-                    "w-full",
-                    groupIndex === groups.length - 1 ? "h-[56px] sm:h-[78px]" : "h-[46px] sm:h-[68px]",
-                  )}
+                  className="h-[56px] w-full sm:h-[78px]"
                 />
               </section>
             ))}
