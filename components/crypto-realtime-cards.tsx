@@ -6,6 +6,7 @@ import { getCryptoIndicatorDescription } from "@/components/crypto-indicator-inf
 import type { CryptoHistoryPayload, CryptoHistorySeries } from "@/components/crypto-history-compare"
 import { InfoPopover } from "@/components/info-popover"
 import { useT } from "@/lib/i18n"
+import { withRelevanceScore } from "@/lib/indicator-score"
 import { cn } from "@/lib/utils"
 
 interface CryptoRealtimeCardsProps {
@@ -127,7 +128,7 @@ export function CryptoRealtimeCards({
       className={cn("grid gap-1.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6", className)}
     >
       {payload.series.map((series) => {
-        const label = t(series.i18nKey)
+        const label = withRelevanceScore(t(series.i18nKey), series.relevanceScore)
         const summary = summarize(series)
         const pctTone =
           !summary

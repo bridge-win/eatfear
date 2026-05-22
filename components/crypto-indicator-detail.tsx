@@ -14,6 +14,7 @@ import { InfoPopover } from "@/components/info-popover"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
 import { Button } from "@/components/ui/button"
 import { useT } from "@/lib/i18n"
+import { withRelevanceScore } from "@/lib/indicator-score"
 
 interface CryptoIndicatorDetailProps {
   payload: CryptoHistoryPayload
@@ -60,14 +61,18 @@ export function CryptoIndicatorDetail({ payload, selectedKey, onBack }: CryptoIn
     .filter((series) => !selectedKeys.includes(series.key))
     .map((series) => ({
       id: series.key,
-      label: `#${String(series.order).padStart(2, "0")} ${t(series.i18nKey)}`,
+      label: `#${String(series.order).padStart(2, "0")} ${withRelevanceScore(t(series.i18nKey), series.relevanceScore)}`,
       hint: series.source,
     }))
 
   const data: AlignedHistoryData | null = useMemo(() => {
     if (selectedSeries.length === 0) return null
     const chartSeries = selectedSeries.map((series) => {
-      return toAlignedSeries(series, t(series.i18nKey), getCryptoIndicatorDescription({ payload, series, t }))
+      return toAlignedSeries(
+        series,
+        withRelevanceScore(t(series.i18nKey), series.relevanceScore),
+        getCryptoIndicatorDescription({ payload, series, t }),
+      )
     })
 
     return {
@@ -78,7 +83,7 @@ export function CryptoIndicatorDetail({ payload, selectedKey, onBack }: CryptoIn
 
   if (!primary) return null
 
-  const primaryLabel = t(primary.i18nKey)
+  const primaryLabel = withRelevanceScore(t(primary.i18nKey), primary.relevanceScore)
   const primaryInfo = getCryptoIndicatorDescription({ payload, series: primary, t })
 
   return (
@@ -137,7 +142,7 @@ export function CryptoIndicatorDetail({ payload, selectedKey, onBack }: CryptoIn
 
       <div className="flex flex-wrap gap-1">
         {selectedSeries.map((series, index) => {
-          const label = t(series.i18nKey)
+          const label = withRelevanceScore(t(series.i18nKey), series.relevanceScore)
           return (
             <span
               key={series.key}

@@ -21,16 +21,57 @@ export interface MacroIndicatorDisplayConfig {
   sourceNote?: string
   /** Optional chart/card color override. */
   color?: string
+  /** 0-100 relevance score from macro priority + market-practitioner usage. */
+  relevanceScore?: number
 }
 
 export interface ConfiguredMacroIndicatorMeta extends MacroIndicatorMeta {
   displayOrder: number
   refreshMs: number
   color?: string
+  relevanceScore: number
 }
 
 export const DEFAULT_MACRO_INDICATOR_REFRESH_MS = 300_000
 export const FAST_MACRO_INDICATOR_REFRESH_MS = 60_000
+
+const MACRO_RELEVANCE_SCORES: Record<string, number> = {
+  "FRED:DFF": 100,
+  "FRED:DGS10": 98,
+  "FRED:DGS2": 93,
+  "FRED:CPIAUCSL": 94,
+  "FRED:CPILFESL": 93,
+  "FRED:PCEPI": 92,
+  "FRED:PCEPILFE": 91,
+  "FRED:PPIACO": 88,
+  "FRED:M2SL": 90,
+  "FRED:M1SL": 84,
+  "FRED:M2REAL": 86,
+  "FRED:M2V": 82,
+  "FRED:MYAGM2CNM189N": 80,
+  "FRED:MYAGM1CNM189N": 78,
+  "FRED:TOTLL": 85,
+  "FRED:IPMAN": 83,
+  "FRED:GDPC1": 82,
+  "FRED:GDP": 79,
+  "FRED:UNRATE": 86,
+  "FRED:PAYEMS": 85,
+  "FRED:ICSA": 84,
+  "DX-Y.NYB": 87,
+  "CNY=X": 82,
+  "USDCNH=X": 82,
+  "FRED:MORTGAGE30US": 76,
+  "FRED:HSN1F": 74,
+  "FRED:RSAFS": 77,
+  "FRED:INDPRO": 76,
+  "FRED:GPDI": 73,
+  "FRED:CP": 72,
+  "^FTW5000": 81,
+  "FRED:DDDM01USA156NWDB": 75,
+  "FRED:DDDM01CNA156NWDB": 73,
+  "FRED:DDDM02USA156NWDB": 70,
+  "FRED:DDDM02CNA156NWDB": 68,
+}
 
 // Edit this file to control Macro indicator visibility, order, refresh cadence,
 // and copy. Unlisted symbols remain enabled and keep their metadata priority.
@@ -83,6 +124,12 @@ function getDefaultRefreshMs(meta: MacroIndicatorMeta): number {
   return meta.frequency === "Realtime" ? FAST_MACRO_INDICATOR_REFRESH_MS : DEFAULT_MACRO_INDICATOR_REFRESH_MS
 }
 
+function getDefaultRelevanceScore(meta: MacroIndicatorMeta): number {
+  const rankScore = meta.macroRank === undefined ? 58 : 103 - meta.macroRank * 3
+  const priorityScore = 100 - Math.min(70, Math.floor(meta.priority))
+  return Math.max(30, Math.min(100, Math.round(rankScore * 0.7 + priorityScore * 0.3)))
+}
+
 export function getConfiguredMacroIndicatorMetas(): ConfiguredMacroIndicatorMeta[] {
   return MACRO_INDICATORS.flatMap((meta) => {
     const config = CONFIG_BY_SYMBOL.get(meta.symbol)
@@ -98,6 +145,7 @@ export function getConfiguredMacroIndicatorMetas(): ConfiguredMacroIndicatorMeta
         displayOrder: config?.order ?? getDefaultDisplayOrder(meta),
         refreshMs: config?.refreshMs ?? getDefaultRefreshMs(meta),
         color: config?.color,
+        relevanceScore: config?.relevanceScore ?? MACRO_RELEVANCE_SCORES[meta.symbol] ?? getDefaultRelevanceScore(meta),
       },
     ]
   }).sort((a, b) => {

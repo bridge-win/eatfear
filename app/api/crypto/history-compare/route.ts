@@ -80,6 +80,50 @@ function rollingReturnZScore(points: RawPoint[], windowSize: number): RawPoint[]
   })
 }
 
+function rollingReturnPct(points: RawPoint[], lookbackDays: number): RawPoint[] {
+  const sorted = dropOutOfRange(points).sort((a, b) => a.timestamp - b.timestamp)
+  return sorted.map((point, index) => {
+    const previous = sorted[index - lookbackDays]
+    if (!previous || previous.value === 0) return { timestamp: point.timestamp, value: 0 }
+    return { timestamp: point.timestamp, value: (point.value / previous.value - 1) * 100 }
+  })
+}
+
+function dailyChangePct(points: RawPoint[]): RawPoint[] {
+  const sorted = dropOutOfRange(points).sort((a, b) => a.timestamp - b.timestamp)
+  return sorted.map((point, index) => {
+    const previous = sorted[index - 1]
+    if (!previous || previous.value === 0) return { timestamp: point.timestamp, value: 0 }
+    return { timestamp: point.timestamp, value: (point.value / previous.value - 1) * 100 }
+  })
+}
+
+function rollingRealizedVolatilityPct(points: RawPoint[], windowSize: number): RawPoint[] {
+  const sorted = dropOutOfRange(points).sort((a, b) => a.timestamp - b.timestamp)
+  const returns = sorted.map((point, index) => {
+    const previous = sorted[index - 1]
+    if (!previous || previous.value === 0) return { timestamp: point.timestamp, value: 0 }
+    return { timestamp: point.timestamp, value: Math.log(point.value / previous.value) }
+  })
+
+  return returns.map((point, index) => {
+    const sample = returns.slice(Math.max(0, index - windowSize + 1), index + 1).map((row) => row.value)
+    const mean = sample.reduce((sum, value) => sum + value, 0) / sample.length
+    const variance = sample.reduce((sum, value) => sum + (value - mean) ** 2, 0) / sample.length
+    return { timestamp: point.timestamp, value: Math.sqrt(variance) * Math.sqrt(365) * 100 }
+  })
+}
+
+function drawdownPct(points: RawPoint[]): RawPoint[] {
+  const sorted = dropOutOfRange(points).sort((a, b) => a.timestamp - b.timestamp)
+  let peak = 0
+  return sorted.map((point) => {
+    peak = Math.max(peak, point.value)
+    if (peak === 0) return { timestamp: point.timestamp, value: 0 }
+    return { timestamp: point.timestamp, value: (point.value / peak - 1) * 100 }
+  })
+}
+
 function rollingValueZScore(points: RawPoint[], windowSize: number): RawPoint[] {
   const sorted = dropOutOfRange(points).sort((a, b) => a.timestamp - b.timestamp)
   if (sorted.length === 0) return []
@@ -201,6 +245,7 @@ interface SeriesSpec {
   source: string
   unit: CryptoIndicatorUnit
   refreshMs: number
+  relevanceScore?: number
   data: { time: number; value: number | null }[]
 }
 
@@ -618,6 +663,12 @@ export async function GET(request: Request) {
   const btcUpperWick = toRawPoints(btcSwapCandles, "upperWickPct")
   const btcLowerWick = toRawPoints(btcSwapCandles, "lowerWickPct")
   const btcReturnZ = rollingReturnZScore(btcPrice, 30)
+  const btcMomentum7d = rollingReturnPct(btcPrice, 7)
+  const btcMomentum30d = rollingReturnPct(btcPrice, 30)
+  const btcMomentum90d = rollingReturnPct(btcPrice, 90)
+  const btcRealizedVol30d = rollingRealizedVolatilityPct(btcPrice, 30)
+  const btcDrawdown = drawdownPct(btcPrice)
+  const oiChangePct = dailyChangePct(oi)
   const oiReturnZ = rollingReturnZScore(oi, 30)
   const basis = buildBasis(btcSwapCandles, btcSpotCandles)
   const signalScores = buildDailySignalScores({
@@ -629,6 +680,11 @@ export async function GET(request: Request) {
 
   const rawSeriesByKey = new Map<string, RawPoint[]>([
     ["btcPrice", btcPrice],
+    ["btcMomentum7d", btcMomentum7d],
+    ["btcMomentum30d", btcMomentum30d],
+    ["btcMomentum90d", btcMomentum90d],
+    ["btcRealizedVol30d", btcRealizedVol30d],
+    ["btcDrawdown", btcDrawdown],
     ["miningElectricityCost", miningElectricityCost],
     ["miningComprehensiveCost", miningComprehensiveCost],
     ["ethPrice", ethPrice],
@@ -649,6 +705,7 @@ export async function GET(request: Request) {
     ["stablecoinMcap", stablecoin],
     ["defiTvl", defiTvl],
     ["oi", oi],
+    ["oiChangePct", oiChangePct],
     ["oiReturnZ", oiReturnZ],
     ["funding", funding],
     ["ls", lsRatio],
@@ -703,6 +760,7 @@ export async function GET(request: Request) {
         source: config.source,
         unit: config.unit,
         refreshMs: config.refreshMs,
+        relevanceScore: config.relevanceScore,
         data: timeline.map((t, i) => ({ time: t, value: aligned[i] })),
       }]
     })

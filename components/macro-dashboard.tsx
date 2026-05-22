@@ -18,6 +18,7 @@ import { TimeRangeSelector } from "@/components/time-range-selector"
 import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-shared"
 import { DEFAULT_MACRO_INDICATOR_REFRESH_MS } from "@/lib/macro-indicator-config"
 import { useT } from "@/lib/i18n"
+import { withRelevanceScore } from "@/lib/indicator-score"
 import { type TimeRangeId } from "@/lib/time-range"
 import type { MacroIndicator } from "@/lib/types"
 
@@ -81,10 +82,11 @@ const buildMacroItems = (indicators: MacroIndicator[]): MarketIndicatorItem[] =>
     if (data.length === 0) return []
 
     const info = buildIndicatorInfo(indicator)
+    const label = withRelevanceScore(indicator.name, indicator.relevanceScore)
     return [{
       key: indicator.symbol,
       order: index + 1,
-      label: indicator.name,
+      label,
       color: getMacroSeriesColor(indicator, index),
       unit: toAlignedUnit(indicator.unit),
       value: Number.isFinite(indicator.value) ? indicator.value : null,

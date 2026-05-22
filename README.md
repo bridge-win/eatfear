@@ -19,7 +19,26 @@ A comprehensive platform for monitoring cryptocurrency and stock market crashes 
 
 ### 1. Deploy to Vercel
 
-Click the "Publish" button in v0 to deploy your app to Vercel.
+Production deploys are automated through GitHub Actions. Every push to `main`
+runs `.github/workflows/vercel-production.yml`, builds the app with the Vercel
+CLI, and publishes the prebuilt output to the linked Vercel production project.
+
+Add these repository secrets in GitHub **Settings → Secrets and variables →
+Actions**:
+
+```bash
+VERCEL_TOKEN=your_vercel_access_token
+VERCEL_ORG_ID=your_vercel_org_id
+VERCEL_PROJECT_ID=your_vercel_project_id
+```
+
+The local `.vercel/project.json` file contains `orgId` and `projectId` after
+running `vercel link`, but the `.vercel` directory must stay uncommitted. Keep
+runtime/build variables such as `FRED_API_KEY`, `RESEND_API_KEY`, and Supabase
+keys in Vercel Project Settings, not in GitHub.
+
+If the Vercel Git integration is also enabled for this repository, disable one
+of the two deployment paths to avoid duplicate production builds.
 
 ### 2. Setup Environment Variables
 

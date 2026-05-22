@@ -17,6 +17,7 @@ import { TimeRangeSelector } from "@/components/time-range-selector"
 import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-shared"
 import { CrashDetector } from "@/lib/crash-detector"
 import { useT } from "@/lib/i18n"
+import { withRelevanceScore } from "@/lib/indicator-score"
 import {
   DEFAULT_STOCK_MACRO_REFRESH_MS,
   DEFAULT_STOCK_REFRESH_MS,
@@ -112,10 +113,12 @@ const buildStockIndicatorItems = ({
       const indicator = macroBySymbol.get(config.symbol)
       if (!indicator || indicator.history.length === 0) return []
       const info = buildIndicatorInfo(indicator)
+      const relevanceScore = config.relevanceScore ?? indicator.relevanceScore
+      const label = withRelevanceScore(config.label ?? indicator.name, relevanceScore)
       return [{
         key: config.key,
         order: index + 1,
-        label: config.label ?? indicator.name,
+        label,
         color,
         unit: toAlignedUnit(indicator.unit),
         value: Number.isFinite(indicator.value) ? indicator.value : null,
@@ -131,10 +134,11 @@ const buildStockIndicatorItems = ({
     if (!asset) return []
     const data = stockSparklineToData(asset, range)
     if (data.length === 0) return []
+    const labelBase = config.label ? `${config.symbol} · ${config.label}` : `${asset.symbol} · ${asset.name}`
     return [{
       key: config.key,
       order: index + 1,
-      label: config.label ? `${config.symbol} · ${config.label}` : `${asset.symbol} · ${asset.name}`,
+      label: withRelevanceScore(labelBase, config.relevanceScore),
       color,
       unit: "usd",
       value: Number.isFinite(asset.price) ? asset.price : null,

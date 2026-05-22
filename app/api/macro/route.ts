@@ -83,6 +83,7 @@ async function buildIndicator(
     displayOrder: meta.displayOrder,
     refreshMs: meta.refreshMs,
     color: meta.color,
+    relevanceScore: meta.relevanceScore,
     macroRank: meta.macroRank,
     macroCategory: meta.macroCategory,
     meaning: meta.meaning,
