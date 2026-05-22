@@ -23,12 +23,15 @@ import {
   DEFAULT_STOCK_REFRESH_MS,
   getEnabledStockIndicators,
   getEnabledStockSymbols,
+  type StockIndicatorConfig,
+  type StockIndicatorGroup,
 } from "@/lib/stock-indicator-config"
 import { fetchStockData } from "@/lib/stock-service"
 import { getRangeDays, getTimeRange, type TimeRangeId } from "@/lib/time-range"
 import type { CrashAlert, MacroIndicator, StockAsset } from "@/lib/types"
 
 const STOCK_DEFAULT_RANGE: TimeRangeId = "1y"
+const STOCK_INITIAL_HISTORY_LIMIT = 12
 
 const STOCK_HISTORY_COLORS = [
   "#2563eb",
@@ -60,6 +63,31 @@ const STOCK_MACRO_DATA_REFRESH_MS = Math.max(
     DEFAULT_STOCK_MACRO_REFRESH_MS,
   ),
 )
+const STOCK_PRIORITY_INDICATORS = STOCK_INDICATORS.slice(0, STOCK_INITIAL_HISTORY_LIMIT)
+const STOCK_PRIORITY_MACRO_SYMBOLS = STOCK_PRIORITY_INDICATORS
+  .filter((entry) => entry.kind === "macro")
+  .map((entry) => entry.symbol)
+
+const getStockSymbolsForGroup = (
+  indicators: StockIndicatorConfig[],
+  group: Exclude<StockIndicatorGroup, "macro">,
+): string[] =>
+  indicators
+    .filter((entry) => entry.kind === "stock" && entry.group === group)
+    .map((entry) => entry.symbol)
+
+function mergeStockAssetMaps(
+  current: Map<string, StockAsset>,
+  next: Map<string, StockAsset>,
+): Map<string, StockAsset> {
+  return new Map([...current, ...next])
+}
+
+function buildMacroApiUrl(range: TimeRangeId, symbols?: string[]): string {
+  const params = new URLSearchParams({ range })
+  if (symbols && symbols.length > 0) params.set("symbols", symbols.join(","))
+  return `/api/macro?${params.toString()}`
+}
 
 const getStockSeriesColor = (symbol: string, index: number) => {
   const seed = [...symbol].reduce((sum, char) => sum + char.charCodeAt(0), index)
@@ -204,31 +232,30 @@ export function StockDashboard({
   const t = useT()
 
   useEffect(() => {
+    let isActive = true
     const crashDetector = new CrashDetector()
     const rangeOption = getTimeRange(range)
 
-    async function loadStockData() {
-      const usSymbols = getEnabledStockSymbols("us")
-      const hkSymbols = getEnabledStockSymbols("hk")
-      const vietnamSymbols = getEnabledStockSymbols("vietnam")
-      const [usData, hkData, vietnamData] = await Promise.all([
-        fetchStockData(usSymbols, {
-          sparkRange: rangeOption.yahooRange,
-          sparkInterval: rangeOption.yahooInterval,
-        }),
-        fetchStockData(hkSymbols, {
-          sparkRange: rangeOption.yahooRange,
-          sparkInterval: rangeOption.yahooInterval,
-        }),
-        fetchStockData(vietnamSymbols, {
-          sparkRange: rangeOption.yahooRange,
-          sparkInterval: rangeOption.yahooInterval,
-        }),
-      ])
-
-      setUsStockAssets(usData)
-      setHkStockAssets(hkData)
-      setVietnamStockAssets(vietnamData)
+    function applyStockData({
+      usData,
+      hkData,
+      vietnamData,
+      merge,
+    }: {
+      usData: Map<string, StockAsset>
+      hkData: Map<string, StockAsset>
+      vietnamData: Map<string, StockAsset>
+      merge: boolean
+    }) {
+      if (merge) {
+        setUsStockAssets((current) => mergeStockAssetMaps(current, usData))
+        setHkStockAssets((current) => mergeStockAssetMaps(current, hkData))
+        setVietnamStockAssets((current) => mergeStockAssetMaps(current, vietnamData))
+      } else {
+        setUsStockAssets(usData)
+        setHkStockAssets(hkData)
+        setVietnamStockAssets(vietnamData)
+      }
       setIsLoading(false)
 
       const allStockData = new Map([...usData, ...hkData, ...vietnamData])
@@ -251,28 +278,79 @@ export function StockDashboard({
       })
     }
 
-    loadStockData()
-    const stockInterval = setInterval(loadStockData, STOCK_DATA_REFRESH_MS)
-    return () => clearInterval(stockInterval)
+    async function loadStockData(staged: boolean) {
+      const usSymbols = staged
+        ? getStockSymbolsForGroup(STOCK_PRIORITY_INDICATORS, "us")
+        : getEnabledStockSymbols("us")
+      const hkSymbols = staged
+        ? getStockSymbolsForGroup(STOCK_PRIORITY_INDICATORS, "hk")
+        : getEnabledStockSymbols("hk")
+      const vietnamSymbols = staged
+        ? getStockSymbolsForGroup(STOCK_PRIORITY_INDICATORS, "vietnam")
+        : getEnabledStockSymbols("vietnam")
+      const [usData, hkData, vietnamData] = await Promise.all([
+        fetchStockData(usSymbols, {
+          sparkRange: rangeOption.yahooRange,
+          sparkInterval: rangeOption.yahooInterval,
+        }),
+        fetchStockData(hkSymbols, {
+          sparkRange: rangeOption.yahooRange,
+          sparkInterval: rangeOption.yahooInterval,
+        }),
+        fetchStockData(vietnamSymbols, {
+          sparkRange: rangeOption.yahooRange,
+          sparkInterval: rangeOption.yahooInterval,
+        }),
+      ])
+
+      if (!isActive) return
+      applyStockData({ usData, hkData, vietnamData, merge: staged })
+    }
+
+    async function loadStagedStockData() {
+      setIsLoading(true)
+      await loadStockData(true)
+      await loadStockData(false)
+    }
+
+    void loadStagedStockData()
+    const stockInterval = setInterval(() => {
+      void loadStockData(false)
+    }, STOCK_DATA_REFRESH_MS)
+    return () => {
+      isActive = false
+      clearInterval(stockInterval)
+    }
   }, [range])
 
   useEffect(() => {
     let isActive = true
     const controller = new AbortController()
 
-    async function loadMacro() {
+    async function fetchMacro(symbols?: string[]): Promise<MacroApiResponse> {
+      const response = await fetch(buildMacroApiUrl(range, symbols), { signal: controller.signal })
+      if (!response.ok) throw new Error(`Macro API returned ${response.status}`)
+      return (await response.json()) as MacroApiResponse
+    }
+
+    async function loadMacro(symbols?: string[]) {
       try {
-        const response = await fetch(`/api/macro?range=${range}`, { signal: controller.signal })
-        if (!response.ok) return
-        const payload = (await response.json()) as MacroApiResponse
+        const payload = await fetchMacro(symbols)
         if (isActive) setMacroIndicators(payload.indicators ?? [])
       } catch {
         // ignore — KPI strip is optional
       }
     }
 
-    loadMacro()
-    const interval = setInterval(loadMacro, STOCK_MACRO_DATA_REFRESH_MS)
+    async function loadStagedMacro() {
+      await loadMacro(STOCK_PRIORITY_MACRO_SYMBOLS)
+      await loadMacro()
+    }
+
+    void loadStagedMacro()
+    const interval = setInterval(() => {
+      void loadMacro()
+    }, STOCK_MACRO_DATA_REFRESH_MS)
     return () => {
       isActive = false
       controller.abort()

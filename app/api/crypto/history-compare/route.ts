@@ -639,6 +639,66 @@ async function blockchainSeries(chart: string, timespan: string): Promise<RawPoi
   return rows.map((p) => ({ timestamp: p.timestamp, value: p.value }))
 }
 
+const BTC_PRICE_KEYS = [
+  "btcPrice",
+  "btcMomentum7d",
+  "btcMomentum30d",
+  "btcMomentum90d",
+  "btcRealizedVol30d",
+  "btcDrawdown",
+  "btcReturnZ",
+] as const
+
+const BTC_SWAP_CANDLE_KEYS = [
+  ...BTC_PRICE_KEYS,
+  "btcVolumeUsd",
+  "btcVolumeZ",
+  "upperWick",
+  "lowerWick",
+  "basis",
+  "signalBuyScore",
+  "signalSellScore",
+  "signalRiskScore",
+  "signalDirection",
+] as const
+
+const OI_KEYS = [
+  "oi",
+  "oiChangePct",
+  "oiReturnZ",
+  "signalBuyScore",
+  "signalSellScore",
+  "signalRiskScore",
+  "signalDirection",
+] as const
+const FUNDING_KEYS = [
+  "funding",
+  "signalBuyScore",
+  "signalSellScore",
+  "signalRiskScore",
+  "signalDirection",
+] as const
+const LONG_SHORT_KEYS = [
+  "ls",
+  "signalBuyScore",
+  "signalSellScore",
+  "signalRiskScore",
+  "signalDirection",
+] as const
+const MINING_COST_KEYS = ["miningElectricityCost", "miningComprehensiveCost"] as const
+const TOP_TRADER_KEYS = ["topTraderAccount", "topTraderPosition"] as const
+const SMART_MONEY_KEYS = ["smartBuy", "smartSell", "smartNet", "smartCum"] as const
+
+function getPositiveInteger(value: string | null): number | null {
+  if (!value) return null
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function hasRequestedKey(requestedKeys: Set<string>, keys: readonly string[]): boolean {
+  return keys.some((key) => requestedKeys.has(key))
+}
+
 /* ----------------------------- handler ----------------------------- */
 
 export async function GET(request: Request) {
@@ -657,8 +717,14 @@ export async function GET(request: Request) {
 
   const now = Date.now()
   let timeline = buildTimeline(days, now)
+  const indicatorLimit = getPositiveInteger(url.searchParams.get("limit"))
+  const configuredIndicators = getEnabledCryptoIndicators()
+  const requestedIndicators =
+    indicatorLimit === null ? configuredIndicators : configuredIndicators.slice(0, indicatorLimit)
+  const requestedKeys = new Set(requestedIndicators.map((indicator) => indicator.key))
 
-  /* Fetch every series in parallel — the slowest leg sets total latency. */
+  /* Staged clients request the top ordered slice first; skip lower-priority
+     upstream calls until the background full-history request asks for them. */
   const [
     btcPriceA, // blockchain.info (longer history)
     btcSwapCandles, // OKX daily swap candles (fallback / derivatives metrics)
@@ -701,54 +767,68 @@ export async function GET(request: Request) {
     nikkei,
     hangseng,
   ] = await Promise.all([
-    fetchBtcUsdDailyFromBlockchain(blockchainSpan, revalidate).then((r) =>
-      (r?.points ?? []).map((p) => ({ timestamp: p.timestamp, value: p.close })),
-    ),
-    okxDailyCandles(instId, okxDays),
-    okxDailyCandles(`${ccy}-USDT`, okxDays),
-    okxDailyKlines("ETH-USDT", okxDays),
-    okxDailyKlines("SOL-USDT", okxDays),
-    okxDailyKlines("XRP-USDT", okxDays),
-    okxDailyKlines("BNB-USDT", okxDays),
-    okxDailyKlines("DOGE-USDT", okxDays),
-    okxOiHistory(ccy, okxDays),
-    okxFundingHistory(instId, okxDays),
-    okxLongShort(ccy, okxDays),
-    okxContractLongShort(instId, okxDays),
-    okxTopTraderPosition(instId, okxDays),
-    okxTakerNet(ccy, okxDays),
-    fetchFearGreedHistory(range, revalidate).then((r) =>
-      (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
-    ),
-    fetchStablecoinMarketCap(range, revalidate).then((r) =>
-      (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
-    ),
-    fetchDefiTvl(range, revalidate).then((r) =>
-      (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
-    ),
-    fetchMempoolHashrateHistory(revalidate),
-    blockchainSeries("hash-rate", blockchainSpan),
-    blockchainSeries("difficulty", blockchainSpan),
-    blockchainSeries("n-transactions", blockchainSpan),
-    blockchainSeries("n-unique-addresses", blockchainSpan),
-    blockchainSeries("mempool-size", blockchainSpan),
-    blockchainSeries("transaction-fees-usd", blockchainSpan),
-    blockchainSeries("avg-block-size", blockchainSpan),
-    deribitDvolDaily(days),
-    yahooPoints("DX-Y.NYB", range),
-    yahooPoints("^TNX", range), // US 10Y yield
-    yahooPoints("^IRX", range), // Short rate proxy (13W)
-    yahooPoints("^VIX", range),
-    yahooPoints("^GSPC", range),
-    yahooPoints("^IXIC", range),
-    yahooPoints("^RUT", range),
-    yahooPoints("GC=F", range),
-    yahooPoints("SI=F", range),
-    yahooPoints("HG=F", range),
-    yahooPoints("CL=F", range),
-    yahooPoints("NG=F", range),
-    yahooPoints("^N225", range),
-    yahooPoints("^HSI", range),
+    hasRequestedKey(requestedKeys, BTC_PRICE_KEYS)
+      ? fetchBtcUsdDailyFromBlockchain(blockchainSpan, revalidate).then((r) =>
+          (r?.points ?? []).map((p) => ({ timestamp: p.timestamp, value: p.close })),
+        )
+      : [],
+    hasRequestedKey(requestedKeys, BTC_SWAP_CANDLE_KEYS) ? okxDailyCandles(instId, okxDays) : [],
+    requestedKeys.has("basis") ? okxDailyCandles(`${ccy}-USDT`, okxDays) : [],
+    requestedKeys.has("ethPrice") ? okxDailyKlines("ETH-USDT", okxDays) : [],
+    requestedKeys.has("solPrice") ? okxDailyKlines("SOL-USDT", okxDays) : [],
+    requestedKeys.has("xrpPrice") ? okxDailyKlines("XRP-USDT", okxDays) : [],
+    requestedKeys.has("bnbPrice") ? okxDailyKlines("BNB-USDT", okxDays) : [],
+    requestedKeys.has("dogePrice") ? okxDailyKlines("DOGE-USDT", okxDays) : [],
+    hasRequestedKey(requestedKeys, OI_KEYS) ? okxOiHistory(ccy, okxDays) : [],
+    hasRequestedKey(requestedKeys, FUNDING_KEYS) ? okxFundingHistory(instId, okxDays) : [],
+    hasRequestedKey(requestedKeys, LONG_SHORT_KEYS) ? okxLongShort(ccy, okxDays) : [],
+    requestedKeys.has("contractLs") ? okxContractLongShort(instId, okxDays) : [],
+    hasRequestedKey(requestedKeys, TOP_TRADER_KEYS)
+      ? okxTopTraderPosition(instId, okxDays)
+      : { account: [], position: [] },
+    hasRequestedKey(requestedKeys, SMART_MONEY_KEYS)
+      ? okxTakerNet(ccy, okxDays)
+      : { buy: [], sell: [], net: [], cumulativeNet: [] },
+    requestedKeys.has("fng")
+      ? fetchFearGreedHistory(range, revalidate).then((r) =>
+          (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
+        )
+      : [],
+    requestedKeys.has("stablecoinMcap")
+      ? fetchStablecoinMarketCap(range, revalidate).then((r) =>
+          (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
+        )
+      : [],
+    requestedKeys.has("defiTvl")
+      ? fetchDefiTvl(range, revalidate).then((r) =>
+          (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
+        )
+      : [],
+    hasRequestedKey(requestedKeys, MINING_COST_KEYS) ? fetchMempoolHashrateHistory(revalidate) : [],
+    requestedKeys.has("hashRate") || hasRequestedKey(requestedKeys, MINING_COST_KEYS)
+      ? blockchainSeries("hash-rate", blockchainSpan)
+      : [],
+    requestedKeys.has("difficulty") ? blockchainSeries("difficulty", blockchainSpan) : [],
+    requestedKeys.has("nTxs") ? blockchainSeries("n-transactions", blockchainSpan) : [],
+    requestedKeys.has("activeAddrs") ? blockchainSeries("n-unique-addresses", blockchainSpan) : [],
+    requestedKeys.has("mempool") ? blockchainSeries("mempool-size", blockchainSpan) : [],
+    requestedKeys.has("txFeesUsd") ? blockchainSeries("transaction-fees-usd", blockchainSpan) : [],
+    requestedKeys.has("avgBlockSize") ? blockchainSeries("avg-block-size", blockchainSpan) : [],
+    requestedKeys.has("dvol") ? deribitDvolDaily(days) : [],
+    requestedKeys.has("dxy") ? yahooPoints("DX-Y.NYB", range) : [],
+    requestedKeys.has("us10y") ? yahooPoints("^TNX", range) : [], // US 10Y yield
+    requestedKeys.has("us2y") ? yahooPoints("^IRX", range) : [], // Short rate proxy (13W)
+    requestedKeys.has("vix") ? yahooPoints("^VIX", range) : [],
+    requestedKeys.has("sp500") ? yahooPoints("^GSPC", range) : [],
+    requestedKeys.has("nasdaq") ? yahooPoints("^IXIC", range) : [],
+    requestedKeys.has("russell") ? yahooPoints("^RUT", range) : [],
+    requestedKeys.has("gold") ? yahooPoints("GC=F", range) : [],
+    requestedKeys.has("silver") ? yahooPoints("SI=F", range) : [],
+    requestedKeys.has("copper") ? yahooPoints("HG=F", range) : [],
+    requestedKeys.has("oil") ? yahooPoints("CL=F", range) : [],
+    requestedKeys.has("natgas") ? yahooPoints("NG=F", range) : [],
+    requestedKeys.has("nikkei") ? yahooPoints("^N225", range) : [],
+    requestedKeys.has("hangseng") ? yahooPoints("^HSI", range) : [],
   ])
 
   const btcPriceB = toRawPoints(btcSwapCandles, "close")
@@ -878,8 +958,7 @@ export async function GET(request: Request) {
     ["hangseng", hangseng],
   ])
 
-  const configuredIndicators = getEnabledCryptoIndicators()
-  const series: SeriesSpec[] = configuredIndicators
+  const series: SeriesSpec[] = requestedIndicators
     .flatMap((config, configIndex) => {
       /* Strip out-of-bounds samples up front; alignDaily then maps real source
          observations onto the selected timeline. Keep partial but usable lines

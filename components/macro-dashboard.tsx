@@ -23,6 +23,7 @@ import { type TimeRangeId } from "@/lib/time-range"
 import type { MacroIndicator } from "@/lib/types"
 
 const MACRO_DEFAULT_RANGE: TimeRangeId = "10y"
+const MACRO_INITIAL_HISTORY_LIMIT = 12
 
 const MACRO_SERIES_COLORS = [
   "#2563eb",
@@ -118,6 +119,12 @@ const buildMacroHistoryData = (items: MarketIndicatorItem[]): AlignedHistoryData
   return { groups: [{ key: "macro", series }] }
 }
 
+function buildMacroApiUrl(range: TimeRangeId, limit?: number): string {
+  const params = new URLSearchParams({ range })
+  if (limit !== undefined) params.set("limit", String(limit))
+  return `/api/macro?${params.toString()}`
+}
+
 export interface MacroDashboardProps {
   initialIndicators?: MacroIndicator[]
   initialUpdatedAt?: number | null
@@ -139,6 +146,7 @@ export function MacroDashboard({
   const [range, setRange] = useState<TimeRangeId>(MACRO_DEFAULT_RANGE)
   const [meta, setMeta] = useState<{ requested: number; returned: number } | null>(initialMeta)
   const [selectedIndicatorKey, setSelectedIndicatorKey] = useState<string | null>(null)
+  const indicatorsRef = useRef<MacroIndicator[]>(initialIndicators ?? [])
   const refreshMsRef = useRef(DEFAULT_MACRO_INDICATOR_REFRESH_MS)
   const t = useT()
 
@@ -147,25 +155,47 @@ export function MacroDashboard({
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout> | null = null
     setIsLoading(true)
+    setError(null)
+
+    async function fetchMacroData(limit?: number): Promise<MacroApiResponse> {
+      const response = await fetch(buildMacroApiUrl(range, limit), { signal: controller.signal })
+      if (!response.ok) {
+        throw new Error(`Macro API returned ${response.status}`)
+      }
+      return (await response.json()) as MacroApiResponse
+    }
+
+    function applyMacroData(payload: MacroApiResponse) {
+      indicatorsRef.current = payload.indicators
+      setIndicators(payload.indicators)
+      setUpdatedAt(payload.updatedAt)
+      setFredEnabled(payload.fredEnabled ?? null)
+      setMeta({ requested: payload.requested ?? 0, returned: payload.returned ?? 0 })
+      refreshMsRef.current = payload.refreshMs ?? DEFAULT_MACRO_INDICATOR_REFRESH_MS
+      setError(null)
+    }
 
     async function loadMacroData() {
+      let hasRenderedPayload = false
       try {
-        const response = await fetch(`/api/macro?range=${range}`, { signal: controller.signal })
-        if (!response.ok) {
-          throw new Error(`Macro API returned ${response.status}`)
-        }
-        const payload = (await response.json()) as MacroApiResponse
+        const priorityPayload = await fetchMacroData(MACRO_INITIAL_HISTORY_LIMIT)
         if (!isActive) return
+        applyMacroData(priorityPayload)
+        hasRenderedPayload = true
+        setIsLoading(false)
+      } catch (requestError) {
+        if (!isActive || (requestError as Error).name === "AbortError") return
+      }
 
-        setIndicators(payload.indicators)
-        setUpdatedAt(payload.updatedAt)
-        setFredEnabled(payload.fredEnabled ?? null)
-        setMeta({ requested: payload.requested ?? 0, returned: payload.returned ?? 0 })
-        refreshMsRef.current = payload.refreshMs ?? DEFAULT_MACRO_INDICATOR_REFRESH_MS
-        setError(null)
+      try {
+        const payload = await fetchMacroData()
+        if (!isActive) return
+        applyMacroData(payload)
       } catch (requestError) {
         if (isActive && (requestError as Error).name !== "AbortError") {
-          setError(requestError instanceof Error ? requestError.message : "Failed to load macro data")
+          if (!hasRenderedPayload && indicatorsRef.current.length === 0) {
+            setError(requestError instanceof Error ? requestError.message : "Failed to load macro data")
+          }
         }
       } finally {
         if (!isActive) return
@@ -174,7 +204,7 @@ export function MacroDashboard({
       }
     }
 
-    loadMacroData()
+    void loadMacroData()
 
     return () => {
       isActive = false
