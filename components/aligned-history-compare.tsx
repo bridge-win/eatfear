@@ -92,6 +92,18 @@ interface HoverPaneTooltip {
   items: HoverPaneTooltipItem[]
 }
 
+interface TimeAxisLabel {
+  key: string
+  label: string
+  positionPct: number
+  align: "start" | "center" | "end"
+}
+
+interface VisibleLogicalRange {
+  from: number
+  to: number
+}
+
 export interface AlignedHistoryCompareProps {
   data: AlignedHistoryData | null
   title: string
@@ -110,6 +122,9 @@ const toUtc = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp
 const LWC_VALUE_CAP = 8.9e13
 const COMPACT_WIDTH = 560
 const MAX_SERIES_PER_PANE = 2
+const DAY_MS = 24 * 60 * 60 * 1000
+const DESKTOP_TIME_LABEL_COUNT = 5
+const COMPACT_TIME_LABEL_COUNT = 3
 
 function formatRaw(value: number, unit: AlignedHistoryUnit): string {
   if (!Number.isFinite(value)) return "—"
@@ -282,7 +297,85 @@ function getTimelineRange(timeline: number[]): { from: UTCTimestamp; to: UTCTime
 function shouldShowTime(timeline: number[]): boolean {
   if (timeline.length < 2) return false
   const spanMs = timeline[timeline.length - 1] - timeline[0]
-  return spanMs <= 3 * 24 * 60 * 60 * 1000
+  return spanMs <= 3 * DAY_MS
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0")
+}
+
+function formatTimeAxisLabel(time: number, spanMs: number, includeDateForShortRange: boolean): string {
+  const date = new Date(time)
+  const year = date.getUTCFullYear()
+  const month = pad2(date.getUTCMonth() + 1)
+  const day = pad2(date.getUTCDate())
+  const hour = pad2(date.getUTCHours())
+  const minute = pad2(date.getUTCMinutes())
+  if (spanMs <= DAY_MS) {
+    return includeDateForShortRange ? `${month}-${day} ${hour}:${minute}` : `${hour}:${minute}`
+  }
+  if (spanMs <= 3 * DAY_MS) return `${month}-${day} ${hour}:${minute}`
+  if (spanMs > 8 * 365 * DAY_MS) return String(year)
+  if (spanMs > 370 * DAY_MS) return `${year}-${month}`
+  return `${month}-${day}`
+}
+
+function isSameUtcDate(a: number, b: number): boolean {
+  const left = new Date(a)
+  const right = new Date(b)
+  return (
+    left.getUTCFullYear() === right.getUTCFullYear() &&
+    left.getUTCMonth() === right.getUTCMonth() &&
+    left.getUTCDate() === right.getUTCDate()
+  )
+}
+
+function getTimeAxisLabels(
+  timeline: number[],
+  isCompact: boolean,
+  visibleLogicalRange: VisibleLogicalRange | null,
+): TimeAxisLabel[] {
+  if (timeline.length === 0) return []
+  const labelCount = Math.min(isCompact ? COMPACT_TIME_LABEL_COUNT : DESKTOP_TIME_LABEL_COUNT, timeline.length)
+  const rangeFrom =
+    visibleLogicalRange && Number.isFinite(visibleLogicalRange.from)
+      ? Math.max(0, Math.min(timeline.length - 1, visibleLogicalRange.from))
+      : 0
+  const rangeTo =
+    visibleLogicalRange && Number.isFinite(visibleLogicalRange.to)
+      ? Math.max(rangeFrom, Math.min(timeline.length - 1, visibleLogicalRange.to))
+      : timeline.length - 1
+  const startIndex = Math.max(0, Math.min(timeline.length - 1, Math.floor(rangeFrom)))
+  const endIndex = Math.max(startIndex, Math.min(timeline.length - 1, Math.ceil(rangeTo)))
+  const start = timeline[startIndex]
+  const end = timeline[endIndex]
+  const spanMs = Math.max(end - start, 1)
+  const includeDateForShortRange = spanMs <= DAY_MS && !isSameUtcDate(start, end)
+  const spanLogical = Math.max(rangeTo - rangeFrom, 1)
+  const usedIndices = new Set<number>()
+
+  return Array.from({ length: labelCount })
+    .map((_, index) => {
+      const logical = rangeFrom + (spanLogical * index) / Math.max(labelCount - 1, 1)
+      const dataIndex = Math.max(0, Math.min(timeline.length - 1, Math.round(logical)))
+      const positionPct = ((logical - rangeFrom) / spanLogical) * 100
+      return { dataIndex, positionPct }
+    })
+    .filter(({ dataIndex }) => {
+      if (usedIndices.has(dataIndex)) return false
+      usedIndices.add(dataIndex)
+      return true
+    })
+    .map(({ dataIndex, positionPct }) => {
+      const time = timeline[dataIndex]
+      const align = positionPct < 8 ? "start" : positionPct > 92 ? "end" : "center"
+      return {
+        key: `${time}-${dataIndex}-${Math.round(positionPct * 100)}`,
+        label: formatTimeAxisLabel(time, spanMs, includeDateForShortRange),
+        positionPct,
+        align,
+      }
+    })
 }
 
 export function AlignedHistoryCompare({
@@ -305,6 +398,7 @@ export function AlignedHistoryCompare({
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [hoverState, setHoverState] = useState<HoverState | null>(null)
   const [cardWidth, setCardWidth] = useState(0)
+  const [visibleLogicalRange, setVisibleLogicalRange] = useState<VisibleLogicalRange | null>(null)
   const groups = useMemo(() => (data ? getGroups(data, maxSeriesPerPane) : []), [data, maxSeriesPerPane])
   const timeline = useMemo(() => (data ? getTimeline(data) : []), [data])
   const isCompact = cardWidth > 0 && cardWidth < COMPACT_WIDTH
@@ -350,6 +444,9 @@ export function AlignedHistoryCompare({
       timelineAnchorData.length > 1
         ? ({ from: 0 as Logical, to: (timelineAnchorData.length - 1) as Logical } satisfies LogicalRange)
         : null
+    setVisibleLogicalRange(
+      sharedLogicalRange ? { from: Number(sharedLogicalRange.from), to: Number(sharedLogicalRange.to) } : null,
+    )
 
     const panes: PaneChart[] = []
     groups.forEach((group) => {
@@ -373,8 +470,8 @@ export function AlignedHistoryCompare({
           minimumWidth: isCompact ? 52 : 84,
         },
         timeScale: {
-          visible: true,
-          borderVisible: true,
+          visible: false,
+          borderVisible: false,
           borderColor: axisColor,
           timeVisible,
           secondsVisible: false,
@@ -452,6 +549,7 @@ export function AlignedHistoryCompare({
     let syncing = false
     const syncRange = (sourceIndex: number) => (range: LogicalRange | null) => {
       if (syncing || !range) return
+      setVisibleLogicalRange({ from: Number(range.from), to: Number(range.to) })
       syncing = true
       try {
         for (let index = 0; index < panes.length; index += 1) {
@@ -557,6 +655,10 @@ export function AlignedHistoryCompare({
       0,
     )
   }, [groups, hidden])
+  const timeAxisLabels = useMemo(
+    () => getTimeAxisLabels(timeline, isCompact, visibleLogicalRange),
+    [isCompact, timeline, visibleLogicalRange],
+  )
 
   const hoverPaneTooltips = useMemo<HoverPaneTooltip[]>(() => {
     const grid = gridRef.current
@@ -695,8 +797,31 @@ export function AlignedHistoryCompare({
                 </div>
                 <div
                   data-pane={group.paneIndex}
-                  className="h-[56px] w-full sm:h-[78px]"
+                  className="h-[42px] w-full sm:h-[62px]"
                 />
+                <div
+                  data-history-time-axis
+                  aria-hidden="true"
+                  className="h-3.5 w-full pt-px sm:h-4"
+                  style={{ paddingRight: isCompact ? 52 : 84 }}
+                >
+                  <div className="relative h-full border-t border-slate-500/45 dark:border-slate-400/35">
+                    {timeAxisLabels.map((label) => (
+                      <span
+                        key={label.key}
+                        data-history-time-label
+                        className={cn(
+                          "absolute top-0.5 whitespace-nowrap text-[9px] font-semibold leading-3 text-slate-700 dark:text-slate-200 sm:text-[10px]",
+                          label.align === "center" && "-translate-x-1/2",
+                          label.align === "end" && "-translate-x-full",
+                        )}
+                        style={{ left: `${label.positionPct}%` }}
+                      >
+                        {label.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </section>
             ))}
             {hoverPaneTooltips.map((tooltip) => (
