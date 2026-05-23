@@ -81,6 +81,7 @@ interface HoverPaneTooltipItem {
   order?: number
   label: string
   color: string
+  time: string
   value: string
 }
 
@@ -318,6 +319,16 @@ function formatTimeAxisLabel(time: number, spanMs: number, includeDateForShortRa
   if (spanMs > 8 * 365 * DAY_MS) return String(year)
   if (spanMs > 370 * DAY_MS) return `${year}-${month}`
   return `${month}-${day}`
+}
+
+function formatHoverTime(time: number): string {
+  const date = new Date(time * 1000)
+  const year = date.getUTCFullYear()
+  const month = pad2(date.getUTCMonth() + 1)
+  const day = pad2(date.getUTCDate())
+  const hour = pad2(date.getUTCHours())
+  const minute = pad2(date.getUTCMinutes())
+  return `${year}-${month}-${day} ${hour}:${minute}`
 }
 
 function isSameUtcDate(a: number, b: number): boolean {
@@ -665,8 +676,9 @@ export function AlignedHistoryCompare({
     if (!hoverState || !grid) return []
 
     const gridRect = grid.getBoundingClientRect()
-    const tooltipWidth = isCompact ? 172 : 220
+    const tooltipWidth = Math.min(isCompact ? 260 : 340, Math.max(180, gridRect.width - 8))
     const left = Math.min(Math.max(hoverState.x + 8, 4), Math.max(4, gridRect.width - tooltipWidth - 4))
+    const hoverTime = formatHoverTime(hoverState.time)
 
     return chartsRef.current.flatMap((pane) => {
       const items: HoverPaneTooltipItem[] = pane.specs
@@ -678,6 +690,7 @@ export function AlignedHistoryCompare({
             order: spec.order,
             label: spec.label,
             color: spec.color,
+            time: hoverTime,
             value: value === null ? "—" : formatRaw(value, spec.unit),
           }
         })
@@ -837,12 +850,13 @@ export function AlignedHistoryCompare({
                     <div
                       key={item.key}
                       data-history-hover-item
-                      className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-1"
+                      className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1"
                     >
                       <span className="h-1.5 w-1.5 rounded-full" style={{ background: item.color }} />
                       <span className="truncate font-semibold tabular-nums">
                         {item.order ? `#${String(item.order).padStart(2, "0")} ` : ""}{item.label}:{item.value}
                       </span>
+                      <span className="shrink-0 text-muted-foreground tabular-nums">{item.time}</span>
                     </div>
                   ))}
                 </div>
