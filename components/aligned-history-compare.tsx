@@ -340,7 +340,8 @@ export function AlignedHistoryCompare({
     const grid = gridRef.current
 
     const isDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false
-    const textColor = isDark ? "rgba(229,231,235,0.85)" : "rgba(30,41,59,0.85)"
+    const textColor = isDark ? "rgba(248,250,252,0.96)" : "rgba(15,23,42,0.96)"
+    const axisColor = isDark ? "rgba(203,213,225,0.42)" : "rgba(71,85,105,0.38)"
     const gridColor = isDark ? "rgba(148,163,184,0.10)" : "rgba(148,163,184,0.14)"
     const sharedRange = getTimelineRange(timeline)
     const timeVisible = shouldShowTime(timeline)
@@ -365,14 +366,16 @@ export function AlignedHistoryCompare({
         grid: { vertLines: { visible: false }, horzLines: { color: gridColor } },
         rightPriceScale: {
           visible: true,
-          borderVisible: false,
+          borderVisible: true,
+          borderColor: axisColor,
           scaleMargins: isCompact ? { top: 0.18, bottom: 0.18 } : { top: 0.1, bottom: 0.1 },
           entireTextOnly: true,
           minimumWidth: isCompact ? 52 : 84,
         },
         timeScale: {
           visible: true,
-          borderVisible: false,
+          borderVisible: true,
+          borderColor: axisColor,
           timeVisible,
           secondsVisible: false,
           rightOffset: 0,

@@ -607,8 +607,8 @@ const DICT: Dict = {
   // History Compare (TradingView-style multi-pane)
   "compare.title": { zh: "历史对比 · 多指标统一时间轴", en: "History Compare · Unified time axis" },
   "compare.info": {
-    zh: "按指标类型把 BTC / 加密 / 宏观时间序列聚合到纵向图表中；每个图表都显示同一套 X 时间轴，并用统一的左右时间边界保持对齐。实时卡片里的指标会尽量同步进入历史曲线；公开源覆盖不足时保留可用区间。悬停任一图表，其余图表会同步到同一时间点；点击图例可独立显示 / 隐藏曲线。",
-    en: "Groups BTC / crypto / macro time series by metric type into a vertical chart stack. Every chart shows the same X time axis and uses the same left / right time bounds, so all panes stay aligned. Realtime-card metrics are carried into history whenever the public source has usable data; sparse sources keep their available window. Hover any chart to sync the rest to the same date; click legend items to hide / show lines.",
+    zh: "按指标类型把 BTC / 加密 / 宏观时间序列聚合到纵向图表中；每个图表都显示同一套 X 时间轴，并用统一的左右时间边界保持对齐。OI / 多空等仓位指标只在公开源覆盖当前时间范围时展示，避免只显示局部区间。悬停任一图表，其余图表会同步到同一时间点；点击图例可独立显示 / 隐藏曲线。",
+    en: "Groups BTC / crypto / macro time series by metric type into a vertical chart stack. Every chart shows the same X time axis and uses the same left / right time bounds, so all panes stay aligned. OI and long/short positioning lines are shown only when the public source covers the selected range, avoiding partial-window plots. Hover any chart to sync the rest to the same date; click legend items to hide / show lines.",
   },
   "compare.info.default": {
     zh: "优先级：辅助\n意义：{label} 的最新读数和历史曲线。\n与 BTC：建议用日/周收益率做相关，避免价格水平共趋势造成伪相关。\n影响方向：结合相邻指标看趋势、拥挤度和风险偏好。",

@@ -309,7 +309,7 @@ function chooseCompleteCandidate(candidates: RawPoint[][], timeline: number[]): 
 /* ---------------------- per-source fetchers ---------------------- */
 
 interface OkxResponse<T> {
-  code: string
+  code: string | number
   data?: T[]
 }
 
@@ -337,20 +337,68 @@ const OKX_RUBIK_PAGE_LIMIT = 100
 const OKX_CANDLE_PAGE_LIMIT = 100
 const OKX_FUNDING_PAGE_LIMIT = 100
 const OKX_MAX_PAGES = 60
+const OKX_RETRY_DELAYS_MS = [500, 1_250, 2_500] as const
+const OKX_RUBIK_REQUEST_SPACING_MS = 420
+/* OKX publishes hard retention windows for these Rubik derivatives stats;
+   skip requests that cannot cover the selected range's left edge. */
+const OKX_INSTRUMENT_HISTORY_EARLIEST_MS = Date.UTC(2024, 0, 1)
+const OKX_TOP_TRADER_HISTORY_EARLIEST_MS = Date.UTC(2024, 2, 22)
+const OKX_MARKET_LONG_SHORT_MAX_DAYS = 180
+
+type OkxDerivativeHistoryPeriod = "1D" | "1W"
+
+function okxDerivativeHistoryPeriod(daysWanted: number): {
+  period: OkxDerivativeHistoryPeriod
+  stepDays: number
+} {
+  return daysWanted > 450 ? { period: "1W", stepDays: 7 } : { period: "1D", stepDays: 1 }
+}
+
+async function wait(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+let okxRubikQueue: Promise<void> = Promise.resolve()
+let okxRubikNextSlot = 0
+
+async function reserveOkxRubikSlot(): Promise<void> {
+  const previous = okxRubikQueue
+  let release: () => void = () => {}
+  okxRubikQueue = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await previous
+  const now = Date.now()
+  const waitMs = Math.max(0, okxRubikNextSlot - now)
+  okxRubikNextSlot = Math.max(now, okxRubikNextSlot) + OKX_RUBIK_REQUEST_SPACING_MS
+  release()
+  if (waitMs > 0) await wait(waitMs)
+}
 
 async function okxRubikSeries(path: string): Promise<string[][]> {
-  try {
-    const res = await fetch(`${OKX}${path}`, {
-      headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-      next: { revalidate },
-    })
-    if (!res.ok) return []
-    const json = (await res.json()) as OkxResponse<string[]>
-    if (json.code !== "0") return []
-    return (json.data ?? []) as string[][]
-  } catch {
-    return []
+  const shouldThrottle = path.startsWith("/api/v5/rubik/")
+  for (let attempt = 0; attempt <= OKX_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      if (shouldThrottle) await reserveOkxRubikSlot()
+      const res = await fetch(`${OKX}${path}`, {
+        headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
+        next: { revalidate },
+      })
+      const json = (await res.json()) as OkxResponse<string[]>
+      const code = String(json.code)
+      const rateLimited = res.status === 429 || code === "50011"
+      if (rateLimited && attempt < OKX_RETRY_DELAYS_MS.length) {
+        await wait(OKX_RETRY_DELAYS_MS[attempt])
+        continue
+      }
+      if (!res.ok || code !== "0") return []
+      return (json.data ?? []) as string[][]
+    } catch {
+      if (attempt >= OKX_RETRY_DELAYS_MS.length) return []
+      await wait(OKX_RETRY_DELAYS_MS[attempt])
+    }
   }
+  return []
 }
 
 /* Paginate Rubik stat endpoints with begin/end. We move the end timestamp
@@ -359,13 +407,14 @@ async function okxRubikSeries(path: string): Promise<string[][]> {
 async function okxRubikPaginated(
   buildPath: (begin: string, end: string, limit: number) => string,
   daysWanted: number,
+  stepDays = 1,
 ): Promise<string[][]> {
-  const desired = Math.max(60, Math.ceil(daysWanted) + 7)
+  const desired = Math.max(60, Math.ceil(daysWanted / stepDays) + 7)
   const collected = new Map<number, string[]>()
   let end = Date.now()
 
   for (let page = 0; page < OKX_MAX_PAGES; page++) {
-    const begin = end - (OKX_RUBIK_PAGE_LIMIT + 2) * DAY_MS
+    const begin = end - (OKX_RUBIK_PAGE_LIMIT + 2) * stepDays * DAY_MS
     const path = buildPath(String(Math.max(0, begin)), String(end), OKX_RUBIK_PAGE_LIMIT)
     const rows = await okxRubikSeries(path)
     if (rows.length === 0) break
@@ -466,15 +515,16 @@ async function okxDailyKlines(instId: string, daysWanted: number): Promise<RawPo
   )
 }
 
-async function okxOiHistory(ccy: string, daysWanted: number): Promise<RawPoint[]> {
-  /* OKX rubik daily OI — values returned as [ts, oiCcy, oiUsd]. */
+async function okxOiHistory(instId: string, daysWanted: number): Promise<RawPoint[]> {
+  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted)
   const rows = await okxRubikPaginated(
     (begin, end, limit) =>
-      `/api/v5/rubik/stat/contracts/open-interest-volume?ccy=${ccy}&period=1D&begin=${begin}&end=${end}&limit=${limit}`,
+      `/api/v5/rubik/stat/contracts/open-interest-history?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
     daysWanted,
+    stepDays,
   )
   return rows
-    .map((row) => ({ timestamp: Number(row[0]), value: Number(row[2]) }))
+    .map((row) => ({ timestamp: Number(row[0]), value: Number(row[3]) }))
     .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value))
 }
 
@@ -485,15 +535,17 @@ async function okxLongShort(ccy: string, daysWanted: number): Promise<RawPoint[]
     daysWanted,
   )
   return rows
-    .map((row) => ({ timestamp: Number(row[0]), value: Number(row[1]) }))
+    .map((row) => ({ timestamp: toDayKey(Number(row[0])), value: Number(row[1]) }))
     .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value))
 }
 
 async function okxContractLongShort(instId: string, daysWanted: number): Promise<RawPoint[]> {
+  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted)
   const rows = await okxRubikPaginated(
     (begin, end, limit) =>
-      `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract?instId=${instId}&period=1D&begin=${begin}&end=${end}&limit=${limit}`,
+      `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
     daysWanted,
+    stepDays,
   )
   return rows
     .map((row) => ({ timestamp: Number(row[0]), value: Number(row[1]) }))
@@ -504,17 +556,27 @@ async function okxTopTraderPosition(instId: string, daysWanted: number): Promise
   account: RawPoint[]
   position: RawPoint[]
 }> {
-  const rows = await okxRubikPaginated(
-    (begin, end, limit) =>
-      `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader?instId=${instId}&period=1D&begin=${begin}&end=${end}&limit=${limit}`,
-    daysWanted,
-  )
+  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted)
+  const [accountRows, positionRows] = await Promise.all([
+    okxRubikPaginated(
+      (begin, end, limit) =>
+        `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
+      daysWanted,
+      stepDays,
+    ),
+    okxRubikPaginated(
+      (begin, end, limit) =>
+        `/api/v5/rubik/stat/contracts/long-short-position-ratio-contract-top-trader?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
+      daysWanted,
+      stepDays,
+    ),
+  ])
   return {
-    account: rows
+    account: accountRows
       .map((row) => ({ timestamp: Number(row[0]), value: Number(row[1]) }))
       .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value)),
-    position: rows
-      .map((row) => ({ timestamp: Number(row[0]), value: Number(row[2]) }))
+    position: positionRows
+      .map((row) => ({ timestamp: Number(row[0]), value: Number(row[1]) }))
       .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value)),
   }
 }
@@ -690,6 +752,15 @@ const MINING_COST_KEYS = ["miningElectricityCost", "miningComprehensiveCost"] as
 const TOP_TRADER_KEYS = ["topTraderAccount", "topTraderPosition"] as const
 const SMART_MONEY_KEYS = ["smartBuy", "smartSell", "smartNet", "smartCum"] as const
 
+const STRICT_RANGE_COVERAGE_KEYS = new Set<string>([
+  "oi",
+  "oiChangePct",
+  "oiReturnZ",
+  "ls",
+  "contractLs",
+  ...TOP_TRADER_KEYS,
+])
+
 const SELECTED_INSTRUMENT_LABEL_KEYS = new Set<string>([
   ...BTC_SWAP_CANDLE_KEYS,
   ...OI_KEYS,
@@ -737,6 +808,10 @@ export async function GET(request: Request) {
 
   const now = Date.now()
   let timeline = buildTimeline(days, now)
+  const timelineStart = timeline[0] ?? now
+  const okxInstrumentHistoryCoversRange = timelineStart >= OKX_INSTRUMENT_HISTORY_EARLIEST_MS
+  const okxTopTraderHistoryCoversRange = timelineStart >= OKX_TOP_TRADER_HISTORY_EARLIEST_MS
+  const okxMarketLongShortCoversRange = days <= OKX_MARKET_LONG_SHORT_MAX_DAYS
   const indicatorLimit = getPositiveInteger(url.searchParams.get("limit"))
   const configuredIndicators = getEnabledCryptoIndicators()
   const requestedIndicators =
@@ -799,11 +874,17 @@ export async function GET(request: Request) {
     requestedKeys.has("xrpPrice") ? okxDailyKlines("XRP-USDT", okxDays) : [],
     requestedKeys.has("bnbPrice") ? okxDailyKlines("BNB-USDT", okxDays) : [],
     requestedKeys.has("dogePrice") ? okxDailyKlines("DOGE-USDT", okxDays) : [],
-    hasRequestedKey(requestedKeys, OI_KEYS) ? okxOiHistory(ccy, okxDays) : [],
+    hasRequestedKey(requestedKeys, OI_KEYS) && okxInstrumentHistoryCoversRange
+      ? okxOiHistory(instId, okxDays)
+      : [],
     hasRequestedKey(requestedKeys, FUNDING_KEYS) ? okxFundingHistory(instId, okxDays) : [],
-    hasRequestedKey(requestedKeys, LONG_SHORT_KEYS) ? okxLongShort(ccy, okxDays) : [],
-    requestedKeys.has("contractLs") ? okxContractLongShort(instId, okxDays) : [],
-    hasRequestedKey(requestedKeys, TOP_TRADER_KEYS)
+    hasRequestedKey(requestedKeys, LONG_SHORT_KEYS) && okxMarketLongShortCoversRange
+      ? okxLongShort(ccy, okxDays)
+      : [],
+    requestedKeys.has("contractLs") && okxInstrumentHistoryCoversRange
+      ? okxContractLongShort(instId, okxDays)
+      : [],
+    hasRequestedKey(requestedKeys, TOP_TRADER_KEYS) && okxTopTraderHistoryCoversRange
       ? okxTopTraderPosition(instId, okxDays)
       : { account: [], position: [] },
     hasRequestedKey(requestedKeys, SMART_MONEY_KEYS)
@@ -983,12 +1064,12 @@ export async function GET(request: Request) {
   const series: SeriesSpec[] = requestedIndicators
     .flatMap((config, configIndex) => {
       if (config.key === selectedCrossSectionPriceKey) return []
-      /* Strip out-of-bounds samples up front; alignDaily then maps real source
-         observations onto the selected timeline. Keep partial but usable lines
-         so realtime crypto metrics are also visible in the history tab. */
       const safe = dropOutOfRange(rawSeriesByKey.get(config.key) ?? [])
       const aligned = alignDaily(safe, timeline)
-      if (!hasUsableCoverage(aligned)) return []
+      const hasCoverage = STRICT_RANGE_COVERAGE_KEYS.has(config.key)
+        ? hasCompleteCoverage(aligned)
+        : hasUsableCoverage(aligned)
+      if (!hasCoverage) return []
       return [{
         key: config.key,
         i18nKey: config.i18nKey,
