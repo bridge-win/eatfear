@@ -9,8 +9,8 @@ import {
   type AlignedHistorySeries,
   type AlignedHistoryUnit,
 } from "@/components/aligned-history-compare"
+import { getCryptoSeriesLabel } from "@/components/crypto-series-label"
 import { useT } from "@/lib/i18n"
-import { withRelevanceScore } from "@/lib/indicator-score"
 import { type TimeRangeId } from "@/lib/time-range"
 import { DEFAULT_CRYPTO_HISTORY_REFRESH_MS } from "@/lib/crypto-indicator-config"
 
@@ -20,6 +20,7 @@ export interface CryptoHistorySeries {
   key: string
   i18nKey: string
   infoI18nKey: string
+  labelVars?: Record<string, string | number>
   order: number
   paneIndex: number
   color: string
@@ -163,7 +164,7 @@ export function CryptoHistoryCompare({
     if (!payload) return null
     const groupsByPane = new Map<number, AlignedHistorySeries[]>()
     for (const spec of payload.series) {
-      const label = withRelevanceScore(t(spec.i18nKey), spec.relevanceScore)
+      const label = getCryptoSeriesLabel(t, spec)
       const series: AlignedHistorySeries = {
         key: spec.key,
         order: spec.order,
@@ -173,7 +174,7 @@ export function CryptoHistoryCompare({
         data: spec.data,
         info: {
           title: `#${String(spec.order).padStart(2, "0")} ${label}`,
-          description: t(spec.infoI18nKey),
+          description: t(spec.infoI18nKey, spec.labelVars),
           source: spec.source,
         },
       }

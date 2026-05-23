@@ -86,8 +86,8 @@ export function CryptoDashboard({
       </header>
 
       <div className="flex flex-wrap items-stretch gap-2">
-        <BlackSwanOpportunityCard className="flex-1 min-w-[12rem]" />
-        <CryptoRegimeScoreCard className="flex-1 min-w-[12rem]" />
+        <BlackSwanOpportunityCard instId={instId} className="flex-1 min-w-[12rem]" />
+        <CryptoRegimeScoreCard instId={instId} className="flex-1 min-w-[12rem]" />
         <CyclePositionCard className="flex-1 min-w-[12rem]" />
       </div>
 

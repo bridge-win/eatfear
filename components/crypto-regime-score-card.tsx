@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { ScoreIndexCard } from "@/components/score-index-card"
 import { useI18n } from "@/lib/i18n"
@@ -65,6 +65,7 @@ interface RegimeFactorRow {
 }
 
 interface RegimePayload {
+  ccy: string
   updatedAt: number
   summary: RegimeSummary
   penaltiesZh: string[]
@@ -88,8 +89,8 @@ function bandStyles(band: RegimeSignalBand) {
   }
 }
 
-async function fetchRegimePayload(): Promise<RegimePayload> {
-  const response = await fetch("/api/crypto/regime-score")
+async function fetchRegimePayload(ccy: string): Promise<RegimePayload> {
+  const response = await fetch(`/api/crypto/regime-score?ccy=${encodeURIComponent(ccy)}`)
   const json = (await response.json()) as RegimePayload & { error?: string }
   if (!response.ok || !json.summary) throw new Error(json.error ?? "Regime score unavailable")
   return json
@@ -115,7 +116,12 @@ function RegimeInfoHover({
   updatedHint: string
 }) {
   const { locale, t } = useI18n()
-  const modelDescription = locale === "zh" ? MODEL_INFO_DESCRIPTION_ZH : MODEL_INFO_DESCRIPTION_EN
+  const ccy = payload?.ccy ?? "BTC"
+  const assetNote =
+    locale === "zh"
+      ? `当前 OKX 衍生品、盘口、Taker、成交量与交易所库存跟随 ${ccy}；BTC ETF、链上周期、算力与 Deribit BTC 期权保留为市场背景。`
+      : `Current OKX derivatives, book, taker flow, volume, and exchange inventory follow ${ccy}; BTC ETF, on-chain cycle, hashrate, and Deribit BTC options remain market context.`
+  const modelDescription = [assetNote, "", locale === "zh" ? MODEL_INFO_DESCRIPTION_ZH : MODEL_INFO_DESCRIPTION_EN].join("\n")
 
   return (
     <div className="space-y-3 px-3 py-2.5 text-left">
@@ -200,29 +206,43 @@ function RegimeInfoHover({
   )
 }
 
-export function CryptoRegimeScoreCard({ className }: { className?: string }) {
+export function CryptoRegimeScoreCard({
+  className,
+  instId = "BTC-USDT-SWAP",
+}: {
+  className?: string
+  instId?: string
+}) {
   const [payload, setPayload] = useState<RegimePayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { locale, t } = useI18n()
-
-  const load = useCallback(async () => {
-    try {
-      setError(null)
-      const next = await fetchRegimePayload()
-      setPayload(next)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "load failed")
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const ccy = instId.split("-")[0] ?? "BTC"
 
   useEffect(() => {
+    let isActive = true
+
+    async function load() {
+      try {
+        setError(null)
+        const next = await fetchRegimePayload(ccy)
+        if (isActive) setPayload(next)
+      } catch (e) {
+        if (isActive) setError(e instanceof Error ? e.message : "load failed")
+      } finally {
+        if (isActive) setLoading(false)
+      }
+    }
+
+    setPayload(null)
+    setLoading(true)
     load()
     const timer = window.setInterval(load, REFRESH_MS)
-    return () => window.clearInterval(timer)
-  }, [load])
+    return () => {
+      isActive = false
+      window.clearInterval(timer)
+    }
+  }, [ccy])
 
   const updatedHint = useMemo(() => {
     if (!payload?.updatedAt) return ""
@@ -238,12 +258,12 @@ export function CryptoRegimeScoreCard({ className }: { className?: string }) {
   }, [payload?.updatedAt, locale])
 
   const valueAriaLabel = loading
-    ? t("regime.aria.loading")
+    ? t("regime.aria.loading", { ccy })
     : error
-      ? t("regime.aria.error")
+      ? t("regime.aria.error", { ccy })
       : payload
-        ? t("regime.aria.value", { value: Math.round(payload.summary.total) })
-        : t("regime.aria.idle")
+        ? t("regime.aria.value", { ccy, value: Math.round(payload.summary.total) })
+        : t("regime.aria.idle", { ccy })
 
   const valueText = loading ? "…" : error ? "—" : payload ? Math.round(payload.summary.total) : "—"
   const toneClass = error
@@ -263,7 +283,7 @@ export function CryptoRegimeScoreCard({ className }: { className?: string }) {
   return (
     <ScoreIndexCard
       className={cn(className)}
-      label={t("regime.label")}
+      label={t("regime.label", { ccy })}
       value={valueText}
       valueSuffix={t("regime.hover.scoreSuffix")}
       signal={signal}

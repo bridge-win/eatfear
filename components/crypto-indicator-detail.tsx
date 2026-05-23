@@ -10,11 +10,11 @@ import {
 } from "@/components/aligned-history-compare"
 import { getCryptoIndicatorDescription } from "@/components/crypto-indicator-info"
 import type { CryptoHistoryPayload, CryptoHistorySeries } from "@/components/crypto-history-compare"
+import { getCryptoSeriesLabel } from "@/components/crypto-series-label"
 import { InfoPopover } from "@/components/info-popover"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
 import { Button } from "@/components/ui/button"
 import { useT } from "@/lib/i18n"
-import { withRelevanceScore } from "@/lib/indicator-score"
 
 interface CryptoIndicatorDetailProps {
   payload: CryptoHistoryPayload
@@ -61,7 +61,7 @@ export function CryptoIndicatorDetail({ payload, selectedKey, onBack }: CryptoIn
     .filter((series) => !selectedKeys.includes(series.key))
     .map((series) => ({
       id: series.key,
-      label: `#${String(series.order).padStart(2, "0")} ${withRelevanceScore(t(series.i18nKey), series.relevanceScore)}`,
+      label: `#${String(series.order).padStart(2, "0")} ${getCryptoSeriesLabel(t, series)}`,
       hint: series.source,
     }))
 
@@ -70,7 +70,7 @@ export function CryptoIndicatorDetail({ payload, selectedKey, onBack }: CryptoIn
     const chartSeries = selectedSeries.map((series) => {
       return toAlignedSeries(
         series,
-        withRelevanceScore(t(series.i18nKey), series.relevanceScore),
+        getCryptoSeriesLabel(t, series),
         getCryptoIndicatorDescription({ payload, series, t }),
       )
     })
@@ -83,7 +83,7 @@ export function CryptoIndicatorDetail({ payload, selectedKey, onBack }: CryptoIn
 
   if (!primary) return null
 
-  const primaryLabel = withRelevanceScore(t(primary.i18nKey), primary.relevanceScore)
+  const primaryLabel = getCryptoSeriesLabel(t, primary)
   const primaryInfo = getCryptoIndicatorDescription({ payload, series: primary, t })
 
   return (
@@ -142,7 +142,7 @@ export function CryptoIndicatorDetail({ payload, selectedKey, onBack }: CryptoIn
 
       <div className="flex flex-wrap gap-1">
         {selectedSeries.map((series, index) => {
-          const label = withRelevanceScore(t(series.i18nKey), series.relevanceScore)
+          const label = getCryptoSeriesLabel(t, series)
           return (
             <span
               key={series.key}

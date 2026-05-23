@@ -239,6 +239,7 @@ interface SeriesSpec {
   key: string
   i18nKey: string
   infoI18nKey: string
+  labelVars?: Record<string, string | number>
   order: number
   paneIndex: number
   color: string
@@ -689,6 +690,24 @@ const MINING_COST_KEYS = ["miningElectricityCost", "miningComprehensiveCost"] as
 const TOP_TRADER_KEYS = ["topTraderAccount", "topTraderPosition"] as const
 const SMART_MONEY_KEYS = ["smartBuy", "smartSell", "smartNet", "smartCum"] as const
 
+const SELECTED_INSTRUMENT_LABEL_KEYS = new Set<string>([
+  ...BTC_SWAP_CANDLE_KEYS,
+  ...OI_KEYS,
+  ...FUNDING_KEYS,
+  ...LONG_SHORT_KEYS,
+  "contractLs",
+  ...TOP_TRADER_KEYS,
+  ...SMART_MONEY_KEYS,
+])
+
+const CROSS_SECTION_PRICE_KEY_BY_CCY: Readonly<Record<string, string>> = {
+  ETH: "ethPrice",
+  SOL: "solPrice",
+  XRP: "xrpPrice",
+  BNB: "bnbPrice",
+  DOGE: "dogePrice",
+}
+
 function getPositiveInteger(value: string | null): number | null {
   if (!value) return null
   const parsed = Number(value)
@@ -708,6 +727,7 @@ export async function GET(request: Request) {
   const miningCostParameters = resolveMiningCostParameters(url.searchParams)
   const days = getRangeDays(range.id)
   const ccy = (url.searchParams.get("ccy") ?? "BTC").toUpperCase()
+  const isBtc = ccy === "BTC"
   const instId = `${ccy}-USDT-SWAP`
   const blockchainSpan = getBlockchainTimespan(range.id)
   /* Total days requested from OKX endpoints. The per-call helpers paginate
@@ -726,7 +746,7 @@ export async function GET(request: Request) {
   /* Staged clients request the top ordered slice first; skip lower-priority
      upstream calls until the background full-history request asks for them. */
   const [
-    btcPriceA, // blockchain.info (longer history)
+    btcPriceA, // blockchain.info (BTC only, longer history)
     btcSwapCandles, // OKX daily swap candles (fallback / derivatives metrics)
     btcSpotCandles,
     ethPrice,
@@ -767,7 +787,7 @@ export async function GET(request: Request) {
     nikkei,
     hangseng,
   ] = await Promise.all([
-    hasRequestedKey(requestedKeys, BTC_PRICE_KEYS)
+    isBtc && hasRequestedKey(requestedKeys, BTC_PRICE_KEYS)
       ? fetchBtcUsdDailyFromBlockchain(blockchainSpan, revalidate).then((r) =>
           (r?.points ?? []).map((p) => ({ timestamp: p.timestamp, value: p.close })),
         )
@@ -832,10 +852,11 @@ export async function GET(request: Request) {
   ])
 
   const btcPriceB = toRawPoints(btcSwapCandles, "close")
-  let btcPrice = chooseCompleteCandidate([btcPriceA, btcPriceB], timeline)
+  const priceCandidates = isBtc ? [btcPriceA, btcPriceB] : [btcPriceB]
+  let btcPrice = chooseCompleteCandidate(priceCandidates, timeline)
   if (range.id === "max" && btcPrice.length > 0) {
     timeline = buildTimelineFromStart(Math.min(...btcPrice.map((point) => point.timestamp)), now)
-    btcPrice = chooseCompleteCandidate([btcPriceA, btcPriceB], timeline)
+    btcPrice = chooseCompleteCandidate(priceCandidates, timeline)
   }
 
   /* Prefer mempool.space for production-cost curves because it is the same
@@ -958,8 +979,10 @@ export async function GET(request: Request) {
     ["hangseng", hangseng],
   ])
 
+  const selectedCrossSectionPriceKey = CROSS_SECTION_PRICE_KEY_BY_CCY[ccy]
   const series: SeriesSpec[] = requestedIndicators
     .flatMap((config, configIndex) => {
+      if (config.key === selectedCrossSectionPriceKey) return []
       /* Strip out-of-bounds samples up front; alignDaily then maps real source
          observations onto the selected timeline. Keep partial but usable lines
          so realtime crypto metrics are also visible in the history tab. */
@@ -970,10 +993,11 @@ export async function GET(request: Request) {
         key: config.key,
         i18nKey: config.i18nKey,
         infoI18nKey: config.infoI18nKey,
+        labelVars: SELECTED_INSTRUMENT_LABEL_KEYS.has(config.key) ? { ccy } : undefined,
         order: configIndex + 1,
         paneIndex: Math.floor(configIndex / 2),
         color: config.color,
-        source: config.source,
+        source: config.key === "btcPrice" && !isBtc ? "OKX" : config.source,
         unit: config.unit,
         refreshMs: config.refreshMs,
         relevanceScore: config.relevanceScore,

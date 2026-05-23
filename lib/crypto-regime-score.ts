@@ -42,6 +42,7 @@ const linTo100 = (x: number, lo: number, hi: number) => {
 const linInv100 = (x: number, lo: number, hi: number) => 100 - linTo100(x, lo, hi)
 
 export interface RawRegimeMetrics {
+  assetCcy: string
   stablecoinPct7d: number | null
   etfAvgDailyUsdLast5: number | null
   etfDailyDeltaVsPriorWeekUsd: number | null
@@ -141,12 +142,13 @@ function scoreCapitalFlows(m: RawRegimeMetrics): RegimeFactorPayload {
 
 function scoreLeverage(m: RawRegimeMetrics): RegimeFactorPayload {
   const lines: string[] = []
+  const asset = m.assetCcy || "BTC"
   const absFunding = m.fundingRatePct === null ? null : Math.abs(m.fundingRatePct)
 
   let fundingScore = 50
   if (absFunding !== null) {
     fundingScore = linInv100(absFunding, 0.02, 0.22)
-    lines.push(`OKX BTC 永续 |费率| ${absFunding.toFixed(3)}%/期${absFunding > 0.15 ? " · 偏极端" : ""}`)
+    lines.push(`OKX ${asset} 永续 |费率| ${absFunding.toFixed(3)}%/期${absFunding > 0.15 ? " · 偏极端" : ""}`)
   } else lines.push("资金费率：数据暂缺")
 
   let oiMom = 0
@@ -168,7 +170,7 @@ function scoreLeverage(m: RawRegimeMetrics): RegimeFactorPayload {
   if (m.longShortRatio !== null) {
     const lsScore =
       m.longShortRatio > 1.35 ? linInv100(m.longShortRatio, 1.35, 1.75) : linTo100(m.longShortRatio, 0.85, 1.35)
-    lines.push(`OKX BTC 永续 多空账户比 ${m.longShortRatio.toFixed(3)}`)
+    lines.push(`OKX ${asset} 永续 多空账户比 ${m.longShortRatio.toFixed(3)}`)
     const blended = 0.45 * fundingScore + 0.4 * oiScore + 0.15 * lsScore
     return {
       id: "leverage",
@@ -191,6 +193,7 @@ function scoreLeverage(m: RawRegimeMetrics): RegimeFactorPayload {
 
 function scoreOnchainCycle(m: RawRegimeMetrics): RegimeFactorPayload {
   const lines: string[] = []
+  const asset = m.assetCcy || "BTC"
   const blocks: Array<{ score: number; weight: number }> = []
 
   if (m.priceVsSma200GapPct !== null) {
@@ -215,9 +218,9 @@ function scoreOnchainCycle(m: RawRegimeMetrics): RegimeFactorPayload {
       score: linInv100(m.exchangeBtcPct7d, -1.5, 1.5),
       weight: 0.17,
     })
-    lines.push(`CoinGlass CEX BTC 加权库存 7D ${m.exchangeBtcPct7d >= 0 ? "+" : ""}${m.exchangeBtcPct7d.toFixed(2)}%（流出利多）`)
+    lines.push(`CoinGlass CEX ${asset} 加权库存 7D ${m.exchangeBtcPct7d >= 0 ? "+" : ""}${m.exchangeBtcPct7d.toFixed(2)}%（流出利多）`)
   } else {
-    lines.push("CEX BTC 库存 7D：需 CoinGlass / COINGLASS_API_KEY")
+    lines.push(`CEX ${asset} 库存 7D：需 CoinGlass / COINGLASS_API_KEY`)
   }
 
   if (m.hashrateRatioTail !== null) {
@@ -240,6 +243,7 @@ function scoreOnchainCycle(m: RawRegimeMetrics): RegimeFactorPayload {
 
 function scoreMarketStructure(m: RawRegimeMetrics): RegimeFactorPayload {
   const lines: string[] = []
+  const asset = m.assetCcy || "BTC"
   let cvdScore = 50
   if (m.takerNetRecent !== null && Number.isFinite(m.takerNetRecent)) {
     const n = m.takerNetRecent
@@ -250,19 +254,19 @@ function scoreMarketStructure(m: RawRegimeMetrics): RegimeFactorPayload {
   let depthScore = 50
   if (m.orderBookImbalancePct !== null) {
     depthScore = linTo100(m.orderBookImbalancePct, -25, 25)
-    lines.push(`OKX BTC 永续 Top20 深度失衡 ${m.orderBookImbalancePct >= 0 ? "+" : ""}${m.orderBookImbalancePct.toFixed(1)}%`)
+    lines.push(`OKX ${asset} 永续 Top20 深度失衡 ${m.orderBookImbalancePct >= 0 ? "+" : ""}${m.orderBookImbalancePct.toFixed(1)}%`)
   } else lines.push("深度：—")
 
   let volScore = 50
   if (m.volumeSpikeRatio !== null) {
     volScore = linTo100(m.volumeSpikeRatio, 0.65, 1.85)
-    lines.push(`OKX BTC 永续 4H · 量比 ${m.volumeSpikeRatio.toFixed(2)}`)
+    lines.push(`OKX ${asset} 永续 4H · 量比 ${m.volumeSpikeRatio.toFixed(2)}`)
   } else lines.push("量比：—")
 
   let trendScore = 50
   if (m.priceChange24hPct !== null) {
     trendScore = linTo100(m.priceChange24hPct, -4, 4)
-    lines.push(`OKX BTC 永续 24h ${m.priceChange24hPct >= 0 ? "+" : ""}${m.priceChange24hPct.toFixed(2)}%`)
+    lines.push(`OKX ${asset} 永续 24h ${m.priceChange24hPct >= 0 ? "+" : ""}${m.priceChange24hPct.toFixed(2)}%`)
   }
 
   const score = clamp(0.28 * cvdScore + 0.28 * depthScore + 0.24 * volScore + 0.2 * trendScore, 0, 100)

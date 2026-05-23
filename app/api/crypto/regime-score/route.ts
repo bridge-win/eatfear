@@ -17,7 +17,6 @@ export const revalidate = 60
 
 const REV = 60
 const OKX = "https://www.okx.com"
-const BTC_INST = "BTC-USDT-SWAP"
 
 interface OkxResponse<T> {
   code: string
@@ -112,7 +111,15 @@ function combineUsdStablePct(usdtPct: number | null, usdcPct: number | null): nu
   return pts.reduce((a, b) => a + b, 0) / pts.length
 }
 
-export async function GET() {
+function sanitizeCcy(value: string | null): string {
+  const upper = (value ?? "BTC").trim().toUpperCase()
+  return /^[A-Z0-9]{2,12}$/.test(upper) ? upper : "BTC"
+}
+
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const ccy = sanitizeCcy(url.searchParams.get("ccy"))
+  const instId = `${ccy}-USDT-SWAP`
   const rangeMo = getTimeRange("1mo")
   const cgKey = process.env.COINGLASS_API_KEY?.trim() ?? ""
 
@@ -133,17 +140,17 @@ export async function GET() {
     etfJob,
     exUsdt,
     exUsdc,
-    exBtcPct,
+    exAssetPct,
   ] = await Promise.all([
     okxPublic<{ last?: string; open24h?: string; volCcy24h?: string; ts?: string }>(
-      `/api/v5/market/ticker?instId=${BTC_INST}`,
+      `/api/v5/market/ticker?instId=${instId}`,
     ),
-    okxPublic<{ fundingRate?: string; fundingTime?: string }>(`/api/v5/public/funding-rate?instId=${BTC_INST}`),
-    okxPublic<OkxBook>(`/api/v5/market/books?instId=${BTC_INST}&sz=20`),
-    okxPublic<string[]>(`/api/v5/rubik/stat/contracts/open-interest-volume?ccy=BTC&period=1H`),
-    okxPublic<string[]>(`/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=BTC&period=1H`),
-    okxPublic<string[]>(`/api/v5/rubik/stat/taker-volume?ccy=BTC&instType=SWAP&period=1H`),
-    okxPublic<string[]>(`/api/v5/market/candles?instId=${BTC_INST}&bar=4H&limit=36`),
+    okxPublic<{ fundingRate?: string; fundingTime?: string }>(`/api/v5/public/funding-rate?instId=${instId}`),
+    okxPublic<OkxBook>(`/api/v5/market/books?instId=${instId}&sz=20`),
+    okxPublic<string[]>(`/api/v5/rubik/stat/contracts/open-interest-volume?ccy=${ccy}&period=1H`),
+    okxPublic<string[]>(`/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=${ccy}&period=1H`),
+    okxPublic<string[]>(`/api/v5/rubik/stat/taker-volume?ccy=${ccy}&instType=SWAP&period=1H`),
+    okxPublic<string[]>(`/api/v5/market/candles?instId=${instId}&bar=4H&limit=36`),
     fetchStablecoinMarketCap(rangeMo, 1800),
     fetchBtcUsdDailyFromBlockchain("2years", REV),
     fetchCoinGeckoBitcoinAth(),
@@ -153,7 +160,7 @@ export async function GET() {
     cgKey ? fetchBitcoinEtfFlowHistory(cgKey, REV + 180) : Promise.resolve(null),
     cgKey ? fetchExchangeBalanceWeightedPct7d(cgKey, "USDT(ETH)", REV + 180) : Promise.resolve(null),
     cgKey ? fetchExchangeBalanceWeightedPct7d(cgKey, "USDC", REV + 180) : Promise.resolve(null),
-    cgKey ? fetchExchangeBalanceWeightedPct7d(cgKey, "BTC", REV + 180) : Promise.resolve(null),
+    cgKey ? fetchExchangeBalanceWeightedPct7d(cgKey, ccy, REV + 180) : Promise.resolve(null),
   ])
 
   let etfSummary: EtfFlowsSummary | null = null
@@ -244,11 +251,12 @@ export async function GET() {
   }
 
   const raw: import("@/lib/crypto-regime-score").RawRegimeMetrics = {
+    assetCcy: ccy,
     stablecoinPct7d,
     etfAvgDailyUsdLast5: etfSummary?.avgDailyUsdLast5 ?? null,
     etfDailyDeltaVsPriorWeekUsd: etfSummary?.dailyDeltaVsPriorWeekUsd ?? null,
     exchangeStablePct7d: combineUsdStablePct(exUsdt, exUsdc),
-    exchangeBtcPct7d: exBtcPct,
+    exchangeBtcPct7d: exAssetPct,
     fundingRatePct,
     oiUsdSeries: oiSeries,
     longShortRatio,
@@ -274,6 +282,7 @@ export async function GET() {
   }))
 
   return NextResponse.json({
+    ccy,
     updatedAt: Date.now(),
     refreshSuggestionSec: 60,
     summary: {
@@ -290,7 +299,7 @@ export async function GET() {
         etfFetchError: cgKey ? coinGlassEtfError : null,
         hint: cgKey === "" ? "Set COINGLASS_API_KEY for CoinGlass ETF net flows & CEX balance metrics." : null,
       },
-      okxRubik: "OKX /api/v5/rubik + market",
+      okxRubik: `OKX ${ccy} /api/v5/rubik + market`,
       btcIndexSma: "Blockchain Charts market-price · daily",
       hashrate: "mempool.space /api/v1/mining/hashrate/total",
       options: "Deribit DVOL + get_trade_volumes (BTC)",
