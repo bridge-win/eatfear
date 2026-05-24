@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 
 import {
   AlignedHistoryCompare,
@@ -10,7 +10,7 @@ import {
   type AlignedHistoryUnit,
 } from "@/components/aligned-history-compare"
 import { getCryptoSeriesLabel } from "@/components/crypto-series-label"
-import { jsonFetcher, usePersistentSWR } from "@/lib/client-persistence"
+import { jsonFetcher, usePersistentSWR, writeStoredJson } from "@/lib/client-persistence"
 import { DEFAULT_CRYPTO_HISTORY_REFRESH_MS, getEnabledCryptoIndicators } from "@/lib/crypto-indicator-config"
 import { useT } from "@/lib/i18n"
 import { type TimeRangeId } from "@/lib/time-range"
@@ -49,6 +49,54 @@ export interface CryptoHistoryPayload {
   updatedAt: number
 }
 
+function buildCryptoHistoryUrl(ccy: string, range: TimeRangeId, params: { limit?: number; offset?: number } = {}): string {
+  const searchParams = new URLSearchParams({ ccy, range })
+  if (params.limit !== undefined) searchParams.set("limit", String(params.limit))
+  if (params.offset !== undefined) searchParams.set("offset", String(params.offset))
+  return `/api/crypto/history-compare?${searchParams.toString()}`
+}
+
+function mergeCryptoHistoryPayloads(
+  priority: CryptoHistoryPayload | undefined,
+  rest: CryptoHistoryPayload | undefined,
+): CryptoHistoryPayload | null {
+  if (!priority && !rest) return null
+  const base = priority ?? rest
+  if (!base) return null
+
+  const seriesByKey = new Map<string, CryptoHistorySeries>()
+  for (const payload of [priority, rest]) {
+    for (const series of payload?.series ?? []) {
+      seriesByKey.set(series.key, series)
+    }
+  }
+
+  const series = Array.from(seriesByKey.values())
+    .sort((a, b) => a.order - b.order)
+    .map((seriesItem, index) => ({
+      ...seriesItem,
+      order: index + 1,
+      paneIndex: Math.floor(index / 2),
+    }))
+  const timeline =
+    (priority?.timeline.length ?? 0) >= (rest?.timeline.length ?? 0)
+      ? priority?.timeline ?? base.timeline
+      : rest?.timeline ?? base.timeline
+  const refreshMs = Math.max(
+    30_000,
+    Math.min(priority?.refreshMs ?? DEFAULT_CRYPTO_HISTORY_REFRESH_MS, rest?.refreshMs ?? DEFAULT_CRYPTO_HISTORY_REFRESH_MS),
+  )
+
+  return {
+    ...base,
+    timeline,
+    series,
+    refreshMs,
+    paneCount: series.length === 0 ? 0 : Math.max(...series.map((item) => item.paneIndex)) + 1,
+    updatedAt: Math.max(priority?.updatedAt ?? 0, rest?.updatedAt ?? 0, base.updatedAt),
+  }
+}
+
 export interface CryptoHistoryCompareProps {
   instId?: string
   range: TimeRangeId
@@ -69,31 +117,37 @@ export function useCryptoHistoryPayload(
   error: string | null
 } {
   const ccy = instId.split("-")[0] ?? "BTC"
-  const priorityUrl = enabled && initialLimit > 0
-    ? `/api/crypto/history-compare?${new URLSearchParams({ ccy, range, limit: String(initialLimit) }).toString()}`
-    : null
-  const fullUrl = enabled
-    ? `/api/crypto/history-compare?${new URLSearchParams({ ccy, range }).toString()}`
-    : null
+  const fullStorageKey = `crypto-history:${ccy}:${range}:full`
+  const priorityUrl = enabled && initialLimit > 0 ? buildCryptoHistoryUrl(ccy, range, { limit: initialLimit }) : null
+  const restUrl = enabled ? buildCryptoHistoryUrl(ccy, range, { offset: initialLimit }) : null
   const priority = usePersistentSWR<CryptoHistoryPayload>(
     `crypto-history:${ccy}:${range}:priority:${initialLimit}`,
     priorityUrl,
     jsonFetcher,
     { revalidateIfStale: true },
   )
-  const full = usePersistentSWR<CryptoHistoryPayload>(
-    `crypto-history:${ccy}:${range}:full`,
-    fullUrl,
+  const rest = usePersistentSWR<CryptoHistoryPayload>(
+    `crypto-history:${ccy}:${range}:rest:${initialLimit}`,
+    restUrl,
     jsonFetcher,
     {
       refreshInterval: (payload) => payload?.refreshMs ?? DEFAULT_CRYPTO_HISTORY_REFRESH_MS,
     },
   )
-  const payload = full.data ?? priority.data ?? null
+  const fullCache = usePersistentSWR<CryptoHistoryPayload>(fullStorageKey, null, jsonFetcher)
+  const mergedPayload = useMemo(() => mergeCryptoHistoryPayloads(priority.data, rest.data), [priority.data, rest.data])
+  const hasCompleteNetworkPayload = priority.data !== undefined && rest.data !== undefined
+  const networkPayload = hasCompleteNetworkPayload ? mergedPayload : null
+  const payload = networkPayload ?? fullCache.data ?? priority.data ?? null
+
+  useEffect(() => {
+    if (mergedPayload && hasCompleteNetworkPayload) writeStoredJson(fullStorageKey, mergedPayload)
+  }, [fullStorageKey, hasCompleteNetworkPayload, mergedPayload])
+
   const loading = payload
-    ? full.isRefreshing || (!full.data && priority.isRefreshing)
-    : full.isLoading || priority.isLoading
-  const error = payload ? null : full.error?.message ?? priority.error?.message ?? null
+    ? priority.isValidating || rest.isValidating || (!mergedPayload && !fullCache.data && rest.isLoading)
+    : fullCache.isLoading || priority.isLoading || rest.isLoading
+  const error = payload ? null : priority.error?.message ?? rest.error?.message ?? fullCache.error?.message ?? null
 
   return { payload, loading, error }
 }

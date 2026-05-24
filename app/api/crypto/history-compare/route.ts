@@ -785,6 +785,12 @@ function getPositiveInteger(value: string | null): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
+function getNonNegativeInteger(value: string | null): number {
+  if (!value) return 0
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0
+}
+
 function hasRequestedKey(requestedKeys: Set<string>, keys: readonly string[]): boolean {
   return keys.some((key) => requestedKeys.has(key))
 }
@@ -813,9 +819,11 @@ export async function GET(request: Request) {
   const okxTopTraderHistoryCoversRange = timelineStart >= OKX_TOP_TRADER_HISTORY_EARLIEST_MS
   const okxMarketLongShortCoversRange = days <= OKX_MARKET_LONG_SHORT_MAX_DAYS
   const indicatorLimit = getPositiveInteger(url.searchParams.get("limit"))
+  const indicatorOffset = getNonNegativeInteger(url.searchParams.get("offset"))
   const configuredIndicators = getEnabledCryptoIndicators()
+  const offsetIndicators = configuredIndicators.slice(indicatorOffset)
   const requestedIndicators =
-    indicatorLimit === null ? configuredIndicators : configuredIndicators.slice(0, indicatorLimit)
+    indicatorLimit === null ? offsetIndicators : offsetIndicators.slice(0, indicatorLimit)
   const requestedKeys = new Set(requestedIndicators.map((indicator) => indicator.key))
 
   /* Staged clients request the top ordered slice first; skip lower-priority
@@ -1063,6 +1071,7 @@ export async function GET(request: Request) {
   const selectedCrossSectionPriceKey = CROSS_SECTION_PRICE_KEY_BY_CCY[ccy]
   const series: SeriesSpec[] = requestedIndicators
     .flatMap((config, configIndex) => {
+      const absoluteIndex = indicatorOffset + configIndex
       if (config.key === selectedCrossSectionPriceKey) return []
       const safe = dropOutOfRange(rawSeriesByKey.get(config.key) ?? [])
       const aligned = alignDaily(safe, timeline)
@@ -1075,8 +1084,8 @@ export async function GET(request: Request) {
         i18nKey: config.i18nKey,
         infoI18nKey: config.infoI18nKey,
         labelVars: SELECTED_INSTRUMENT_LABEL_KEYS.has(config.key) ? { ccy } : undefined,
-        order: configIndex + 1,
-        paneIndex: Math.floor(configIndex / 2),
+        order: absoluteIndex + 1,
+        paneIndex: Math.floor(absoluteIndex / 2),
         color: config.color,
         source: config.key === "btcPrice" && !isBtc ? "OKX" : config.source,
         unit: config.unit,
@@ -1085,7 +1094,6 @@ export async function GET(request: Request) {
         data: timeline.map((t, i) => ({ time: t, value: aligned[i] })),
       }]
     })
-    .map((spec, index) => ({ ...spec, order: index + 1, paneIndex: Math.floor(index / 2) }))
   const refreshMs =
     series.length === 0
       ? DEFAULT_CRYPTO_HISTORY_REFRESH_MS

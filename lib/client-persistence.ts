@@ -14,6 +14,7 @@ export interface PersistentSWRResult<T> {
   data: T | undefined
   error: Error | undefined
   isLoading: boolean
+  isValidating: boolean
   isRefreshing: boolean
   mutate: KeyedMutator<T>
 }
@@ -128,6 +129,7 @@ export function usePersistentSWR<T>(
     data,
     error: response.error,
     isLoading: data === undefined && (response.isLoading || !storageReady),
+    isValidating: response.isValidating,
     isRefreshing: response.isValidating && data !== undefined,
     mutate: response.mutate,
   }

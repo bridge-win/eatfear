@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import {
   AlignedHistoryCompare,
@@ -19,6 +19,7 @@ import {
   jsonFetcher,
   usePersistentState,
   usePersistentSWR,
+  writeStoredJson,
   type DashboardTabValue,
 } from "@/lib/client-persistence"
 import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-shared"
@@ -126,10 +127,45 @@ const buildMacroHistoryData = (items: MarketIndicatorItem[]): AlignedHistoryData
   return { groups: [{ key: "macro", series }] }
 }
 
-function buildMacroApiUrl(range: TimeRangeId, limit?: number): string {
+function buildMacroApiUrl(range: TimeRangeId, options: { limit?: number; offset?: number } = {}): string {
   const params = new URLSearchParams({ range })
-  if (limit !== undefined) params.set("limit", String(limit))
+  if (options.limit !== undefined) params.set("limit", String(options.limit))
+  if (options.offset !== undefined) params.set("offset", String(options.offset))
   return `/api/macro?${params.toString()}`
+}
+
+function mergeMacroPayloads(
+  priority: MacroApiResponse | undefined,
+  rest: MacroApiResponse | undefined,
+): MacroApiResponse | null {
+  if (!priority && !rest) return null
+  const base = priority ?? rest
+  if (!base) return null
+
+  const indicatorsBySymbol = new Map<string, MacroIndicator>()
+  for (const payload of [priority, rest]) {
+    for (const indicator of payload?.indicators ?? []) {
+      indicatorsBySymbol.set(indicator.symbol, indicator)
+    }
+  }
+  const indicators = Array.from(indicatorsBySymbol.values()).sort(sortMacroIndicators)
+  const refreshMs = Math.max(
+    30_000,
+    Math.min(
+      priority?.refreshMs ?? DEFAULT_MACRO_INDICATOR_REFRESH_MS,
+      rest?.refreshMs ?? DEFAULT_MACRO_INDICATOR_REFRESH_MS,
+    ),
+  )
+
+  return {
+    ...base,
+    indicators,
+    refreshMs,
+    requested: EXPECTED_MACRO_INDICATOR_COUNT,
+    returned: indicators.length,
+    updatedAt: Math.max(priority?.updatedAt ?? 0, rest?.updatedAt ?? 0, base.updatedAt),
+    fredEnabled: priority?.fredEnabled ?? rest?.fredEnabled,
+  }
 }
 
 export interface MacroDashboardProps {
@@ -149,6 +185,7 @@ export function MacroDashboard({
   const [tab, setTab] = usePersistentState<DashboardTabValue>("macro:tab", "history", isDashboardTabValue)
   const [selectedIndicatorKey, setSelectedIndicatorKey] = useState<string | null>(null)
   const t = useT()
+  const fullStorageKey = `macro:${range}:full`
   const initialPayload = useMemo<MacroApiResponse | undefined>(() => {
     if (!initialIndicators || initialIndicators.length === 0) return undefined
     const rangeOption = getTimeRange(MACRO_DEFAULT_RANGE)
@@ -165,20 +202,33 @@ export function MacroDashboard({
   }, [initialFredEnabled, initialIndicators, initialMeta, initialUpdatedAt])
   const priority = usePersistentSWR<MacroApiResponse>(
     `macro:${range}:priority:${MACRO_INITIAL_HISTORY_LIMIT}`,
-    buildMacroApiUrl(range, MACRO_INITIAL_HISTORY_LIMIT),
+    buildMacroApiUrl(range, { limit: MACRO_INITIAL_HISTORY_LIMIT }),
     jsonFetcher,
     { revalidateIfStale: true },
   )
-  const full = usePersistentSWR<MacroApiResponse>(
-    `macro:${range}:full`,
-    buildMacroApiUrl(range),
+  const rest = usePersistentSWR<MacroApiResponse>(
+    `macro:${range}:rest:${MACRO_INITIAL_HISTORY_LIMIT}`,
+    buildMacroApiUrl(range, { offset: MACRO_INITIAL_HISTORY_LIMIT }),
     jsonFetcher,
     {
-      fallbackData: range === MACRO_DEFAULT_RANGE ? initialPayload : undefined,
       refreshInterval: (payload) => payload?.refreshMs ?? DEFAULT_MACRO_INDICATOR_REFRESH_MS,
     },
   )
-  const payload = full.data ?? priority.data ?? initialPayload
+  const fullCache = usePersistentSWR<MacroApiResponse>(
+    fullStorageKey,
+    null,
+    jsonFetcher,
+    { fallbackData: range === MACRO_DEFAULT_RANGE ? initialPayload : undefined },
+  )
+  const mergedPayload = useMemo(() => mergeMacroPayloads(priority.data, rest.data), [priority.data, rest.data])
+  const hasCompleteNetworkPayload = priority.data !== undefined && rest.data !== undefined
+  const networkPayload = hasCompleteNetworkPayload ? mergedPayload : null
+  const payload = networkPayload ?? fullCache.data ?? priority.data ?? initialPayload
+
+  useEffect(() => {
+    if (mergedPayload && hasCompleteNetworkPayload) writeStoredJson(fullStorageKey, mergedPayload)
+  }, [fullStorageKey, hasCompleteNetworkPayload, mergedPayload])
+
   const indicators = payload?.indicators ?? []
   const updatedAt = payload?.updatedAt ?? null
   const fredEnabled = payload?.fredEnabled ?? null
@@ -189,9 +239,9 @@ export function MacroDashboard({
       }
     : initialMeta
   const isLoading = payload
-    ? full.isRefreshing || (!full.data && priority.isRefreshing)
-    : full.isLoading || priority.isLoading
-  const error = payload ? null : full.error?.message ?? priority.error?.message ?? null
+    ? priority.isValidating || rest.isValidating || (!mergedPayload && !fullCache.data && rest.isLoading)
+    : fullCache.isLoading || priority.isLoading || rest.isLoading
+  const error = payload ? null : priority.error?.message ?? rest.error?.message ?? fullCache.error?.message ?? null
 
   const macroItems = useMemo(() => buildMacroItems(indicators), [indicators])
   const macroHistoryData = useMemo(() => buildMacroHistoryData(macroItems), [macroItems])

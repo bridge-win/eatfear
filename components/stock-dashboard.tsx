@@ -18,6 +18,7 @@ import {
   isDashboardTabValue,
   usePersistentState,
   usePersistentSWR,
+  writeStoredJson,
   type DashboardTabValue,
 } from "@/lib/client-persistence"
 import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-shared"
@@ -68,7 +69,11 @@ const STOCK_MACRO_DATA_REFRESH_MS = Math.max(
     DEFAULT_STOCK_MACRO_REFRESH_MS,
   ),
 )
-const STOCK_PRIORITY_INDICATORS = STOCK_INDICATORS.slice(0, STOCK_INITIAL_HISTORY_LIMIT)
+const STOCK_PRIORITY_INDICATORS = STOCK_INDICATORS
+  .filter((entry) => entry.kind === "macro")
+  .slice(0, STOCK_INITIAL_HISTORY_LIMIT)
+const STOCK_PRIORITY_KEYS = new Set(STOCK_PRIORITY_INDICATORS.map((entry) => entry.key))
+const STOCK_REST_INDICATORS = STOCK_INDICATORS.filter((entry) => !STOCK_PRIORITY_KEYS.has(entry.key))
 const STOCK_PRIORITY_MACRO_SYMBOLS = STOCK_PRIORITY_INDICATORS
   .filter((entry) => entry.kind === "macro")
   .map((entry) => entry.symbol)
@@ -211,14 +216,16 @@ interface StockDashboardPayload {
   updatedAt: number
 }
 
-const buildStockDashboardKey = (range: TimeRangeId, staged: boolean): string => {
-  return `stock-dashboard:${range}:${staged ? "priority" : "full"}`
+type StockDashboardStage = "priority" | "rest"
+
+const buildStockDashboardKey = (range: TimeRangeId, stage: StockDashboardStage): string => {
+  return `stock-dashboard:${range}:${stage}`
 }
 
-function parseStockDashboardKey(key: string): { range: TimeRangeId; staged: boolean } {
+function parseStockDashboardKey(key: string): { range: TimeRangeId; stage: StockDashboardStage } {
   const [, range, stage] = key.split(":")
   if (!range || !isTimeRangeId(range)) throw new Error(`Invalid stock dashboard range: ${range ?? ""}`)
-  return { range, staged: stage === "priority" }
+  return { range, stage: stage === "rest" ? "rest" : "priority" }
 }
 
 async function fetchStockMacroPayload(range: TimeRangeId, symbols?: string[]): Promise<MacroApiResponse | null> {
@@ -232,13 +239,14 @@ async function fetchStockMacroPayload(range: TimeRangeId, symbols?: string[]): P
 }
 
 async function fetchStockDashboardPayload(key: string): Promise<StockDashboardPayload> {
-  const { range, staged } = parseStockDashboardKey(key)
+  const { range, stage } = parseStockDashboardKey(key)
   const rangeOption = getTimeRange(range)
-  const indicators = staged ? STOCK_PRIORITY_INDICATORS : STOCK_INDICATORS
+  const indicators =
+    stage === "priority" ? STOCK_PRIORITY_INDICATORS : STOCK_REST_INDICATORS
   const usSymbols = getStockSymbolsForGroup(indicators, "us")
   const hkSymbols = getStockSymbolsForGroup(indicators, "hk")
   const vietnamSymbols = getStockSymbolsForGroup(indicators, "vietnam")
-  const macroSymbols = staged ? STOCK_PRIORITY_MACRO_SYMBOLS : undefined
+  const macroSymbols = indicators.filter((entry) => entry.kind === "macro").map((entry) => entry.symbol)
   const stockOptions = {
     sparkRange: rangeOption.yahooRange,
     sparkInterval: rangeOption.yahooInterval,
@@ -247,7 +255,7 @@ async function fetchStockDashboardPayload(key: string): Promise<StockDashboardPa
     fetchStockData(usSymbols, stockOptions),
     fetchStockData(hkSymbols, stockOptions),
     fetchStockData(vietnamSymbols, stockOptions),
-    fetchStockMacroPayload(range, macroSymbols),
+    macroSymbols.length > 0 ? fetchStockMacroPayload(range, macroSymbols) : Promise.resolve(null),
   ])
 
   return {
@@ -256,6 +264,50 @@ async function fetchStockDashboardPayload(key: string): Promise<StockDashboardPa
     vietnam: Array.from(vietnamData.values()),
     macro,
     updatedAt: Date.now(),
+  }
+}
+
+function mergeStockAssets(left: StockAsset[] | undefined, right: StockAsset[] | undefined): StockAsset[] {
+  return Array.from(new Map([...(left ?? []), ...(right ?? [])].map((stock) => [stock.symbol, stock])).values())
+}
+
+function mergeStockMacroPayloads(
+  priority: MacroApiResponse | null | undefined,
+  rest: MacroApiResponse | null | undefined,
+): MacroApiResponse | null {
+  if (!priority && !rest) return null
+  const base = priority ?? rest
+  if (!base) return null
+  const indicatorsBySymbol = new Map<string, MacroIndicator>()
+  for (const payload of [priority, rest]) {
+    for (const indicator of payload?.indicators ?? []) {
+      indicatorsBySymbol.set(indicator.symbol, indicator)
+    }
+  }
+  const indicators = Array.from(indicatorsBySymbol.values())
+  return {
+    ...base,
+    indicators,
+    requested: STOCK_INDICATORS.filter((entry) => entry.kind === "macro").length,
+    returned: indicators.length,
+    refreshMs: STOCK_MACRO_DATA_REFRESH_MS,
+    updatedAt: Math.max(priority?.updatedAt ?? 0, rest?.updatedAt ?? 0, base.updatedAt),
+  }
+}
+
+function mergeStockDashboardPayloads(
+  priority: StockDashboardPayload | undefined,
+  rest: StockDashboardPayload | undefined,
+): StockDashboardPayload | null {
+  if (!priority && !rest) return null
+  const base = priority ?? rest
+  if (!base) return null
+  return {
+    us: mergeStockAssets(priority?.us, rest?.us),
+    hk: mergeStockAssets(priority?.hk, rest?.hk),
+    vietnam: mergeStockAssets(priority?.vietnam, rest?.vietnam),
+    macro: mergeStockMacroPayloads(priority?.macro, rest?.macro),
+    updatedAt: Math.max(priority?.updatedAt ?? 0, rest?.updatedAt ?? 0, base.updatedAt),
   }
 }
 
@@ -278,6 +330,7 @@ export function StockDashboard({
   const [selectedIndicatorKey, setSelectedIndicatorKey] = useState<string | null>(null)
   const crashDetectorRef = useRef(new CrashDetector())
   const t = useT()
+  const fullStorageKey = `stock:${range}:full`
 
   const initialPayload = useMemo<StockDashboardPayload | undefined>(() => {
     const hasStocks =
@@ -309,25 +362,38 @@ export function StockDashboard({
 
   const priority = usePersistentSWR<StockDashboardPayload>(
     `stock:${range}:priority:${STOCK_INITIAL_HISTORY_LIMIT}`,
-    buildStockDashboardKey(range, true),
+    buildStockDashboardKey(range, "priority"),
     fetchStockDashboardPayload,
     { revalidateIfStale: true },
   )
-  const full = usePersistentSWR<StockDashboardPayload>(
-    `stock:${range}:full`,
-    buildStockDashboardKey(range, false),
+  const rest = usePersistentSWR<StockDashboardPayload>(
+    `stock:${range}:rest:${STOCK_INITIAL_HISTORY_LIMIT}`,
+    buildStockDashboardKey(range, "rest"),
     fetchStockDashboardPayload,
     {
-      fallbackData: range === STOCK_DEFAULT_RANGE ? initialPayload : undefined,
       refreshInterval: STOCK_DASHBOARD_REFRESH_MS,
     },
   )
-  const payload = full.data ?? priority.data ?? initialPayload
+  const fullCache = usePersistentSWR<StockDashboardPayload>(
+    fullStorageKey,
+    null,
+    fetchStockDashboardPayload,
+    { fallbackData: range === STOCK_DEFAULT_RANGE ? initialPayload : undefined },
+  )
+  const mergedPayload = useMemo(() => mergeStockDashboardPayloads(priority.data, rest.data), [priority.data, rest.data])
+  const hasCompleteNetworkPayload = priority.data !== undefined && rest.data !== undefined
+  const networkPayload = hasCompleteNetworkPayload ? mergedPayload : null
+  const payload = networkPayload ?? fullCache.data ?? priority.data ?? initialPayload
+
+  useEffect(() => {
+    if (mergedPayload && hasCompleteNetworkPayload) writeStoredJson(fullStorageKey, mergedPayload)
+  }, [fullStorageKey, hasCompleteNetworkPayload, mergedPayload])
+
   const macroIndicators = payload?.macro?.indicators ?? []
   const isLoading = payload
-    ? full.isRefreshing || (!full.data && priority.isRefreshing)
-    : full.isLoading || priority.isLoading
-  const error = payload ? null : full.error?.message ?? priority.error?.message ?? null
+    ? priority.isValidating || rest.isValidating || (!mergedPayload && !fullCache.data && rest.isLoading)
+    : fullCache.isLoading || priority.isLoading || rest.isLoading
+  const error = payload ? null : priority.error?.message ?? rest.error?.message ?? fullCache.error?.message ?? null
 
   const stockAssets = useMemo(
     () =>
