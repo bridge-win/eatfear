@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import {
   AlignedHistoryCompare,
@@ -14,6 +14,12 @@ import { MarketIndicatorDetail } from "@/components/market-indicator-detail"
 import { DashboardFrame } from "@/components/page-frame"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TimeRangeSelector } from "@/components/time-range-selector"
+import {
+  isDashboardTabValue,
+  usePersistentState,
+  usePersistentSWR,
+  type DashboardTabValue,
+} from "@/lib/client-persistence"
 import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-shared"
 import { CrashDetector } from "@/lib/crash-detector"
 import { useT } from "@/lib/i18n"
@@ -22,12 +28,11 @@ import {
   DEFAULT_STOCK_MACRO_REFRESH_MS,
   DEFAULT_STOCK_REFRESH_MS,
   getEnabledStockIndicators,
-  getEnabledStockSymbols,
   type StockIndicatorConfig,
   type StockIndicatorGroup,
 } from "@/lib/stock-indicator-config"
 import { fetchStockData } from "@/lib/stock-service"
-import { getRangeDays, getTimeRange, type TimeRangeId } from "@/lib/time-range"
+import { getRangeDays, getTimeRange, isTimeRangeId, type TimeRangeId } from "@/lib/time-range"
 import type { CrashAlert, MacroIndicator, StockAsset } from "@/lib/types"
 
 const STOCK_DEFAULT_RANGE: TimeRangeId = "1y"
@@ -67,6 +72,7 @@ const STOCK_PRIORITY_INDICATORS = STOCK_INDICATORS.slice(0, STOCK_INITIAL_HISTOR
 const STOCK_PRIORITY_MACRO_SYMBOLS = STOCK_PRIORITY_INDICATORS
   .filter((entry) => entry.kind === "macro")
   .map((entry) => entry.symbol)
+const STOCK_DASHBOARD_REFRESH_MS = Math.min(STOCK_DATA_REFRESH_MS, STOCK_MACRO_DATA_REFRESH_MS)
 
 const getStockSymbolsForGroup = (
   indicators: StockIndicatorConfig[],
@@ -76,17 +82,14 @@ const getStockSymbolsForGroup = (
     .filter((entry) => entry.kind === "stock" && entry.group === group)
     .map((entry) => entry.symbol)
 
-function mergeStockAssetMaps(
-  current: Map<string, StockAsset>,
-  next: Map<string, StockAsset>,
-): Map<string, StockAsset> {
-  return new Map([...current, ...next])
-}
-
 function buildMacroApiUrl(range: TimeRangeId, symbols?: string[]): string {
   const params = new URLSearchParams({ range })
   if (symbols && symbols.length > 0) params.set("symbols", symbols.join(","))
   return `/api/macro?${params.toString()}`
+}
+
+function stockAssetArrayToMap(stocks: StockAsset[] | undefined): Map<string, StockAsset> {
+  return new Map((stocks ?? []).map((stock) => [stock.symbol, stock]))
 }
 
 const getStockSeriesColor = (symbol: string, index: number) => {
@@ -200,6 +203,62 @@ const buildStockHistoryData = (items: MarketIndicatorItem[]): AlignedHistoryData
   return { groups: [{ key: "stock", series }] }
 }
 
+interface StockDashboardPayload {
+  us: StockAsset[]
+  hk: StockAsset[]
+  vietnam: StockAsset[]
+  macro: MacroApiResponse | null
+  updatedAt: number
+}
+
+const buildStockDashboardKey = (range: TimeRangeId, staged: boolean): string => {
+  return `stock-dashboard:${range}:${staged ? "priority" : "full"}`
+}
+
+function parseStockDashboardKey(key: string): { range: TimeRangeId; staged: boolean } {
+  const [, range, stage] = key.split(":")
+  if (!range || !isTimeRangeId(range)) throw new Error(`Invalid stock dashboard range: ${range ?? ""}`)
+  return { range, staged: stage === "priority" }
+}
+
+async function fetchStockMacroPayload(range: TimeRangeId, symbols?: string[]): Promise<MacroApiResponse | null> {
+  try {
+    const response = await fetch(buildMacroApiUrl(range, symbols))
+    if (!response.ok) return null
+    return (await response.json()) as MacroApiResponse
+  } catch {
+    return null
+  }
+}
+
+async function fetchStockDashboardPayload(key: string): Promise<StockDashboardPayload> {
+  const { range, staged } = parseStockDashboardKey(key)
+  const rangeOption = getTimeRange(range)
+  const indicators = staged ? STOCK_PRIORITY_INDICATORS : STOCK_INDICATORS
+  const usSymbols = getStockSymbolsForGroup(indicators, "us")
+  const hkSymbols = getStockSymbolsForGroup(indicators, "hk")
+  const vietnamSymbols = getStockSymbolsForGroup(indicators, "vietnam")
+  const macroSymbols = staged ? STOCK_PRIORITY_MACRO_SYMBOLS : undefined
+  const stockOptions = {
+    sparkRange: rangeOption.yahooRange,
+    sparkInterval: rangeOption.yahooInterval,
+  }
+  const [usData, hkData, vietnamData, macro] = await Promise.all([
+    fetchStockData(usSymbols, stockOptions),
+    fetchStockData(hkSymbols, stockOptions),
+    fetchStockData(vietnamSymbols, stockOptions),
+    fetchStockMacroPayload(range, macroSymbols),
+  ])
+
+  return {
+    us: Array.from(usData.values()),
+    hk: Array.from(hkData.values()),
+    vietnam: Array.from(vietnamData.values()),
+    macro,
+    updatedAt: Date.now(),
+  }
+}
+
 export interface StockDashboardProps {
   initialUsStocks?: StockAsset[]
   initialHkStocks?: StockAsset[]
@@ -213,164 +272,93 @@ export function StockDashboard({
   initialVietnamStocks,
   initialMacroIndicators,
 }: StockDashboardProps = {}) {
-  const [usStockAssets, setUsStockAssets] = useState<Map<string, StockAsset>>(
-    () => new Map((initialUsStocks ?? []).map((s) => [s.symbol, s])),
-  )
-  const [hkStockAssets, setHkStockAssets] = useState<Map<string, StockAsset>>(
-    () => new Map((initialHkStocks ?? []).map((s) => [s.symbol, s])),
-  )
-  const [vietnamStockAssets, setVietnamStockAssets] = useState<Map<string, StockAsset>>(
-    () => new Map((initialVietnamStocks ?? []).map((s) => [s.symbol, s])),
-  )
+  const [range, setRange] = usePersistentState("stock:range", STOCK_DEFAULT_RANGE, isTimeRangeId)
+  const [tab, setTab] = usePersistentState<DashboardTabValue>("stock:tab", "history", isDashboardTabValue)
   const [crashes, setCrashes] = useState<CrashAlert[]>([])
-  const [isLoading, setIsLoading] = useState(
-    !(initialUsStocks && initialHkStocks && initialVietnamStocks),
-  )
-  const [macroIndicators, setMacroIndicators] = useState<MacroIndicator[]>(initialMacroIndicators ?? [])
-  const [range, setRange] = useState<TimeRangeId>(STOCK_DEFAULT_RANGE)
   const [selectedIndicatorKey, setSelectedIndicatorKey] = useState<string | null>(null)
+  const crashDetectorRef = useRef(new CrashDetector())
   const t = useT()
 
-  useEffect(() => {
-    let isActive = true
-    const crashDetector = new CrashDetector()
-    const rangeOption = getTimeRange(range)
-    setUsStockAssets(new Map())
-    setHkStockAssets(new Map())
-    setVietnamStockAssets(new Map())
-    setCrashes([])
-    setIsLoading(true)
+  const initialPayload = useMemo<StockDashboardPayload | undefined>(() => {
+    const hasStocks =
+      (initialUsStocks?.length ?? 0) > 0 ||
+      (initialHkStocks?.length ?? 0) > 0 ||
+      (initialVietnamStocks?.length ?? 0) > 0
+    const hasMacro = (initialMacroIndicators?.length ?? 0) > 0
+    if (!hasStocks && !hasMacro) return undefined
 
-    function applyStockData({
-      usData,
-      hkData,
-      vietnamData,
-      merge,
-      finishLoading,
-    }: {
-      usData: Map<string, StockAsset>
-      hkData: Map<string, StockAsset>
-      vietnamData: Map<string, StockAsset>
-      merge: boolean
-      finishLoading: boolean
-    }) {
-      if (merge) {
-        setUsStockAssets((current) => mergeStockAssetMaps(current, usData))
-        setHkStockAssets((current) => mergeStockAssetMaps(current, hkData))
-        setVietnamStockAssets((current) => mergeStockAssetMaps(current, vietnamData))
-      } else {
-        setUsStockAssets(usData)
-        setHkStockAssets(hkData)
-        setVietnamStockAssets(vietnamData)
-      }
-      if (finishLoading) setIsLoading(false)
-
-      const allStockData = new Map([...usData, ...hkData, ...vietnamData])
-      allStockData.forEach((stock) => {
-        crashDetector.updatePrice(stock.symbol, stock.price)
-        const assetType = stock.symbol.includes(".HK") ? "hk_stock" : "stock"
-        const detectedCrashes = crashDetector.detectCrashes(stock, assetType)
-        if (detectedCrashes.length > 0) {
-          setCrashes((previous) => {
-            const existing = previous.filter(
-              (crash) =>
-                !detectedCrashes.some(
-                  (detectedCrash) =>
-                    detectedCrash.symbol === crash.symbol && detectedCrash.timeframe === crash.timeframe,
-                ),
-            )
-            return [...existing, ...detectedCrashes]
-          })
-        }
-      })
+    const rangeOption = getTimeRange(STOCK_DEFAULT_RANGE)
+    return {
+      us: initialUsStocks ?? [],
+      hk: initialHkStocks ?? [],
+      vietnam: initialVietnamStocks ?? [],
+      macro: hasMacro
+        ? {
+            indicators: initialMacroIndicators ?? [],
+            range: STOCK_DEFAULT_RANGE,
+            interval: rangeOption.yahooInterval,
+            updatedAt: Date.now(),
+            requested: STOCK_PRIORITY_MACRO_SYMBOLS.length,
+            returned: initialMacroIndicators?.length ?? 0,
+            refreshMs: STOCK_MACRO_DATA_REFRESH_MS,
+          }
+        : null,
+      updatedAt: Date.now(),
     }
+  }, [initialHkStocks, initialMacroIndicators, initialUsStocks, initialVietnamStocks])
 
-    async function loadStockData(staged: boolean) {
-      const usSymbols = staged
-        ? getStockSymbolsForGroup(STOCK_PRIORITY_INDICATORS, "us")
-        : getEnabledStockSymbols("us")
-      const hkSymbols = staged
-        ? getStockSymbolsForGroup(STOCK_PRIORITY_INDICATORS, "hk")
-        : getEnabledStockSymbols("hk")
-      const vietnamSymbols = staged
-        ? getStockSymbolsForGroup(STOCK_PRIORITY_INDICATORS, "vietnam")
-        : getEnabledStockSymbols("vietnam")
-      const [usData, hkData, vietnamData] = await Promise.all([
-        fetchStockData(usSymbols, {
-          sparkRange: rangeOption.yahooRange,
-          sparkInterval: rangeOption.yahooInterval,
-        }),
-        fetchStockData(hkSymbols, {
-          sparkRange: rangeOption.yahooRange,
-          sparkInterval: rangeOption.yahooInterval,
-        }),
-        fetchStockData(vietnamSymbols, {
-          sparkRange: rangeOption.yahooRange,
-          sparkInterval: rangeOption.yahooInterval,
-        }),
-      ])
-
-      if (!isActive) return
-      applyStockData({ usData, hkData, vietnamData, merge: staged, finishLoading: !staged })
-    }
-
-    async function loadStagedStockData() {
-      await loadStockData(true)
-      if (!isActive) return
-      await loadStockData(false)
-    }
-
-    void loadStagedStockData()
-    const stockInterval = setInterval(() => {
-      void loadStockData(false)
-    }, STOCK_DATA_REFRESH_MS)
-    return () => {
-      isActive = false
-      clearInterval(stockInterval)
-    }
-  }, [range])
-
-  useEffect(() => {
-    let isActive = true
-    const controller = new AbortController()
-    setMacroIndicators([])
-
-    async function fetchMacro(symbols?: string[]): Promise<MacroApiResponse> {
-      const response = await fetch(buildMacroApiUrl(range, symbols), { signal: controller.signal })
-      if (!response.ok) throw new Error(`Macro API returned ${response.status}`)
-      return (await response.json()) as MacroApiResponse
-    }
-
-    async function loadMacro(symbols?: string[]) {
-      try {
-        const payload = await fetchMacro(symbols)
-        if (isActive) setMacroIndicators(payload.indicators ?? [])
-      } catch {
-        // ignore — KPI strip is optional
-      }
-    }
-
-    async function loadStagedMacro() {
-      await loadMacro(STOCK_PRIORITY_MACRO_SYMBOLS)
-      if (!isActive) return
-      await loadMacro()
-    }
-
-    void loadStagedMacro()
-    const interval = setInterval(() => {
-      void loadMacro()
-    }, STOCK_MACRO_DATA_REFRESH_MS)
-    return () => {
-      isActive = false
-      controller.abort()
-      clearInterval(interval)
-    }
-  }, [range])
+  const priority = usePersistentSWR<StockDashboardPayload>(
+    `stock:${range}:priority:${STOCK_INITIAL_HISTORY_LIMIT}`,
+    buildStockDashboardKey(range, true),
+    fetchStockDashboardPayload,
+    { revalidateIfStale: true },
+  )
+  const full = usePersistentSWR<StockDashboardPayload>(
+    `stock:${range}:full`,
+    buildStockDashboardKey(range, false),
+    fetchStockDashboardPayload,
+    {
+      fallbackData: range === STOCK_DEFAULT_RANGE ? initialPayload : undefined,
+      refreshInterval: STOCK_DASHBOARD_REFRESH_MS,
+    },
+  )
+  const payload = full.data ?? priority.data ?? initialPayload
+  const macroIndicators = payload?.macro?.indicators ?? []
+  const isLoading = payload
+    ? full.isRefreshing || (!full.data && priority.isRefreshing)
+    : full.isLoading || priority.isLoading
+  const error = payload ? null : full.error?.message ?? priority.error?.message ?? null
 
   const stockAssets = useMemo(
-    () => new Map([...usStockAssets, ...hkStockAssets, ...vietnamStockAssets]),
-    [usStockAssets, hkStockAssets, vietnamStockAssets],
+    () =>
+      new Map([
+        ...stockAssetArrayToMap(payload?.us),
+        ...stockAssetArrayToMap(payload?.hk),
+        ...stockAssetArrayToMap(payload?.vietnam),
+      ]),
+    [payload?.hk, payload?.us, payload?.vietnam],
   )
+
+  useEffect(() => {
+    const detectedCrashes: CrashAlert[] = []
+    stockAssets.forEach((stock) => {
+      crashDetectorRef.current.updatePrice(stock.symbol, stock.price)
+      const assetType = stock.symbol.includes(".HK") ? "hk_stock" : "stock"
+      detectedCrashes.push(...crashDetectorRef.current.detectCrashes(stock, assetType))
+    })
+    if (detectedCrashes.length === 0) return
+
+    setCrashes((previous) => {
+      const existing = previous.filter(
+        (crash) =>
+          !detectedCrashes.some(
+            (detectedCrash) =>
+              detectedCrash.symbol === crash.symbol && detectedCrash.timeframe === crash.timeframe,
+          ),
+      )
+      return [...existing, ...detectedCrashes]
+    })
+  }, [stockAssets])
   const stockItems = useMemo(
     () => buildStockIndicatorItems({ range, macroIndicators, stockAssets }),
     [range, macroIndicators, stockAssets],
@@ -390,7 +378,13 @@ export function StockDashboard({
         <TimeRangeSelector value={range} onChange={setRange} />
       </header>
 
-      <Tabs defaultValue="history" className="w-full">
+      <Tabs
+        value={tab}
+        onValueChange={(next) => {
+          if (isDashboardTabValue(next)) setTab(next)
+        }}
+        className="w-full"
+      >
         <TabsList className="grid h-auto w-full max-w-xs grid-cols-2">
           <TabsTrigger value="realtime" className="text-xs">{t("stock.tab.realtime")}</TabsTrigger>
           <TabsTrigger value="history" className="text-xs">{t("stock.tab.history")}</TabsTrigger>
@@ -418,9 +412,10 @@ export function StockDashboard({
             <MarketIndicatorCards
               items={stockItems}
               loading={isLoading}
-              error={null}
+              error={error}
               loadingLabel={t("stock.loading")}
               noDataLabel={t("stock.empty")}
+              expectedCount={STOCK_INDICATORS.length}
               onSelectItem={setSelectedIndicatorKey}
               dataPrefix="stock"
             />
@@ -433,10 +428,11 @@ export function StockDashboard({
             infoDescription={t("stock.historyCompare.info")}
             infoSource="Yahoo Finance · FRED · TradingView Lightweight Charts"
             loading={isLoading}
-            error={null}
+            error={error}
             loadingLabel={t("stock.loading")}
             noDataLabel={t("chart.noData")}
             seriesCountLabel={t("compare.seriesCount")}
+            expectedSeriesCount={STOCK_INDICATORS.length}
           />
         </TabsContent>
       </Tabs>

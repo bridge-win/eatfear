@@ -13,6 +13,7 @@ interface CryptoRealtimeCardsProps {
   payload: CryptoHistoryPayload | null
   loading: boolean
   error: string | null
+  expectedCount?: number
   onSelectSeries?: (key: string) => void
   className?: string
 }
@@ -83,10 +84,38 @@ function formatPct(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`
 }
 
+function LoadingCard({ index }: { index: number }) {
+  return (
+    <article
+      data-crypto-realtime-card
+      data-crypto-loading-card
+      data-series-order={index + 1}
+      className="min-w-0 rounded-md border bg-card/60 px-2.5 py-2 shadow-sm"
+    >
+      <header className="flex min-w-0 items-start justify-between gap-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          <span className="shrink-0 text-[9px] font-semibold tabular-nums text-muted-foreground">
+            #{String(index + 1).padStart(2, "0")}
+          </span>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/30" />
+          <span className="h-3 w-28 max-w-full animate-pulse rounded bg-muted" />
+        </div>
+        <RefreshCw className="mt-0.5 h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
+      </header>
+      <div className="mt-2 flex items-end justify-between gap-1.5">
+        <span className="h-5 w-20 animate-pulse rounded bg-muted" />
+        <span className="h-3 w-10 animate-pulse rounded bg-muted" />
+      </div>
+      <p className="mt-1 h-2.5 w-16 animate-pulse rounded bg-muted" />
+    </article>
+  )
+}
+
 export function CryptoRealtimeCards({
   payload,
   loading,
   error,
+  expectedCount,
   onSelectSeries,
   className,
 }: CryptoRealtimeCardsProps) {
@@ -107,9 +136,16 @@ export function CryptoRealtimeCards({
 
   if (loading && !payload) {
     return (
-      <div className={cn("flex items-center gap-2 text-xs text-muted-foreground", className)}>
-        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-        {t("compare.loading")}
+      <div className={cn("space-y-2", className)}>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+          {t("compare.loading")}
+        </div>
+        <div data-crypto-realtime-grid className="grid gap-1.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+          {Array.from({ length: Math.max(6, Math.min(expectedCount ?? 6, 12)) }, (_, index) => (
+            <LoadingCard key={`loading-${index}`} index={index} />
+          ))}
+        </div>
       </div>
     )
   }
@@ -121,6 +157,8 @@ export function CryptoRealtimeCards({
       </div>
     )
   }
+
+  const placeholderCount = loading ? Math.max(0, (expectedCount ?? payload.series.length) - payload.series.length) : 0
 
   return (
     <div
@@ -196,6 +234,9 @@ export function CryptoRealtimeCards({
           </article>
         )
       })}
+      {Array.from({ length: placeholderCount }, (_, index) => (
+        <LoadingCard key={`loading-${index}`} index={payload.series.length + index} />
+      ))}
     </div>
   )
 }

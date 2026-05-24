@@ -1,9 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import { Info } from "lucide-react"
 
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
+import { usePersistentSWR } from "@/lib/client-persistence"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import type { CycleBand, HashRibbonStatus, MayerZone, PuellZone } from "@/app/api/crypto/cycle-position/route"
@@ -43,6 +44,13 @@ interface CyclePayload {
   }
   upstream: Record<string, string>
   error?: string
+}
+
+async function fetchCyclePayload(url: string): Promise<CyclePayload> {
+  const res = await fetch(url)
+  const json = (await res.json()) as CyclePayload
+  if (!res.ok) throw new Error(json.error ?? "Cycle position unavailable")
+  return json
 }
 
 function cycleBandColor(band: CycleBand): string {
@@ -232,30 +240,16 @@ function HoverContents({
 }
 
 export function CyclePositionCard({ className }: { className?: string }) {
-  const [payload, setPayload] = useState<CyclePayload | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const { locale } = useI18n()
-
-  const load = useCallback(async () => {
-    try {
-      setError(null)
-      const res = await fetch("/api/crypto/cycle-position")
-      const json = (await res.json()) as CyclePayload
-      if (!res.ok) throw new Error(json.error ?? "Cycle position unavailable")
-      setPayload(json)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "load failed")
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    load()
-    const timer = window.setInterval(load, REFRESH_MS)
-    return () => window.clearInterval(timer)
-  }, [load])
+  const swr = usePersistentSWR<CyclePayload>(
+    "crypto:cycle-position",
+    "/api/crypto/cycle-position",
+    fetchCyclePayload,
+    { refreshInterval: REFRESH_MS },
+  )
+  const payload = swr.data ?? null
+  const loading = swr.isLoading
+  const error = payload ? null : swr.error?.message ?? null
 
   const updatedHint = useMemo(() => {
     if (!payload?.updatedAt) return ""
@@ -270,7 +264,7 @@ export function CyclePositionCard({ className }: { className?: string }) {
   }, [payload?.updatedAt, locale])
 
   const toneClass = payload ? cycleBandColor(payload.cycleBand) : "text-muted-foreground"
-  const signal = loading
+  const signal = loading && !payload
     ? (locale === "zh" ? "载入中…" : "Loading…")
     : error
       ? error
@@ -280,7 +274,7 @@ export function CyclePositionCard({ className }: { className?: string }) {
           : payload.cycleSignalEn
         : null
 
-  const scoreDisplay = loading ? "…" : error ? "—" : payload ? payload.cycleScore : "—"
+  const scoreDisplay = loading && !payload ? "…" : error ? "—" : payload ? payload.cycleScore : "—"
 
   return (
     <div
@@ -312,7 +306,7 @@ export function CyclePositionCard({ className }: { className?: string }) {
             collisionPadding={16}
             className="max-h-[min(640px,_82vh)] w-[min(28rem,_94vw)] overflow-y-auto p-0"
           >
-            <HoverContents payload={payload} loading={loading} error={error} updatedHint={updatedHint} />
+            <HoverContents payload={payload} loading={loading && !payload} error={error} updatedHint={updatedHint} />
           </HoverCardContent>
         </HoverCard>
       </div>

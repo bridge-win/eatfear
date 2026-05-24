@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 
 import { ScoreIndexCard } from "@/components/score-index-card"
+import { usePersistentSWR } from "@/lib/client-persistence"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import type { RegimeSignalBand } from "@/lib/crypto-regime-score"
@@ -89,8 +90,8 @@ function bandStyles(band: RegimeSignalBand) {
   }
 }
 
-async function fetchRegimePayload(ccy: string): Promise<RegimePayload> {
-  const response = await fetch(`/api/crypto/regime-score?ccy=${encodeURIComponent(ccy)}`)
+async function fetchRegimePayload(url: string): Promise<RegimePayload> {
+  const response = await fetch(url)
   const json = (await response.json()) as RegimePayload & { error?: string }
   if (!response.ok || !json.summary) throw new Error(json.error ?? "Regime score unavailable")
   return json
@@ -213,36 +214,17 @@ export function CryptoRegimeScoreCard({
   className?: string
   instId?: string
 }) {
-  const [payload, setPayload] = useState<RegimePayload | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const { locale, t } = useI18n()
   const ccy = instId.split("-")[0] ?? "BTC"
-
-  useEffect(() => {
-    let isActive = true
-
-    async function load() {
-      try {
-        setError(null)
-        const next = await fetchRegimePayload(ccy)
-        if (isActive) setPayload(next)
-      } catch (e) {
-        if (isActive) setError(e instanceof Error ? e.message : "load failed")
-      } finally {
-        if (isActive) setLoading(false)
-      }
-    }
-
-    setPayload(null)
-    setLoading(true)
-    load()
-    const timer = window.setInterval(load, REFRESH_MS)
-    return () => {
-      isActive = false
-      window.clearInterval(timer)
-    }
-  }, [ccy])
+  const swr = usePersistentSWR<RegimePayload>(
+    `crypto:regime-score:${ccy}`,
+    `/api/crypto/regime-score?ccy=${encodeURIComponent(ccy)}`,
+    fetchRegimePayload,
+    { refreshInterval: REFRESH_MS },
+  )
+  const payload = swr.data ?? null
+  const loading = swr.isLoading
+  const error = payload ? null : swr.error?.message ?? null
 
   const updatedHint = useMemo(() => {
     if (!payload?.updatedAt) return ""
@@ -257,7 +239,7 @@ export function CryptoRegimeScoreCard({
     }
   }, [payload?.updatedAt, locale])
 
-  const valueAriaLabel = loading
+  const valueAriaLabel = loading && !payload
     ? t("regime.aria.loading", { ccy })
     : error
       ? t("regime.aria.error", { ccy })
@@ -265,14 +247,14 @@ export function CryptoRegimeScoreCard({
         ? t("regime.aria.value", { ccy, value: Math.round(payload.summary.total) })
         : t("regime.aria.idle", { ccy })
 
-  const valueText = loading ? "…" : error ? "—" : payload ? Math.round(payload.summary.total) : "—"
+  const valueText = loading && !payload ? "…" : error ? "—" : payload ? Math.round(payload.summary.total) : "—"
   const toneClass = error
     ? "text-muted-foreground"
     : payload
       ? bandStyles(payload.summary.band)
       : "text-foreground"
 
-  const signal = loading
+  const signal = loading && !payload
     ? t("regime.hover.loading")
     : error
       ? error
@@ -290,7 +272,7 @@ export function CryptoRegimeScoreCard({
       toneClassName={toneClass}
       valueAriaLabel={valueAriaLabel}
       infoAriaLabel={t("regime.hover.aria")}
-      infoContent={<RegimeInfoHover loading={loading} error={error} payload={payload} updatedHint={updatedHint} />}
+      infoContent={<RegimeInfoHover loading={loading && !payload} error={error} payload={payload} updatedHint={updatedHint} />}
     />
   )
 }

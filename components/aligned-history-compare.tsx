@@ -17,6 +17,7 @@ import {
   type UTCTimestamp,
   type WhitespaceData,
 } from "lightweight-charts"
+import { RefreshCw } from "lucide-react"
 
 import { InfoTooltip } from "@/components/info-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -115,6 +116,7 @@ export interface AlignedHistoryCompareProps {
   loadingLabel: string
   noDataLabel: string
   seriesCountLabel: string
+  expectedSeriesCount?: number
   maxSeriesPerPane?: number
   className?: string
 }
@@ -389,6 +391,54 @@ function getTimeAxisLabels(
     })
 }
 
+function HistoryPaneLoading({
+  paneIndex,
+  seriesCount,
+  maxSeriesPerPane,
+  loadingLabel,
+}: {
+  paneIndex: number
+  seriesCount: number
+  maxSeriesPerPane: number
+  loadingLabel: string
+}) {
+  const rowCount = Math.max(1, Math.min(seriesCount, maxSeriesPerPane))
+  return (
+    <section
+      data-history-loading-group
+      data-history-loading-pane={paneIndex}
+      className="border-t border-border/50 pt-px first:border-t-0 first:pt-0 sm:pt-0.5"
+    >
+      <div className="mb-px grid grid-cols-2 items-center gap-x-1.5 gap-y-px">
+        {Array.from({ length: rowCount }, (_, index) => (
+          <div
+            key={index}
+            data-history-loading-series
+            className="grid h-3.5 min-w-0 grid-cols-[1.35rem_auto_minmax(0,1fr)_4.1rem_2.8rem] items-center gap-0.5 sm:grid-cols-[1.55rem_auto_minmax(0,1fr)_4.5rem_3.2rem] sm:gap-1"
+          >
+            <span className="text-[8px] font-semibold leading-none text-muted-foreground sm:text-[9px]">
+              #{String(paneIndex * maxSeriesPerPane + index + 1).padStart(2, "0")}
+            </span>
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/30" />
+            <span className="h-2.5 min-w-0 animate-pulse rounded bg-muted" />
+            <span className="h-2.5 animate-pulse rounded bg-muted" />
+            <span className="h-2.5 animate-pulse rounded bg-muted" />
+          </div>
+        ))}
+      </div>
+      <div className="h-[42px] w-full rounded-sm border border-dashed border-border/60 bg-muted/25 sm:h-[62px]">
+        <div className="flex h-full items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
+          <RefreshCw className="h-3 w-3 animate-spin" />
+          {loadingLabel}
+        </div>
+      </div>
+      <div className="h-3.5 w-full pt-px sm:h-4">
+        <div className="h-full border-t border-slate-500/25 dark:border-slate-400/25" />
+      </div>
+    </section>
+  )
+}
+
 export function AlignedHistoryCompare({
   data,
   title,
@@ -399,6 +449,7 @@ export function AlignedHistoryCompare({
   loadingLabel,
   noDataLabel,
   seriesCountLabel,
+  expectedSeriesCount,
   maxSeriesPerPane = MAX_SERIES_PER_PANE,
   className,
 }: AlignedHistoryCompareProps) {
@@ -670,6 +721,9 @@ export function AlignedHistoryCompare({
     () => getTimeAxisLabels(timeline, isCompact, visibleLogicalRange),
     [isCompact, timeline, visibleLogicalRange],
   )
+  const displaySeriesCount = Math.max(seriesCount, expectedSeriesCount ?? seriesCount)
+  const pendingSeriesCount = loading ? Math.max(0, displaySeriesCount - seriesCount) : 0
+  const pendingPaneCount = Math.ceil(pendingSeriesCount / maxSeriesPerPane)
 
   const hoverPaneTooltips = useMemo<HoverPaneTooltip[]>(() => {
     const grid = gridRef.current
@@ -722,7 +776,10 @@ export function AlignedHistoryCompare({
           </div>
           {data && seriesCount > 0 && (
             <span className="h-4 w-[7.75rem] overflow-hidden truncate text-right text-[9px] leading-4 text-muted-foreground sm:w-36">
-              {visibleSeriesCount}/{seriesCount} {seriesCountLabel}
+              {visibleSeriesCount}/{displaySeriesCount} {seriesCountLabel}
+              {loading && (
+                <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground/60" />
+              )}
             </span>
           )}
         </div>
@@ -730,8 +787,32 @@ export function AlignedHistoryCompare({
       <CardContent className="px-2.5 pt-0">
         {error ? (
           <p className="py-12 text-center text-xs text-destructive">{error}</p>
-        ) : loading && !data ? (
-          <p className="py-12 text-center text-xs text-muted-foreground">{loadingLabel}</p>
+        ) : loading && (!data || seriesCount === 0 || timeline.length === 0) ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              {loadingLabel}
+            </div>
+            <div className="relative flex flex-col gap-px sm:gap-0.5">
+              {Array.from(
+                {
+                  length: Math.max(
+                    1,
+                    Math.ceil(Math.min(displaySeriesCount || maxSeriesPerPane * 3, maxSeriesPerPane * 6) / maxSeriesPerPane),
+                  ),
+                },
+                (_, index) => (
+                  <HistoryPaneLoading
+                    key={index}
+                    paneIndex={index}
+                    seriesCount={Math.min(maxSeriesPerPane, Math.max(1, displaySeriesCount - index * maxSeriesPerPane))}
+                    maxSeriesPerPane={maxSeriesPerPane}
+                    loadingLabel={loadingLabel}
+                  />
+                ),
+              )}
+            </div>
+          </div>
         ) : !data || seriesCount === 0 || timeline.length === 0 ? (
           <p className="py-12 text-center text-xs text-muted-foreground">{noDataLabel}</p>
         ) : (
@@ -837,6 +918,18 @@ export function AlignedHistoryCompare({
                 </div>
               </section>
             ))}
+            {Array.from({ length: pendingPaneCount }, (_, index) => {
+              const loadedBeforePane = seriesCount + index * maxSeriesPerPane
+              return (
+                <HistoryPaneLoading
+                  key={`loading-${index}`}
+                  paneIndex={groups.length + index}
+                  seriesCount={Math.min(maxSeriesPerPane, displaySeriesCount - loadedBeforePane)}
+                  maxSeriesPerPane={maxSeriesPerPane}
+                  loadingLabel={loadingLabel}
+                />
+              )
+            })}
             {hoverPaneTooltips.map((tooltip) => (
               <div
                 key={tooltip.key}

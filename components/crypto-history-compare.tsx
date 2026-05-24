@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo } from "react"
 
 import {
   AlignedHistoryCompare,
@@ -10,11 +10,20 @@ import {
   type AlignedHistoryUnit,
 } from "@/components/aligned-history-compare"
 import { getCryptoSeriesLabel } from "@/components/crypto-series-label"
+import { jsonFetcher, usePersistentSWR } from "@/lib/client-persistence"
+import { DEFAULT_CRYPTO_HISTORY_REFRESH_MS, getEnabledCryptoIndicators } from "@/lib/crypto-indicator-config"
 import { useT } from "@/lib/i18n"
 import { type TimeRangeId } from "@/lib/time-range"
-import { DEFAULT_CRYPTO_HISTORY_REFRESH_MS } from "@/lib/crypto-indicator-config"
 
 const CRYPTO_INITIAL_HISTORY_LIMIT = 12
+
+const CROSS_SECTION_PRICE_KEY_BY_CCY: Readonly<Record<string, string>> = {
+  ETH: "ethPrice",
+  SOL: "solPrice",
+  XRP: "xrpPrice",
+  BNB: "bnbPrice",
+  DOGE: "dogePrice",
+}
 
 export interface CryptoHistorySeries {
   key: string
@@ -59,91 +68,40 @@ export function useCryptoHistoryPayload(
   loading: boolean
   error: string | null
 } {
-  const [payload, setPayload] = useState<CryptoHistoryPayload | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const payloadRef = useRef<CryptoHistoryPayload | null>(null)
-  const refreshMsRef = useRef(DEFAULT_CRYPTO_HISTORY_REFRESH_MS)
   const ccy = instId.split("-")[0] ?? "BTC"
-
-  useEffect(() => {
-    if (!enabled) {
-      payloadRef.current = null
-      setPayload(null)
-      setLoading(false)
-      setError(null)
-      return
-    }
-    let active = true
-    const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout> | null = null
-    payloadRef.current = null
-    setPayload(null)
-    setLoading(true)
-    setError(null)
-
-    async function fetchPayload(limit?: number): Promise<CryptoHistoryPayload> {
-      const params = new URLSearchParams({ ccy, range })
-      if (limit !== undefined) params.set("limit", String(limit))
-      const response = await fetch(`/api/crypto/history-compare?${params.toString()}`, {
-        signal: controller.signal,
-      })
-      if (!response.ok) throw new Error(`history-compare ${response.status}`)
-      return (await response.json()) as CryptoHistoryPayload
-    }
-
-    function applyPayload(json: CryptoHistoryPayload) {
-      refreshMsRef.current = json.refreshMs || DEFAULT_CRYPTO_HISTORY_REFRESH_MS
-      payloadRef.current = json
-      setPayload(json)
-      setError(null)
-    }
-
-    async function load(staged: boolean) {
-      let hasRenderedPayload = Boolean(payloadRef.current)
-      try {
-        if (staged && initialLimit > 0) {
-          const priorityJson = await fetchPayload(initialLimit)
-          if (!active) return
-          applyPayload(priorityJson)
-          hasRenderedPayload = true
-          setLoading(false)
-        }
-      } catch (requestError) {
-        if (!active || (requestError as Error).name === "AbortError") return
-      }
-
-      try {
-        const json = await fetchPayload()
-        if (!active) return
-        applyPayload(json)
-      } catch (requestError) {
-        if (
-          active &&
-          (requestError as Error).name !== "AbortError" &&
-          !hasRenderedPayload &&
-          !payloadRef.current
-        ) {
-          setError(requestError instanceof Error ? requestError.message : "load failed")
-        }
-      } finally {
-        if (!active) return
-        setLoading(false)
-        timer = setTimeout(() => {
-          void load(false)
-        }, refreshMsRef.current)
-      }
-    }
-
-    void load(true)
-    return () => {
-      active = false
-      controller.abort()
-      if (timer) clearTimeout(timer)
-    }
-  }, [ccy, enabled, initialLimit, range])
+  const priorityUrl = enabled && initialLimit > 0
+    ? `/api/crypto/history-compare?${new URLSearchParams({ ccy, range, limit: String(initialLimit) }).toString()}`
+    : null
+  const fullUrl = enabled
+    ? `/api/crypto/history-compare?${new URLSearchParams({ ccy, range }).toString()}`
+    : null
+  const priority = usePersistentSWR<CryptoHistoryPayload>(
+    `crypto-history:${ccy}:${range}:priority:${initialLimit}`,
+    priorityUrl,
+    jsonFetcher,
+    { revalidateIfStale: true },
+  )
+  const full = usePersistentSWR<CryptoHistoryPayload>(
+    `crypto-history:${ccy}:${range}:full`,
+    fullUrl,
+    jsonFetcher,
+    {
+      refreshInterval: (payload) => payload?.refreshMs ?? DEFAULT_CRYPTO_HISTORY_REFRESH_MS,
+    },
+  )
+  const payload = full.data ?? priority.data ?? null
+  const loading = payload
+    ? full.isRefreshing || (!full.data && priority.isRefreshing)
+    : full.isLoading || priority.isLoading
+  const error = payload ? null : full.error?.message ?? priority.error?.message ?? null
 
   return { payload, loading, error }
+}
+
+export function getExpectedCryptoHistorySeriesCount(instId: string): number {
+  const ccy = (instId.split("-")[0] ?? "BTC").toUpperCase()
+  const omittedKey = CROSS_SECTION_PRICE_KEY_BY_CCY[ccy]
+  return getEnabledCryptoIndicators().filter((indicator) => indicator.key !== omittedKey).length
 }
 
 export function CryptoHistoryCompare({
@@ -159,6 +117,7 @@ export function CryptoHistoryCompare({
   const payload = controlledPayload === undefined ? fetched.payload : controlledPayload
   const loading = controlledLoading ?? fetched.loading
   const error = controlledError ?? fetched.error
+  const expectedSeriesCount = getExpectedCryptoHistorySeriesCount(instId)
 
   const data: AlignedHistoryData | null = useMemo(() => {
     if (!payload) return null
@@ -210,6 +169,7 @@ export function CryptoHistoryCompare({
       loadingLabel={t("compare.loading")}
       noDataLabel={t("chart.noData")}
       seriesCountLabel={t("compare.seriesCount")}
+      expectedSeriesCount={expectedSeriesCount}
       className={className}
     />
   )

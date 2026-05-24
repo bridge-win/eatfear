@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import { AlertTriangle, Flame, Sparkles, TrendingUp } from "lucide-react"
 
 import { ScoreIndexCard } from "@/components/score-index-card"
+import { usePersistentSWR } from "@/lib/client-persistence"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import type {
@@ -78,8 +79,8 @@ function severityIcon(sev: BlackSwanActiveSignal["severity"]) {
   }
 }
 
-async function fetchPayload(ccy: string): Promise<Payload> {
-  const res = await fetch(`/api/crypto/black-swan?ccy=${encodeURIComponent(ccy)}`)
+async function fetchPayload(url: string): Promise<Payload> {
+  const res = await fetch(url)
   const json = (await res.json()) as Payload
   if (!res.ok || !json.summary) throw new Error(json.error ?? "Black-swan score unavailable")
   return json
@@ -248,36 +249,17 @@ export function BlackSwanOpportunityCard({
   className?: string
   instId?: string
 }) {
-  const [payload, setPayload] = useState<Payload | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const { locale, t } = useI18n()
   const ccy = instId.split("-")[0] ?? "BTC"
-
-  useEffect(() => {
-    let isActive = true
-
-    async function load() {
-      try {
-        setError(null)
-        const next = await fetchPayload(ccy)
-        if (isActive) setPayload(next)
-      } catch (e) {
-        if (isActive) setError(e instanceof Error ? e.message : "load failed")
-      } finally {
-        if (isActive) setLoading(false)
-      }
-    }
-
-    setPayload(null)
-    setLoading(true)
-    load()
-    const timer = window.setInterval(load, REFRESH_MS)
-    return () => {
-      isActive = false
-      window.clearInterval(timer)
-    }
-  }, [ccy])
+  const swr = usePersistentSWR<Payload>(
+    `crypto:black-swan:${ccy}`,
+    `/api/crypto/black-swan?ccy=${encodeURIComponent(ccy)}`,
+    fetchPayload,
+    { refreshInterval: REFRESH_MS },
+  )
+  const payload = swr.data ?? null
+  const loading = swr.isLoading
+  const error = payload ? null : swr.error?.message ?? null
 
   const updatedHint = useMemo(() => {
     if (!payload?.updatedAt) return ""
@@ -292,14 +274,14 @@ export function BlackSwanOpportunityCard({
     }
   }, [payload?.updatedAt, locale])
 
-  const valueText = loading ? "…" : error ? "—" : payload ? Math.round(payload.summary.opportunityScore) : "—"
+  const valueText = loading && !payload ? "…" : error ? "—" : payload ? Math.round(payload.summary.opportunityScore) : "—"
   const toneClass = error
     ? "text-muted-foreground"
     : payload
       ? bandStyles(payload.summary.band)
       : "text-foreground"
 
-  const signal = loading
+  const signal = loading && !payload
     ? t("blackSwan.hover.loading")
     : error
       ? error
@@ -318,14 +300,14 @@ export function BlackSwanOpportunityCard({
       signal={signal}
       toneClassName={toneClass}
       valueAriaLabel={
-        loading
+        loading && !payload
           ? t("blackSwan.aria.loading", { ccy })
           : payload
             ? t("blackSwan.aria.value", { ccy, value: Math.round(payload.summary.opportunityScore) })
             : t("blackSwan.aria.idle", { ccy })
       }
       infoAriaLabel={t("blackSwan.hover.aria")}
-      infoContent={<HoverContents payload={payload} loading={loading} error={error} updatedHint={updatedHint} />}
+      infoContent={<HoverContents payload={payload} loading={loading && !payload} error={error} updatedHint={updatedHint} />}
     />
   )
 }

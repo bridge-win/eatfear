@@ -106,6 +106,10 @@ export const timeRangeOptions: TimeRangeOption[] = [
 
 export const DEFAULT_TIME_RANGE: TimeRangeId = "1mo"
 
+export const isTimeRangeId = (value: string): value is TimeRangeId => {
+  return timeRangeOptions.some((option) => option.id === value)
+}
+
 export const getTimeRange = (id: TimeRangeId | string | null | undefined): TimeRangeOption => {
   return timeRangeOptions.find((option) => option.id === id) ?? timeRangeOptions[2]
 }
