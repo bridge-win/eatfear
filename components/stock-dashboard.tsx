@@ -11,6 +11,7 @@ import {
 import { CrashAlertBanner } from "@/components/crash-alert-banner"
 import { MarketIndicatorCards, type MarketIndicatorItem } from "@/components/market-indicator-cards"
 import { MarketIndicatorDetail } from "@/components/market-indicator-detail"
+import { OpportunityRadar } from "@/components/opportunity-radar"
 import { DashboardFrame } from "@/components/page-frame"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TimeRangeSelector } from "@/components/time-range-selector"
@@ -25,6 +26,7 @@ import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-share
 import { CrashDetector } from "@/lib/crash-detector"
 import { useT } from "@/lib/i18n"
 import { withRelevanceScore } from "@/lib/indicator-score"
+import { buildTradingOpportunities, type OpportunityInputSeries } from "@/lib/opportunity-engine"
 import {
   DEFAULT_STOCK_MACRO_REFRESH_MS,
   DEFAULT_STOCK_REFRESH_MS,
@@ -429,6 +431,29 @@ export function StockDashboard({
     () => buildStockIndicatorItems({ range, macroIndicators, stockAssets }),
     [range, macroIndicators, stockAssets],
   )
+  const opportunityInputs = useMemo<OpportunityInputSeries[]>(
+    () =>
+      stockItems.map((item) => ({
+        key: item.key,
+        label: item.label,
+        source: item.source,
+        description: item.description,
+        value: item.value,
+        changePercent: item.changePercent,
+        timestamp: item.timestamp,
+        data: item.data,
+      })),
+    [stockItems],
+  )
+  const opportunities = useMemo(
+    () =>
+      buildTradingOpportunities({
+        assetClass: "stock",
+        marketName: "Equity",
+        series: opportunityInputs,
+      }),
+    [opportunityInputs],
+  )
   const stockHistoryData = useMemo(
     () => buildStockHistoryData(stockItems),
     [stockItems],
@@ -443,6 +468,17 @@ export function StockDashboard({
         </div>
         <TimeRangeSelector value={range} onChange={setRange} />
       </header>
+
+      <OpportunityRadar
+        assetClass="stock"
+        title={{ zh: "股票机会雷达", en: "Equity Opportunity Radar" }}
+        subtitle={{
+          zh: "整合指数趋势、风格因子、信用压力、美元与低波/质量轮动，识别风险偏好和防御切换。",
+          en: "Combines index trends, factor ETFs, credit pressure, USD, and low-vol/quality rotation to detect risk appetite and defensive shifts.",
+        }}
+        opportunities={opportunities}
+        loading={isLoading}
+      />
 
       <Tabs
         value={tab}
