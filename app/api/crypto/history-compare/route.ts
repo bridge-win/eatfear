@@ -677,6 +677,102 @@ async function okxFundingHistory(instId: string, daysWanted: number): Promise<Ra
     .sort((a, b) => b.timestamp - a.timestamp)
 }
 
+interface OkxLiquidationGroup {
+  instId: string
+  details: {
+    side: "buy" | "sell"
+    posSide: "long" | "short"
+    bkPx: string
+    sz: string
+    ts: string
+  }[]
+}
+
+/* OKX USDT-margined swap face value: 1 contract = ctVal base-currency units.
+   Used to compute notional USD = sz × ctVal × bkPx. */
+const SWAP_CT_VAL: Record<string, number> = {
+  "BTC-USDT-SWAP": 0.01,
+  "ETH-USDT-SWAP": 0.01,
+  "SOL-USDT-SWAP": 0.1,
+  "XRP-USDT-SWAP": 100,
+  "BNB-USDT-SWAP": 0.01,
+  "DOGE-USDT-SWAP": 1000,
+  "ADA-USDT-SWAP": 100,
+  "AVAX-USDT-SWAP": 0.1,
+}
+
+/* OKX keeps ~90 days of liquidation order history. Paginate until cutoff
+   or OKX stops returning data. */
+async function okxLiquidationDaily(
+  instId: string,
+  daysWanted: number,
+): Promise<{ long: RawPoint[]; short: RawPoint[] }> {
+  const maxDays = Math.min(daysWanted, 90)
+  const cutoffMs = Date.now() - maxDays * DAY_MS
+  const ctVal = SWAP_CT_VAL[instId] ?? 0.01
+  const longByDay = new Map<number, number>()
+  const shortByDay = new Map<number, number>()
+  let after: string | null = null
+
+  for (let page = 0; page < 30; page++) {
+    const params = new URLSearchParams({
+      instType: "SWAP",
+      instId,
+      state: "filled",
+      limit: "100",
+    })
+    if (after) params.set("after", after)
+
+    let groups: OkxLiquidationGroup[] = []
+    try {
+      const res = await fetch(
+        `${OKX}/api/v5/public/liquidation-orders?${params.toString()}`,
+        { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate } },
+      )
+      if (!res.ok) break
+      const json = (await res.json()) as { code: string; data?: OkxLiquidationGroup[] }
+      if (String(json.code) !== "0") break
+      groups = json.data ?? []
+    } catch {
+      break
+    }
+
+    if (groups.length === 0) break
+
+    let oldestTs = Number.POSITIVE_INFINITY
+    let added = 0
+
+    for (const group of groups) {
+      for (const detail of group.details ?? []) {
+        const ts = Number(detail.ts)
+        const bkPx = Number(detail.bkPx)
+        const sz = Number(detail.sz)
+        if (!Number.isFinite(ts) || !Number.isFinite(bkPx) || !Number.isFinite(sz)) continue
+
+        const notionalUsd = sz * ctVal * bkPx
+        const dayKey = toDayKey(ts)
+        if (detail.posSide === "long") {
+          longByDay.set(dayKey, (longByDay.get(dayKey) ?? 0) + notionalUsd)
+        } else {
+          shortByDay.set(dayKey, (shortByDay.get(dayKey) ?? 0) + notionalUsd)
+        }
+        if (ts < oldestTs) oldestTs = ts
+        added++
+      }
+    }
+
+    if (added === 0) break
+    if (oldestTs <= cutoffMs) break
+    if (!Number.isFinite(oldestTs)) break
+    after = String(oldestTs)
+  }
+
+  return {
+    long: Array.from(longByDay.entries()).map(([ts, v]) => ({ timestamp: ts, value: v })),
+    short: Array.from(shortByDay.entries()).map(([ts, v]) => ({ timestamp: ts, value: v })),
+  }
+}
+
 /* Deribit BTC DVOL daily close — single-asset implied-volatility index. */
 async function deribitDvolDaily(rangeDays: number): Promise<RawPoint[]> {
   const end = Date.now()
@@ -748,6 +844,7 @@ const LONG_SHORT_KEYS = [
   "signalRiskScore",
   "signalDirection",
 ] as const
+const LIQ_KEYS = ["liqLong", "liqShort"] as const
 const MINING_COST_KEYS = ["miningElectricityCost", "miningComprehensiveCost"] as const
 const TOP_TRADER_KEYS = ["topTraderAccount", "topTraderPosition"] as const
 const SMART_MONEY_KEYS = ["smartBuy", "smartSell", "smartNet", "smartCum"] as const
@@ -766,6 +863,7 @@ const SELECTED_INSTRUMENT_LABEL_KEYS = new Set<string>([
   ...OI_KEYS,
   ...FUNDING_KEYS,
   ...LONG_SHORT_KEYS,
+  ...LIQ_KEYS,
   "contractLs",
   ...TOP_TRADER_KEYS,
   ...SMART_MONEY_KEYS,
@@ -843,6 +941,7 @@ export async function GET(request: Request) {
     contractLsRatio,
     topTrader,
     taker,
+    liq,
     fng,
     stablecoin,
     defiTvl,
@@ -898,6 +997,9 @@ export async function GET(request: Request) {
     hasRequestedKey(requestedKeys, SMART_MONEY_KEYS)
       ? okxTakerNet(ccy, okxDays)
       : { buy: [], sell: [], net: [], cumulativeNet: [] },
+    hasRequestedKey(requestedKeys, LIQ_KEYS)
+      ? okxLiquidationDaily(instId, okxDays)
+      : { long: [], short: [] },
     requestedKeys.has("fng")
       ? fetchFearGreedHistory(range, revalidate).then((r) =>
           (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
@@ -1043,6 +1145,8 @@ export async function GET(request: Request) {
     ["smartSell", taker.sell],
     ["smartNet", taker.net],
     ["smartCum", taker.cumulativeNet],
+    ["liqLong", liq.long],
+    ["liqShort", liq.short],
     ["fng", fng],
     ["dvol", dvol],
     ["hashRate", hashRateEH],

@@ -160,6 +160,101 @@ const normalizeTopTraderRatioHistory = (rows: string[][]) =>
     .filter((point) => Number.isFinite(point.longShortAccountRatio))
     .reverse()
 
+interface OkxLiquidationGroup {
+  instId: string
+  details: {
+    side: "buy" | "sell"
+    posSide: "long" | "short"
+    bkPx: string
+    sz: string
+    ts: string
+  }[]
+}
+
+/* Per-price-bucket aggregation of recent liquidation orders (last ~24h).
+   Useful for identifying price levels with high cascade-liquidation density. */
+async function fetchLiquidationLevels(instId: string, currentPrice: number) {
+  if (currentPrice <= 0) return []
+
+  const ccy = instId.split("-")[0] ?? "BTC"
+  // Scale bucket to ~0.3% of price, snapped to a round number
+  const rawBucket = currentPrice * 0.003
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawBucket)))
+  const bucketSize = Math.max(magnitude, Math.round(rawBucket / magnitude) * magnitude)
+
+  const longByBucket = new Map<number, number>()
+  const shortByBucket = new Map<number, number>()
+  // BTC-USDT-SWAP: 1 contract = 0.01 BTC face value
+  const CT_VAL: Record<string, number> = {
+    BTC: 0.01, ETH: 0.01, SOL: 0.1, XRP: 100, BNB: 0.01, DOGE: 1000,
+  }
+  const ctVal = CT_VAL[ccy] ?? 0.01
+  let after: string | null = null
+
+  for (let page = 0; page < 5; page++) {
+    const params = new URLSearchParams({
+      instType: "SWAP",
+      instId,
+      state: "filled",
+      limit: "100",
+    })
+    if (after) params.set("after", after)
+
+    let groups: OkxLiquidationGroup[] = []
+    try {
+      const res = await fetch(
+        `${OKX_BASE_URL}/api/v5/public/liquidation-orders?${params.toString()}`,
+        { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" }, next: { revalidate } },
+      )
+      if (!res.ok) break
+      const json = (await res.json()) as { code: string; data?: OkxLiquidationGroup[] }
+      if (String(json.code) !== "0") break
+      groups = json.data ?? []
+    } catch {
+      break
+    }
+
+    if (groups.length === 0) break
+    let oldestTs = Number.POSITIVE_INFINITY
+
+    for (const group of groups) {
+      for (const detail of group.details ?? []) {
+        const ts = Number(detail.ts)
+        const bkPx = Number(detail.bkPx)
+        const sz = Number(detail.sz)
+        if (!Number.isFinite(bkPx) || !Number.isFinite(sz) || bkPx <= 0) continue
+        const notionalUsd = sz * ctVal * bkPx
+        const bucket = Math.floor(bkPx / bucketSize) * bucketSize
+        if (detail.posSide === "long") {
+          longByBucket.set(bucket, (longByBucket.get(bucket) ?? 0) + notionalUsd)
+        } else {
+          shortByBucket.set(bucket, (shortByBucket.get(bucket) ?? 0) + notionalUsd)
+        }
+        if (Number.isFinite(ts) && ts < oldestTs) oldestTs = ts
+      }
+    }
+
+    if (!Number.isFinite(oldestTs)) break
+    after = String(oldestTs)
+  }
+
+  const allBuckets = new Set([...longByBucket.keys(), ...shortByBucket.keys()])
+  return Array.from(allBuckets)
+    .sort((a, b) => a - b)
+    .map((bucket) => {
+      const longLiqUsd = longByBucket.get(bucket) ?? 0
+      const shortLiqUsd = shortByBucket.get(bucket) ?? 0
+      return {
+        priceLow: bucket,
+        priceHigh: bucket + bucketSize,
+        longLiqUsd,
+        shortLiqUsd,
+        totalUsd: longLiqUsd + shortLiqUsd,
+      }
+    })
+    .filter((level) => level.totalUsd > 0)
+}
+
 const sanitizeInstId = (raw: string | null) => {
   if (!raw) return DEFAULT_INST_ID
   const cleaned = raw.toUpperCase().trim()
@@ -241,6 +336,8 @@ export async function GET(request: Request) {
     const spotTicker = spotTickerRows[0]
     const spotPrice = Number(spotTicker?.last ?? 0)
 
+    const liquidationLevels = await fetchLiquidationLevels(instId, price)
+
     // Calculate perpetual premium (basis) = (perp price - spot price) / spot price * 100
     const perpPremium = spotPrice > 0 ? ((price - spotPrice) / spotPrice) * 100 : 0
 
@@ -309,6 +406,7 @@ export async function GET(request: Request) {
       contractLongShortRatioHistory: normalizeTwoColumnHistory(contractLongShortRatioRows, "ratio"),
       topTraderPositionHistory: normalizeTopTraderRatioHistory(topTraderPositionRows),
       takerVolumeHistory,
+      liquidationLevels,
     })
   } catch (error) {
     return NextResponse.json(
