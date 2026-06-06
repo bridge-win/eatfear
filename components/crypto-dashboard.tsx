@@ -9,9 +9,12 @@ import {
   useCryptoHistoryPayload,
 } from "@/components/crypto-history-compare"
 import { CryptoIndicatorDetail } from "@/components/crypto-indicator-detail"
+import { getCryptoIndicatorDescription } from "@/components/crypto-indicator-info"
 import { CryptoRealtimeCards } from "@/components/crypto-realtime-cards"
 import { CryptoRegimeScoreCard } from "@/components/crypto-regime-score-card"
+import { getCryptoSeriesLabel } from "@/components/crypto-series-label"
 import { CyclePositionCard } from "@/components/cycle-position-card"
+import { OpportunityRadar } from "@/components/opportunity-radar"
 import { DashboardFrame } from "@/components/page-frame"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -24,6 +27,7 @@ import {
   type DashboardTabValue,
 } from "@/lib/client-persistence"
 import { useT } from "@/lib/i18n"
+import { buildTradingOpportunities, type OpportunityInputSeries } from "@/lib/opportunity-engine"
 import { isTimeRangeId, type TimeRangeId } from "@/lib/time-range"
 import type { CryptoInstrument } from "@/lib/types"
 
@@ -84,6 +88,41 @@ export function CryptoDashboard({
       })),
     [instruments, t],
   )
+  const opportunityInputs = useMemo<OpportunityInputSeries[]>(() => {
+    const payload = cryptoHistory.payload
+    if (!payload) return []
+    return payload.series.map((series) => {
+      const finitePoints = series.data.filter(
+        (point): point is { time: number; value: number } =>
+          point.value !== null && Number.isFinite(point.value),
+      )
+      const latest = finitePoints[finitePoints.length - 1]
+      const first = finitePoints[0]
+      const changePercent = latest && first && first.value !== 0
+        ? (latest.value / first.value - 1) * 100
+        : null
+      return {
+        key: series.key,
+        label: getCryptoSeriesLabel(t, series),
+        source: series.source,
+        description: getCryptoIndicatorDescription({ payload, series, t }),
+        value: latest?.value ?? null,
+        changePercent,
+        timestamp: latest?.time ?? null,
+        data: series.data,
+        relevanceScore: series.relevanceScore,
+      }
+    })
+  }, [cryptoHistory.payload, t])
+  const opportunities = useMemo(
+    () =>
+      buildTradingOpportunities({
+        assetClass: "crypto",
+        marketName: instId.split("-")[0] ?? "BTC",
+        series: opportunityInputs,
+      }),
+    [instId, opportunityInputs],
+  )
 
   return (
     <DashboardFrame>
@@ -105,6 +144,17 @@ export function CryptoDashboard({
         <CryptoRegimeScoreCard instId={instId} className="flex-1 min-w-[12rem]" />
         <CyclePositionCard className="flex-1 min-w-[12rem]" />
       </div>
+
+      <OpportunityRadar
+        assetClass="crypto"
+        title={{ zh: "交易机会雷达", en: "Trading Opportunity Radar" }}
+        subtitle={{
+          zh: "把趋势、流动性、衍生品拥挤、恐慌反转和宏观确认合成可解释机会卡。",
+          en: "Synthesizes trend, liquidity, derivatives crowding, panic reversals, and macro confirmation into explainable setups.",
+        }}
+        opportunities={opportunities}
+        loading={cryptoHistory.loading}
+      />
 
       <Tabs
         value={tab}

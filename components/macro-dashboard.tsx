@@ -10,6 +10,7 @@ import {
 } from "@/components/aligned-history-compare"
 import { MarketIndicatorCards, type MarketIndicatorItem } from "@/components/market-indicator-cards"
 import { MarketIndicatorDetail } from "@/components/market-indicator-detail"
+import { OpportunityRadar } from "@/components/opportunity-radar"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DashboardFrame } from "@/components/page-frame"
@@ -26,6 +27,7 @@ import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-share
 import { DEFAULT_MACRO_INDICATOR_REFRESH_MS, getConfiguredMacroIndicatorMetas } from "@/lib/macro-indicator-config"
 import { useT } from "@/lib/i18n"
 import { withRelevanceScore } from "@/lib/indicator-score"
+import { buildTradingOpportunities, type OpportunityInputSeries } from "@/lib/opportunity-engine"
 import { getTimeRange, isTimeRangeId, type TimeRangeId } from "@/lib/time-range"
 import type { MacroIndicator } from "@/lib/types"
 
@@ -244,6 +246,29 @@ export function MacroDashboard({
   const error = payload ? null : priority.error?.message ?? rest.error?.message ?? fullCache.error?.message ?? null
 
   const macroItems = useMemo(() => buildMacroItems(indicators), [indicators])
+  const opportunityInputs = useMemo<OpportunityInputSeries[]>(
+    () =>
+      macroItems.map((item) => ({
+        key: item.key,
+        label: item.label,
+        source: item.source,
+        description: item.description,
+        value: item.value,
+        changePercent: item.changePercent,
+        timestamp: item.timestamp,
+        data: item.data,
+      })),
+    [macroItems],
+  )
+  const opportunities = useMemo(
+    () =>
+      buildTradingOpportunities({
+        assetClass: "macro",
+        marketName: "Macro",
+        series: opportunityInputs,
+      }),
+    [opportunityInputs],
+  )
   const macroHistoryData = useMemo(() => buildMacroHistoryData(macroItems), [macroItems])
 
   return (
@@ -269,6 +294,17 @@ export function MacroDashboard({
       </header>
 
       {fredEnabled === false && <FredHint />}
+
+      <OpportunityRadar
+        assetClass="macro"
+        title={{ zh: "宏观机会雷达", en: "Macro Opportunity Radar" }}
+        subtitle={{
+          zh: "把利率、美元、信用、VIX、M2、通胀与就业合成风险资产顺风/逆风和冲击风险。",
+          en: "Combines rates, USD, credit, VIX, M2, inflation, and labor data into risk-asset tailwind/headwind and shock-risk reads.",
+        }}
+        opportunities={opportunities}
+        loading={isLoading}
+      />
 
       {error && (
         <Card className="border-destructive/40">
