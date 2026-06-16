@@ -199,6 +199,15 @@ const formatCompactUnit = (value: number, unit: string) => {
 
 const formatPercent = (value: number, digits = 2) => `${value >= 0 ? "+" : ""}${value.toFixed(digits)}%`
 
+const formatCountdown = (ms: number) => {
+  if (!Number.isFinite(ms) || ms <= 0) return "--:--:--"
+  const totalSeconds = Math.floor(ms / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+}
+
 const clampScore = (value: number) => Math.max(0, Math.min(100, Math.round(value)))
 
 const calculateZScore = (values: number[], currentValue: number) => {
@@ -568,6 +577,8 @@ export function BtcVolatilitySystem({
   const [orderBook, setOrderBook] = useState<OrderBookState>(emptyOrderBook)
   const [liquidations] = useState<LiquidationEvent[]>([])
   const [fundingRate, setFundingRate] = useState(0)
+  const [nextFundingTime, setNextFundingTime] = useState(0)
+  const [liveNow, setLiveNow] = useState(() => Date.now())
   const [openInterest, setOpenInterest] = useState(0)
   const [openInterestUsd, setOpenInterestUsd] = useState(0)
   const [openInterestHistory, setOpenInterestHistory] = useState<OpenInterestPoint[]>([])
@@ -627,6 +638,7 @@ export function BtcVolatilitySystem({
           (payload.openInterestHistory ?? []).map((point) => ({ time: point.time, value: point.valueUsd })),
         )
         setFundingRate(payload.fundingRate?.rate ?? 0)
+        setNextFundingTime(payload.fundingRate?.nextFundingTime ?? 0)
         setFundingRateHistory(payload.fundingRateHistory ?? [])
         setLongShortAccountRatioHistory(payload.longShortAccountRatioHistory ?? [])
         setContractLongShortRatioHistory(payload.contractLongShortRatioHistory ?? [])
@@ -651,6 +663,11 @@ export function BtcVolatilitySystem({
       clearInterval(interval)
     }
   }, [instId, range, sourceId, onApiKeyStatusChange])
+
+  useEffect(() => {
+    const tick = setInterval(() => setLiveNow(Date.now()), 1000)
+    return () => clearInterval(tick)
+  }, [])
 
   const now = Date.now()
   const recentLiquidations = useMemo(
@@ -1195,7 +1212,11 @@ export function BtcVolatilitySystem({
                   <MetricCard
                     label={t("vol.metric.funding.label")}
                     value={`${fundingRate.toFixed(4)}%`}
-                    helper={t("vol.metric.funding.helper")}
+                    helper={
+                      nextFundingTime > 0
+                        ? t("vol.metric.funding.countdown", { time: formatCountdown(nextFundingTime - liveNow) })
+                        : t("vol.metric.funding.helper")
+                    }
                     tone={fundingRate >= 0 ? "green" : "red"}
                     info={{
                       description: t("vol.metric.funding.info"),

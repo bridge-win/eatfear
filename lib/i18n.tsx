@@ -411,6 +411,7 @@ const DICT: Dict = {
   "vol.metric.oiTitle.info": { zh: "未平仓合约价值（USD）。OI 上升 = 新仓涌入，下降 = 仓位平仓或被强平。", en: "Open-interest value (USD). Rising = new positions; falling = closes or liquidations." },
   "vol.metric.funding.label": { zh: "资金费率", en: "Funding Rate" },
   "vol.metric.funding.helper": { zh: "当前预测/结算费率", en: "Current predicted / settled rate" },
+  "vol.metric.funding.countdown": { zh: "下次结算 {time}", en: "Next settle in {time}" },
   "vol.metric.funding.info": {
     zh: "永续合约多空之间的周期性资金交换。正 = 多头给空头付费（多头拥挤），负 = 空头给多头付费（空头拥挤）。",
     en: "Periodic payment between perp longs and shorts. Positive = longs pay shorts (crowded longs); negative = shorts pay longs (crowded shorts).",
