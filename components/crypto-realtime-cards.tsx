@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef, useState } from "react"
 import { RefreshCw } from "lucide-react"
 
 import { getCryptoIndicatorDescription } from "@/components/crypto-indicator-info"
@@ -84,6 +85,22 @@ function formatPct(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`
 }
 
+function useFlashOnChange(value: number | undefined) {
+  const [flash, setFlash] = useState<"up" | "down" | null>(null)
+  const prevRef = useRef<number | undefined>(undefined)
+
+  useEffect(() => {
+    const prev = prevRef.current
+    prevRef.current = value
+    if (value === undefined || prev === undefined || value === prev) return
+    setFlash(value > prev ? "up" : "down")
+    const timer = setTimeout(() => setFlash(null), 800)
+    return () => clearTimeout(timer)
+  }, [value])
+
+  return flash
+}
+
 function LoadingCard({ index }: { index: number }) {
   return (
     <article
@@ -107,6 +124,84 @@ function LoadingCard({ index }: { index: number }) {
         <span className="h-3 w-10 animate-pulse rounded bg-muted" />
       </div>
       <p className="mt-1 h-2.5 w-16 animate-pulse rounded bg-muted" />
+    </article>
+  )
+}
+
+interface RealtimeCardProps {
+  series: CryptoHistorySeries
+  payload: CryptoHistoryPayload
+  onSelectSeries?: (key: string) => void
+}
+
+function RealtimeCard({ series, payload, onSelectSeries }: RealtimeCardProps) {
+  const t = useT()
+  const label = getCryptoSeriesLabel(t, series)
+  const summary = summarize(series)
+  const flash = useFlashOnChange(summary?.last)
+  const pctTone =
+    !summary
+      ? "text-muted-foreground"
+      : summary.pct >= 0
+        ? "text-emerald-600 dark:text-emerald-400"
+        : "text-red-600 dark:text-red-400"
+  const fullInfoDescription = getCryptoIndicatorDescription({ payload, series, t })
+
+  return (
+    <article
+      data-crypto-realtime-card
+      data-series-key={series.key}
+      data-series-order={series.order}
+      role={onSelectSeries ? "button" : undefined}
+      tabIndex={onSelectSeries ? 0 : undefined}
+      onClick={() => onSelectSeries?.(series.key)}
+      onKeyDown={(event) => {
+        if (!onSelectSeries) return
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          onSelectSeries(series.key)
+        }
+      }}
+      className={cn(
+        "min-w-0 rounded-md border bg-card/80 px-2.5 py-2 shadow-sm transition-colors duration-700",
+        onSelectSeries && "cursor-pointer hover:border-foreground/30 hover:bg-muted/30",
+        flash === "up" && "bg-emerald-500/15 dark:bg-emerald-500/10",
+        flash === "down" && "bg-red-500/15 dark:bg-red-500/10",
+      )}
+    >
+      <header className="flex min-w-0 items-start justify-between gap-1.5">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="shrink-0 text-[9px] font-semibold tabular-nums text-muted-foreground">
+              #{String(series.order).padStart(2, "0")}
+            </span>
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: series.color }} />
+            <h3 className="truncate text-[11px] font-medium leading-4" title={label}>
+              {label}
+            </h3>
+          </div>
+        </div>
+        <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+          <InfoPopover
+            title={`#${String(series.order).padStart(2, "0")} ${label}`}
+            description={fullInfoDescription}
+            source={series.source}
+            className="mt-0.5 h-3.5 w-3.5 shrink-0"
+            iconClassName="h-3 w-3"
+            contentClassName="w-[30rem]"
+          />
+        </span>
+      </header>
+
+      <div className="mt-2 flex items-end justify-between gap-1.5">
+        <p className="min-w-0 truncate text-lg font-semibold leading-5 tabular-nums">
+          {summary ? formatValue(summary.last, series.unit) : "—"}
+        </p>
+        <p className={cn("shrink-0 text-[10px] font-medium tabular-nums", pctTone)}>
+          {summary ? formatPct(summary.pct) : "—"}
+        </p>
+      </div>
+      <p className="mt-1 truncate text-[9px] text-muted-foreground">{summary ? formatDate(summary.timestamp) : "—"}</p>
     </article>
   )
 }
@@ -165,75 +260,9 @@ export function CryptoRealtimeCards({
       data-crypto-realtime-grid
       className={cn("grid gap-1.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6", className)}
     >
-      {payload.series.map((series) => {
-        const label = getCryptoSeriesLabel(t, series)
-        const summary = summarize(series)
-        const pctTone =
-          !summary
-            ? "text-muted-foreground"
-            : summary.pct >= 0
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-red-600 dark:text-red-400"
-        const fullInfoDescription = getCryptoIndicatorDescription({ payload, series, t })
-        return (
-          <article
-            key={series.key}
-            data-crypto-realtime-card
-            data-series-key={series.key}
-            data-series-order={series.order}
-            role={onSelectSeries ? "button" : undefined}
-            tabIndex={onSelectSeries ? 0 : undefined}
-            onClick={() => onSelectSeries?.(series.key)}
-            onKeyDown={(event) => {
-              if (!onSelectSeries) return
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault()
-                onSelectSeries(series.key)
-              }
-            }}
-            className={cn(
-              "min-w-0 rounded-md border bg-card/80 px-2.5 py-2 shadow-sm",
-              onSelectSeries && "cursor-pointer transition-colors hover:border-foreground/30 hover:bg-muted/30",
-            )}
-          >
-            <header className="flex min-w-0 items-start justify-between gap-1.5">
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-1">
-                  <span className="shrink-0 text-[9px] font-semibold tabular-nums text-muted-foreground">
-                    #{String(series.order).padStart(2, "0")}
-                  </span>
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: series.color }} />
-                  <h3 className="truncate text-[11px] font-medium leading-4" title={label}>
-                    {label}
-                  </h3>
-                </div>
-              </div>
-              <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                <InfoPopover
-                  title={`#${String(series.order).padStart(2, "0")} ${label}`}
-                  description={fullInfoDescription}
-                  source={series.source}
-                  className="mt-0.5 h-3.5 w-3.5 shrink-0"
-                  iconClassName="h-3 w-3"
-                  contentClassName="w-[30rem]"
-                />
-              </span>
-            </header>
-
-            <div className="mt-2 flex items-end justify-between gap-1.5">
-              <p className="min-w-0 truncate text-lg font-semibold leading-5 tabular-nums">
-                {summary ? formatValue(summary.last, series.unit) : "—"}
-              </p>
-              <p className={cn("shrink-0 text-[10px] font-medium tabular-nums", pctTone)}>
-                {summary ? formatPct(summary.pct) : "—"}
-              </p>
-            </div>
-            <p className="mt-1 truncate text-[9px] text-muted-foreground">
-              {summary ? formatDate(summary.timestamp) : "—"}
-            </p>
-          </article>
-        )
-      })}
+      {payload.series.map((series) => (
+        <RealtimeCard key={series.key} series={series} payload={payload} onSelectSeries={onSelectSeries} />
+      ))}
       {Array.from({ length: placeholderCount }, (_, index) => (
         <LoadingCard key={`loading-${index}`} index={payload.series.length + index} />
       ))}
