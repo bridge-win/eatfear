@@ -17,6 +17,15 @@ const DICT: Dict = {
   "nav.macro": { zh: "宏观", en: "Macro" },
   "nav.news": { zh: "资讯", en: "News" },
   "lang.toggle": { zh: "切换语言", en: "Switch language" },
+  "theme.toggle": { zh: "切换主题", en: "Toggle theme" },
+  "nav.search": { zh: "搜索", en: "Search" },
+  "command.placeholder": { zh: "搜索页面、指标...", en: "Search pages, indicators..." },
+  "command.empty": { zh: "未找到结果", en: "No results found." },
+  "command.group.pages": { zh: "页面", en: "Pages" },
+  "command.group.theme": { zh: "外观", en: "Appearance" },
+  "command.theme.light": { zh: "浅色模式", en: "Light mode" },
+  "command.theme.dark": { zh: "深色模式", en: "Dark mode" },
+  "nav.menu": { zh: "菜单", en: "Menu" },
 
   // Crypto dashboard chrome
   "crypto.title": { zh: "加密看板", en: "Crypto Dashboard" },

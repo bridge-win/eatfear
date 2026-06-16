@@ -1,10 +1,14 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { TrendingDown } from "lucide-react"
+import { Menu, TrendingDown } from "lucide-react"
 
+import { CommandPalette } from "@/components/command-palette"
 import { LanguageToggle } from "@/components/language-toggle"
+import { ThemeToggle } from "@/components/theme-toggle"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -16,40 +20,85 @@ const navItems = [
   { href: "/news", key: "nav.news" },
 ] as const
 
+function isItemActive(pathname: string, href: string) {
+  return href === "/home" ? pathname === "/home" : pathname === href || pathname.startsWith(`${href}/`)
+}
+
 export function SiteHeader() {
   const pathname = usePathname()
   const t = useT()
+  const [mobileOpen, setMobileOpen] = React.useState(false)
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="container mx-auto flex min-h-12 flex-col gap-2 px-4 py-2 md:flex-row md:items-center md:justify-between">
-        <Link href="/crypto" className="flex items-center gap-2">
-          <TrendingDown className="h-5 w-5 text-primary" />
-          <span className="text-lg font-bold">eatfear</span>
-        </Link>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <nav className="flex flex-wrap items-center gap-2">
-            {navItems.map((item) => {
-              const isActive =
-                item.href === "/home"
-                  ? pathname === "/home"
-                  : pathname === item.href || pathname.startsWith(`${item.href}/`)
+      <div className="container mx-auto flex min-h-12 items-center justify-between gap-2 px-4 py-2">
+        <div className="flex items-center gap-2">
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger asChild>
+              <button
+                type="button"
+                aria-label={t("nav.menu")}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+              >
+                <Menu className="h-4.5 w-4.5" />
+              </button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-64">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <TrendingDown className="h-5 w-5 text-primary" />
+                  eatfear
+                </SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-1 px-2">
+                {navItems.map((item) => {
+                  const isActive = isItemActive(pathname, item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      prefetch
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                        isActive && "bg-foreground text-background hover:bg-foreground hover:text-background",
+                      )}
+                    >
+                      {t(item.key)}
+                    </Link>
+                  )
+                })}
+              </nav>
+            </SheetContent>
+          </Sheet>
+          <Link href="/crypto" className="flex items-center gap-2">
+            <TrendingDown className="h-5 w-5 text-primary" />
+            <span className="text-lg font-bold">eatfear</span>
+          </Link>
+        </div>
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  prefetch
-                  className={cn(
-                    "rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                    isActive && "bg-foreground text-background hover:bg-foreground hover:text-background",
-                  )}
-                >
-                  {t(item.key)}
-                </Link>
-              )
-            })}
-          </nav>
+        <nav className="hidden flex-wrap items-center gap-2 md:flex">
+          {navItems.map((item) => {
+            const isActive = isItemActive(pathname, item.href)
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                prefetch
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                  isActive && "bg-foreground text-background hover:bg-foreground hover:text-background",
+                )}
+              >
+                {t(item.key)}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="flex items-center justify-end gap-2">
+          <CommandPalette />
+          <ThemeToggle />
           <LanguageToggle />
         </div>
       </div>

@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { I18nProvider } from "@/lib/i18n"
 import "./globals.css"
@@ -38,12 +39,14 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
-        <I18nProvider>
-          {children}
-          <Toaster />
-        </I18nProvider>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+          <I18nProvider>
+            {children}
+            <Toaster />
+          </I18nProvider>
+        </ThemeProvider>
         <Analytics />
       </body>
     </html>
