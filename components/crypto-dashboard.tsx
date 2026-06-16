@@ -15,6 +15,7 @@ import { CryptoRegimeScoreCard } from "@/components/crypto-regime-score-card"
 import { getCryptoSeriesLabel } from "@/components/crypto-series-label"
 import { CyclePositionCard } from "@/components/cycle-position-card"
 import { OpportunityRadar } from "@/components/opportunity-radar"
+import { OptionsMaxPainCard } from "@/components/options-max-pain-card"
 import { DashboardFrame } from "@/components/page-frame"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -78,6 +79,10 @@ export function CryptoDashboard({
       : FALLBACK_INSTRUMENTS
   const cryptoHistory = useCryptoHistoryPayload(instId, range)
   const t = useT()
+  const optionsCurrency = useMemo(() => {
+    const base = instId.split("-")[0]
+    return base === "BTC" || base === "ETH" ? base : null
+  }, [instId])
 
   const symbolOptions: SymbolOption[] = useMemo(
     () =>
@@ -144,6 +149,8 @@ export function CryptoDashboard({
         <CryptoRegimeScoreCard instId={instId} className="flex-1 min-w-[12rem]" />
         <CyclePositionCard className="flex-1 min-w-[12rem]" />
       </div>
+
+      {optionsCurrency && <OptionsMaxPainCard currency={optionsCurrency} />}
 
       <OpportunityRadar
         assetClass="crypto"

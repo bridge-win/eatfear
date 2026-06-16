@@ -596,6 +596,23 @@ const DICT: Dict = {
   "smart.kpi.ratio": { zh: "买卖比", en: "Buy/Sell" },
   "smart.kpi.cumNet": { zh: "累计净买入", en: "Cumulative net buy" },
 
+  // Options OI / max pain (Deribit)
+  "optionsOi.title": { zh: "{ccy} 期权持仓墙 (Deribit)", en: "{ccy} Options OI Walls (Deribit)" },
+  "optionsOi.info": {
+    zh: "按行使价聚合 Deribit {ccy} 期权未平仓量（看涨/看跌），选取未平仓量最集中的到期日。\n看涨墙 / 看跌墙：未平仓量最大的行使价，常被视为价格上方阻力 / 下方支撑（卖方倾向于把价格“钉”在这些价位附近）。\n最大痛点 (Max Pain)：若到期时结算在该价位，期权卖方（做市商）总支付最小——历史上到期日价格有靠近该价位的统计倾向，但不是必然规律。\n局限：这是当前挂单仓位的静态快照，不是强平价位预测；且对冲行为、新开仓和早期平仓都会改变实际结果。",
+    en: "Aggregates Deribit {ccy} options open interest by strike (calls vs puts) for the expiry with the largest concentration of OI.\nCall Wall / Put Wall: the strike with the most OI — often acts as resistance above / support below, since option sellers (market makers) tend to hedge price toward these levels.\nMax Pain: the strike where option sellers' total payout is minimized at expiry — price has a loose historical tendency to drift toward it, but it is not a hard rule.\nCaveat: this is a static snapshot of currently open positions, not a liquidation-price forecast — hedging flow, new positions, and early closes all shift the real outcome.",
+  },
+  "optionsOi.loading": { zh: "正在加载期权持仓墙…", en: "Loading options OI walls…" },
+  "optionsOi.unavailable": { zh: "暂无可用期权数据", en: "No options data available" },
+  "optionsOi.putWall": { zh: "看跌墙", en: "Put Wall" },
+  "optionsOi.callWall": { zh: "看涨墙", en: "Call Wall" },
+  "optionsOi.maxPain": { zh: "最大痛点", en: "Max Pain" },
+  "optionsOi.spot": { zh: "现价", en: "Spot" },
+  "optionsOi.expiry": { zh: "到期", en: "Expiry" },
+  "optionsOi.totalOi": { zh: "总未平仓量", en: "Total OI" },
+  "optionsOi.tooltip.call": { zh: "看涨持仓", en: "Call OI" },
+  "optionsOi.tooltip.put": { zh: "看跌持仓", en: "Put OI" },
+
   // Mining cost / electricity curve
   "mining.title": { zh: "BTC 挖矿成本曲线", en: "BTC Mining Cost Curves" },
   "mining.info": {
