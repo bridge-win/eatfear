@@ -17,6 +17,7 @@ const navItems = [
   { href: "/crypto", key: "nav.crypto" },
   { href: "/stock", key: "nav.stock" },
   { href: "/macro", key: "nav.macro" },
+  { href: "/methodology", key: "nav.methodology" },
   { href: "/news", key: "nav.news" },
 ] as const
 

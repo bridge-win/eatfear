@@ -26,6 +26,7 @@ interface MarketIndicatorCardsProps {
   error: string | null
   loadingLabel: string
   noDataLabel: string
+  expectedCount?: number
   onSelectItem?: (key: string) => void
   className?: string
   dataPrefix?: string
@@ -71,12 +72,40 @@ function formatDate(timestamp: number | null): string {
   return new Date(timestamp).toISOString().slice(0, 10)
 }
 
+function LoadingCard({ index, dataPrefix }: { index: number; dataPrefix: string }) {
+  return (
+    <article
+      data-market-realtime-card={dataPrefix}
+      data-market-loading-card
+      data-indicator-order={index + 1}
+      className="min-w-0 rounded-md border bg-card/60 px-2.5 py-2 shadow-sm"
+    >
+      <header className="flex min-w-0 items-start justify-between gap-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          <span className="shrink-0 text-[9px] font-semibold tabular-nums text-muted-foreground">
+            #{String(index + 1).padStart(2, "0")}
+          </span>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/30" />
+          <span className="h-3 w-28 max-w-full animate-pulse rounded bg-muted" />
+        </div>
+        <RefreshCw className="mt-0.5 h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
+      </header>
+      <div className="mt-2 flex items-end justify-between gap-1.5">
+        <span className="h-5 w-20 animate-pulse rounded bg-muted" />
+        <span className="h-3 w-10 animate-pulse rounded bg-muted" />
+      </div>
+      <p className="mt-1 h-2.5 w-16 animate-pulse rounded bg-muted" />
+    </article>
+  )
+}
+
 export function MarketIndicatorCards({
   items,
   loading,
   error,
   loadingLabel,
   noDataLabel,
+  expectedCount,
   onSelectItem,
   className,
   dataPrefix = "market",
@@ -89,11 +118,24 @@ export function MarketIndicatorCards({
     )
   }
 
+  const placeholderCount = loading ? Math.max(0, (expectedCount ?? items.length) - items.length) : 0
+  const emptyPlaceholderCount = Math.max(6, Math.min(expectedCount ?? 6, 12))
+
   if (loading && items.length === 0) {
     return (
-      <div className={cn("flex items-center gap-2 text-xs text-muted-foreground", className)}>
-        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-        {loadingLabel}
+      <div className={cn("space-y-2", className)}>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+          {loadingLabel}
+        </div>
+        <div
+          data-market-realtime-grid={dataPrefix}
+          className="grid gap-1.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6"
+        >
+          {Array.from({ length: emptyPlaceholderCount }, (_, index) => (
+            <LoadingCard key={`loading-${index}`} index={index} dataPrefix={dataPrefix} />
+          ))}
+        </div>
       </div>
     )
   }
@@ -170,6 +212,9 @@ export function MarketIndicatorCards({
           </article>
         )
       })}
+      {Array.from({ length: placeholderCount }, (_, index) => (
+        <LoadingCard key={`loading-${index}`} index={items.length + index} dataPrefix={dataPrefix} />
+      ))}
     </div>
   )
 }

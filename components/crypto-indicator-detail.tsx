@@ -10,6 +10,7 @@ import {
 } from "@/components/aligned-history-compare"
 import { getCryptoIndicatorDescription } from "@/components/crypto-indicator-info"
 import type { CryptoHistoryPayload, CryptoHistorySeries } from "@/components/crypto-history-compare"
+import { getCryptoSeriesLabel } from "@/components/crypto-series-label"
 import { InfoPopover } from "@/components/info-popover"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
 import { Button } from "@/components/ui/button"
@@ -60,14 +61,18 @@ export function CryptoIndicatorDetail({ payload, selectedKey, onBack }: CryptoIn
     .filter((series) => !selectedKeys.includes(series.key))
     .map((series) => ({
       id: series.key,
-      label: `#${String(series.order).padStart(2, "0")} ${t(series.i18nKey)}`,
+      label: `#${String(series.order).padStart(2, "0")} ${getCryptoSeriesLabel(t, series)}`,
       hint: series.source,
     }))
 
   const data: AlignedHistoryData | null = useMemo(() => {
     if (selectedSeries.length === 0) return null
     const chartSeries = selectedSeries.map((series) => {
-      return toAlignedSeries(series, t(series.i18nKey), getCryptoIndicatorDescription({ payload, series, t }))
+      return toAlignedSeries(
+        series,
+        getCryptoSeriesLabel(t, series),
+        getCryptoIndicatorDescription({ payload, series, t }),
+      )
     })
 
     return {
@@ -78,7 +83,7 @@ export function CryptoIndicatorDetail({ payload, selectedKey, onBack }: CryptoIn
 
   if (!primary) return null
 
-  const primaryLabel = t(primary.i18nKey)
+  const primaryLabel = getCryptoSeriesLabel(t, primary)
   const primaryInfo = getCryptoIndicatorDescription({ payload, series: primary, t })
 
   return (
@@ -137,7 +142,7 @@ export function CryptoIndicatorDetail({ payload, selectedKey, onBack }: CryptoIn
 
       <div className="flex flex-wrap gap-1">
         {selectedSeries.map((series, index) => {
-          const label = t(series.i18nKey)
+          const label = getCryptoSeriesLabel(t, series)
           return (
             <span
               key={series.key}

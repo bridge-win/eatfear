@@ -1,19 +1,34 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 
 import { BlackSwanOpportunityCard } from "@/components/black-swan-opportunity-card"
-import { CryptoHistoryCompare, useCryptoHistoryPayload } from "@/components/crypto-history-compare"
+import {
+  CryptoHistoryCompare,
+  getExpectedCryptoHistorySeriesCount,
+  useCryptoHistoryPayload,
+} from "@/components/crypto-history-compare"
 import { CryptoIndicatorDetail } from "@/components/crypto-indicator-detail"
+import { getCryptoIndicatorDescription } from "@/components/crypto-indicator-info"
 import { CryptoRealtimeCards } from "@/components/crypto-realtime-cards"
 import { CryptoRegimeScoreCard } from "@/components/crypto-regime-score-card"
+import { getCryptoSeriesLabel } from "@/components/crypto-series-label"
 import { CyclePositionCard } from "@/components/cycle-position-card"
+import { OpportunityRadar } from "@/components/opportunity-radar"
 import { DashboardFrame } from "@/components/page-frame"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TimeRangeSelector } from "@/components/time-range-selector"
+import {
+  isDashboardTabValue,
+  jsonFetcher,
+  usePersistentState,
+  usePersistentSWR,
+  type DashboardTabValue,
+} from "@/lib/client-persistence"
 import { useT } from "@/lib/i18n"
-import { type TimeRangeId } from "@/lib/time-range"
+import { buildTradingOpportunities, type OpportunityInputSeries } from "@/lib/opportunity-engine"
+import { isTimeRangeId, type TimeRangeId } from "@/lib/time-range"
 import type { CryptoInstrument } from "@/lib/types"
 
 const CRYPTO_DEFAULT_RANGE: TimeRangeId = "1y"
@@ -27,6 +42,14 @@ const FALLBACK_INSTRUMENTS: CryptoInstrument[] = [
   { instId: "DOGE-USDT-SWAP", base: "DOGE", quote: "USDT", label: "DOGE-USDT-PERP" },
 ]
 
+interface CryptoInstrumentsPayload {
+  instruments?: CryptoInstrument[]
+}
+
+function isInstrumentId(value: string): value is string {
+  return /^[A-Z0-9]+-USDT-SWAP$/.test(value)
+}
+
 export interface CryptoDashboardProps {
   initialInstruments?: CryptoInstrument[]
 }
@@ -34,31 +57,27 @@ export interface CryptoDashboardProps {
 export function CryptoDashboard({
   initialInstruments,
 }: CryptoDashboardProps = {}) {
-  const [instruments, setInstruments] = useState<CryptoInstrument[]>(
-    initialInstruments && initialInstruments.length > 0 ? initialInstruments : FALLBACK_INSTRUMENTS,
-  )
-  const [instId, setInstId] = useState<string>("BTC-USDT-SWAP")
-  const [range, setRange] = useState<TimeRangeId>(CRYPTO_DEFAULT_RANGE)
+  const [instId, setInstId] = usePersistentState<string>("crypto:inst-id", "BTC-USDT-SWAP", isInstrumentId)
+  const [range, setRange] = usePersistentState("crypto:range", CRYPTO_DEFAULT_RANGE, isTimeRangeId)
+  const [tab, setTab] = usePersistentState<DashboardTabValue>("crypto:tab", "history", isDashboardTabValue)
   const [selectedSeriesKey, setSelectedSeriesKey] = useState<string | null>(null)
+  const instrumentsPayload = usePersistentSWR<CryptoInstrumentsPayload>(
+    "crypto:instruments",
+    "/api/crypto/instruments",
+    jsonFetcher,
+    {
+      fallbackData: {
+        instruments: initialInstruments && initialInstruments.length > 0 ? initialInstruments : FALLBACK_INSTRUMENTS,
+      },
+      refreshInterval: 60 * 60 * 1000,
+    },
+  )
+  const instruments =
+    instrumentsPayload.data?.instruments && instrumentsPayload.data.instruments.length > 0
+      ? instrumentsPayload.data.instruments
+      : FALLBACK_INSTRUMENTS
   const cryptoHistory = useCryptoHistoryPayload(instId, range)
   const t = useT()
-
-  useEffect(() => {
-    let isActive = true
-    fetch("/api/crypto/instruments")
-      .then((response) => response.json())
-      .then((payload: { instruments?: CryptoInstrument[] }) => {
-        if (isActive && payload.instruments && payload.instruments.length > 0) {
-          setInstruments(payload.instruments)
-        }
-      })
-      .catch(() => {
-        // keep fallback list
-      })
-    return () => {
-      isActive = false
-    }
-  }, [])
 
   const symbolOptions: SymbolOption[] = useMemo(
     () =>
@@ -68,6 +87,41 @@ export function CryptoDashboard({
         hint: t("symbol.perpHint", { base: instrument.base, source: "OKX" }),
       })),
     [instruments, t],
+  )
+  const opportunityInputs = useMemo<OpportunityInputSeries[]>(() => {
+    const payload = cryptoHistory.payload
+    if (!payload) return []
+    return payload.series.map((series) => {
+      const finitePoints = series.data.filter(
+        (point): point is { time: number; value: number } =>
+          point.value !== null && Number.isFinite(point.value),
+      )
+      const latest = finitePoints[finitePoints.length - 1]
+      const first = finitePoints[0]
+      const changePercent = latest && first && first.value !== 0
+        ? (latest.value / first.value - 1) * 100
+        : null
+      return {
+        key: series.key,
+        label: getCryptoSeriesLabel(t, series),
+        source: series.source,
+        description: getCryptoIndicatorDescription({ payload, series, t }),
+        value: latest?.value ?? null,
+        changePercent,
+        timestamp: latest?.time ?? null,
+        data: series.data,
+        relevanceScore: series.relevanceScore,
+      }
+    })
+  }, [cryptoHistory.payload, t])
+  const opportunities = useMemo(
+    () =>
+      buildTradingOpportunities({
+        assetClass: "crypto",
+        marketName: instId.split("-")[0] ?? "BTC",
+        series: opportunityInputs,
+      }),
+    [instId, opportunityInputs],
   )
 
   return (
@@ -86,12 +140,29 @@ export function CryptoDashboard({
       </header>
 
       <div className="flex flex-wrap items-stretch gap-2">
-        <BlackSwanOpportunityCard className="flex-1 min-w-[12rem]" />
-        <CryptoRegimeScoreCard className="flex-1 min-w-[12rem]" />
+        <BlackSwanOpportunityCard instId={instId} className="flex-1 min-w-[12rem]" />
+        <CryptoRegimeScoreCard instId={instId} className="flex-1 min-w-[12rem]" />
         <CyclePositionCard className="flex-1 min-w-[12rem]" />
       </div>
 
-      <Tabs defaultValue="history" className="w-full">
+      <OpportunityRadar
+        assetClass="crypto"
+        title={{ zh: "交易机会雷达", en: "Trading Opportunity Radar" }}
+        subtitle={{
+          zh: "把趋势、流动性、衍生品拥挤、恐慌反转和宏观确认合成可解释机会卡。",
+          en: "Synthesizes trend, liquidity, derivatives crowding, panic reversals, and macro confirmation into explainable setups.",
+        }}
+        opportunities={opportunities}
+        loading={cryptoHistory.loading}
+      />
+
+      <Tabs
+        value={tab}
+        onValueChange={(next) => {
+          if (isDashboardTabValue(next)) setTab(next)
+        }}
+        className="w-full"
+      >
         <TabsList className="grid h-auto w-full max-w-xs grid-cols-2">
           <TabsTrigger value="realtime" className="text-xs">{t("crypto.tab.realtime")}</TabsTrigger>
           <TabsTrigger value="history" className="text-xs">{t("crypto.tab.history")}</TabsTrigger>
@@ -108,6 +179,7 @@ export function CryptoDashboard({
               payload={cryptoHistory.payload}
               loading={cryptoHistory.loading}
               error={cryptoHistory.error}
+              expectedCount={getExpectedCryptoHistorySeriesCount(instId)}
               onSelectSeries={setSelectedSeriesKey}
             />
           )}

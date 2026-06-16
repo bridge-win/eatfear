@@ -30,6 +30,40 @@ const applyTransformToHistory = (history: MacroSeriesPoint[], meta: MacroIndicat
 const getIndicatorSortRank = (indicator: MacroIndicator) =>
   indicator.displayOrder ?? indicator.macroRank ?? 100 + (indicator.priority ?? 999)
 
+function getPositiveInteger(value: string | null): number | null {
+  if (!value) return null
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function getNonNegativeInteger(value: string | null): number {
+  if (!value) return 0
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0
+}
+
+function getRequestedMetas(
+  configuredIndicators: ConfiguredMacroIndicatorMeta[],
+  searchParams: URLSearchParams,
+): ConfiguredMacroIndicatorMeta[] {
+  const symbolsParam = searchParams.get("symbols")
+  const limit = getPositiveInteger(searchParams.get("limit"))
+  const offset = getNonNegativeInteger(searchParams.get("offset"))
+  const symbolSet = new Set(
+    (symbolsParam ?? "")
+      .split(",")
+      .map((symbol) => symbol.trim())
+      .filter(Boolean),
+  )
+  const selected =
+    symbolSet.size > 0
+      ? configuredIndicators.filter((meta) => symbolSet.has(meta.symbol))
+      : configuredIndicators
+
+  const offsetSelected = selected.slice(offset)
+  return limit === null ? offsetSelected : offsetSelected.slice(0, limit)
+}
+
 async function fetchByMeta(meta: MacroIndicatorMeta, range: TimeRangeOption): Promise<FetchOutcome | null> {
   const symbol = meta.providerSymbol ?? meta.symbol
 
@@ -83,6 +117,7 @@ async function buildIndicator(
     displayOrder: meta.displayOrder,
     refreshMs: meta.refreshMs,
     color: meta.color,
+    relevanceScore: meta.relevanceScore,
     macroRank: meta.macroRank,
     macroCategory: meta.macroCategory,
     meaning: meta.meaning,
@@ -97,8 +132,9 @@ export async function GET(request: Request) {
   const rangeParam = url.searchParams.get("range") ?? DEFAULT_TIME_RANGE
   const range = getTimeRange(rangeParam)
   const configuredIndicators = getConfiguredMacroIndicatorMetas()
+  const requestedMetas = getRequestedMetas(configuredIndicators, url.searchParams)
 
-  const results = await Promise.allSettled(configuredIndicators.map((meta) => buildIndicator(meta, range)))
+  const results = await Promise.allSettled(requestedMetas.map((meta) => buildIndicator(meta, range)))
 
   const indicators: MacroIndicator[] = []
   for (const result of results) {
@@ -125,7 +161,7 @@ export async function GET(request: Request) {
       refreshMs,
       fredEnabled: Boolean(process.env.FRED_API_KEY ?? process.env.NEXT_PUBLIC_FRED_API_KEY),
       indicators,
-      requested: configuredIndicators.length,
+      requested: requestedMetas.length,
       returned: indicators.length,
     },
     { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },

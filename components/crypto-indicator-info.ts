@@ -1,4 +1,5 @@
 import type { CryptoHistoryPayload, CryptoHistorySeries } from "@/components/crypto-history-compare"
+import { getCryptoSeriesBaseLabel } from "@/components/crypto-series-label"
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string
 
@@ -74,8 +75,11 @@ export function getCryptoIndicatorDescription({
   series: CryptoHistorySeries
   t: Translate
 }): string {
-  const fallback = t(series.infoI18nKey)
-  const baseDescription = fallback === series.infoI18nKey ? t("compare.info.default", { label: t(series.i18nKey) }) : fallback
+  const fallback = t(series.infoI18nKey, series.labelVars)
+  const baseDescription =
+    fallback === series.infoI18nKey
+      ? t("compare.info.default", { label: getCryptoSeriesBaseLabel(t, series) })
+      : fallback
   if (!CUSTOM_CRYPTO_SIGNAL_KEYS.has(series.key)) return baseDescription
 
   const retZ = getLatest(payload, "btcReturnZ")
@@ -111,7 +115,7 @@ export function getCryptoIndicatorDescription({
     baseDescription,
     "",
     "Data sources and latest values:",
-    `- OKX 1D candles: BTC return Z=${retZ === null ? "—" : retZ.toFixed(2)}, volume Z=${volZ === null ? "—" : volZ.toFixed(2)}, upper wick=${upperWick === null ? "—" : formatValue(upperWick, "pct")}, lower wick=${lowerWick === null ? "—" : formatValue(lowerWick, "pct")}.`,
+    `- OKX 1D candles: ${payload.ccy} return Z=${retZ === null ? "—" : retZ.toFixed(2)}, volume Z=${volZ === null ? "—" : volZ.toFixed(2)}, upper wick=${upperWick === null ? "—" : formatValue(upperWick, "pct")}, lower wick=${lowerWick === null ? "—" : formatValue(lowerWick, "pct")}.`,
     `- OKX Open Interest: daily change=${oiChangePct === null ? "—" : formatValue(oiChangePct, "pct")}.`,
     `- OKX Funding: ${funding === null ? "—" : formatValue(funding, "pct")}.`,
     `- OKX Long/Short Account Ratio: ${ls === null ? "—" : formatValue(ls, "ratio")}.`,

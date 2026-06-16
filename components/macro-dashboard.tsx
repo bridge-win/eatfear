@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { RefreshCw } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 
 import {
   AlignedHistoryCompare,
@@ -11,17 +10,30 @@ import {
 } from "@/components/aligned-history-compare"
 import { MarketIndicatorCards, type MarketIndicatorItem } from "@/components/market-indicator-cards"
 import { MarketIndicatorDetail } from "@/components/market-indicator-detail"
+import { OpportunityRadar } from "@/components/opportunity-radar"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DashboardFrame } from "@/components/page-frame"
 import { TimeRangeSelector } from "@/components/time-range-selector"
+import {
+  isDashboardTabValue,
+  jsonFetcher,
+  usePersistentState,
+  usePersistentSWR,
+  writeStoredJson,
+  type DashboardTabValue,
+} from "@/lib/client-persistence"
 import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-shared"
-import { DEFAULT_MACRO_INDICATOR_REFRESH_MS } from "@/lib/macro-indicator-config"
+import { DEFAULT_MACRO_INDICATOR_REFRESH_MS, getConfiguredMacroIndicatorMetas } from "@/lib/macro-indicator-config"
 import { useT } from "@/lib/i18n"
-import { type TimeRangeId } from "@/lib/time-range"
+import { withRelevanceScore } from "@/lib/indicator-score"
+import { buildTradingOpportunities, type OpportunityInputSeries } from "@/lib/opportunity-engine"
+import { getTimeRange, isTimeRangeId, type TimeRangeId } from "@/lib/time-range"
 import type { MacroIndicator } from "@/lib/types"
 
 const MACRO_DEFAULT_RANGE: TimeRangeId = "10y"
+const MACRO_INITIAL_HISTORY_LIMIT = 12
+const EXPECTED_MACRO_INDICATOR_COUNT = getConfiguredMacroIndicatorMetas().length
 
 const MACRO_SERIES_COLORS = [
   "#2563eb",
@@ -81,10 +93,11 @@ const buildMacroItems = (indicators: MacroIndicator[]): MarketIndicatorItem[] =>
     if (data.length === 0) return []
 
     const info = buildIndicatorInfo(indicator)
+    const label = withRelevanceScore(indicator.name, indicator.relevanceScore)
     return [{
       key: indicator.symbol,
       order: index + 1,
-      label: indicator.name,
+      label,
       color: getMacroSeriesColor(indicator, index),
       unit: toAlignedUnit(indicator.unit),
       value: Number.isFinite(indicator.value) ? indicator.value : null,
@@ -116,6 +129,47 @@ const buildMacroHistoryData = (items: MarketIndicatorItem[]): AlignedHistoryData
   return { groups: [{ key: "macro", series }] }
 }
 
+function buildMacroApiUrl(range: TimeRangeId, options: { limit?: number; offset?: number } = {}): string {
+  const params = new URLSearchParams({ range })
+  if (options.limit !== undefined) params.set("limit", String(options.limit))
+  if (options.offset !== undefined) params.set("offset", String(options.offset))
+  return `/api/macro?${params.toString()}`
+}
+
+function mergeMacroPayloads(
+  priority: MacroApiResponse | undefined,
+  rest: MacroApiResponse | undefined,
+): MacroApiResponse | null {
+  if (!priority && !rest) return null
+  const base = priority ?? rest
+  if (!base) return null
+
+  const indicatorsBySymbol = new Map<string, MacroIndicator>()
+  for (const payload of [priority, rest]) {
+    for (const indicator of payload?.indicators ?? []) {
+      indicatorsBySymbol.set(indicator.symbol, indicator)
+    }
+  }
+  const indicators = Array.from(indicatorsBySymbol.values()).sort(sortMacroIndicators)
+  const refreshMs = Math.max(
+    30_000,
+    Math.min(
+      priority?.refreshMs ?? DEFAULT_MACRO_INDICATOR_REFRESH_MS,
+      rest?.refreshMs ?? DEFAULT_MACRO_INDICATOR_REFRESH_MS,
+    ),
+  )
+
+  return {
+    ...base,
+    indicators,
+    refreshMs,
+    requested: EXPECTED_MACRO_INDICATOR_COUNT,
+    returned: indicators.length,
+    updatedAt: Math.max(priority?.updatedAt ?? 0, rest?.updatedAt ?? 0, base.updatedAt),
+    fredEnabled: priority?.fredEnabled ?? rest?.fredEnabled,
+  }
+}
+
 export interface MacroDashboardProps {
   initialIndicators?: MacroIndicator[]
   initialUpdatedAt?: number | null
@@ -129,59 +183,92 @@ export function MacroDashboard({
   initialFredEnabled = null,
   initialMeta = null,
 }: MacroDashboardProps = {}) {
-  const [indicators, setIndicators] = useState<MacroIndicator[]>(initialIndicators ?? [])
-  const [updatedAt, setUpdatedAt] = useState<number | null>(initialUpdatedAt)
-  const [isLoading, setIsLoading] = useState(!(initialIndicators && initialIndicators.length > 0))
-  const [error, setError] = useState<string | null>(null)
-  const [fredEnabled, setFredEnabled] = useState<boolean | null>(initialFredEnabled)
-  const [range, setRange] = useState<TimeRangeId>(MACRO_DEFAULT_RANGE)
-  const [meta, setMeta] = useState<{ requested: number; returned: number } | null>(initialMeta)
+  const [range, setRange] = usePersistentState("macro:range", MACRO_DEFAULT_RANGE, isTimeRangeId)
+  const [tab, setTab] = usePersistentState<DashboardTabValue>("macro:tab", "history", isDashboardTabValue)
   const [selectedIndicatorKey, setSelectedIndicatorKey] = useState<string | null>(null)
-  const refreshMsRef = useRef(DEFAULT_MACRO_INDICATOR_REFRESH_MS)
   const t = useT()
+  const fullStorageKey = `macro:${range}:full`
+  const initialPayload = useMemo<MacroApiResponse | undefined>(() => {
+    if (!initialIndicators || initialIndicators.length === 0) return undefined
+    const rangeOption = getTimeRange(MACRO_DEFAULT_RANGE)
+    return {
+      indicators: initialIndicators,
+      range: MACRO_DEFAULT_RANGE,
+      interval: rangeOption.yahooInterval,
+      updatedAt: initialUpdatedAt ?? Date.now(),
+      fredEnabled: initialFredEnabled ?? undefined,
+      requested: initialMeta?.requested ?? EXPECTED_MACRO_INDICATOR_COUNT,
+      returned: initialMeta?.returned ?? initialIndicators.length,
+      refreshMs: DEFAULT_MACRO_INDICATOR_REFRESH_MS,
+    }
+  }, [initialFredEnabled, initialIndicators, initialMeta, initialUpdatedAt])
+  const priority = usePersistentSWR<MacroApiResponse>(
+    `macro:${range}:priority:${MACRO_INITIAL_HISTORY_LIMIT}`,
+    buildMacroApiUrl(range, { limit: MACRO_INITIAL_HISTORY_LIMIT }),
+    jsonFetcher,
+    { revalidateIfStale: true },
+  )
+  const rest = usePersistentSWR<MacroApiResponse>(
+    `macro:${range}:rest:${MACRO_INITIAL_HISTORY_LIMIT}`,
+    buildMacroApiUrl(range, { offset: MACRO_INITIAL_HISTORY_LIMIT }),
+    jsonFetcher,
+    {
+      refreshInterval: (payload) => payload?.refreshMs ?? DEFAULT_MACRO_INDICATOR_REFRESH_MS,
+    },
+  )
+  const fullCache = usePersistentSWR<MacroApiResponse>(
+    fullStorageKey,
+    null,
+    jsonFetcher,
+    { fallbackData: range === MACRO_DEFAULT_RANGE ? initialPayload : undefined },
+  )
+  const mergedPayload = useMemo(() => mergeMacroPayloads(priority.data, rest.data), [priority.data, rest.data])
+  const hasCompleteNetworkPayload = priority.data !== undefined && rest.data !== undefined
+  const networkPayload = hasCompleteNetworkPayload ? mergedPayload : null
+  const payload = networkPayload ?? fullCache.data ?? priority.data ?? initialPayload
 
   useEffect(() => {
-    let isActive = true
-    const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout> | null = null
-    setIsLoading(true)
+    if (mergedPayload && hasCompleteNetworkPayload) writeStoredJson(fullStorageKey, mergedPayload)
+  }, [fullStorageKey, hasCompleteNetworkPayload, mergedPayload])
 
-    async function loadMacroData() {
-      try {
-        const response = await fetch(`/api/macro?range=${range}`, { signal: controller.signal })
-        if (!response.ok) {
-          throw new Error(`Macro API returned ${response.status}`)
-        }
-        const payload = (await response.json()) as MacroApiResponse
-        if (!isActive) return
-
-        setIndicators(payload.indicators)
-        setUpdatedAt(payload.updatedAt)
-        setFredEnabled(payload.fredEnabled ?? null)
-        setMeta({ requested: payload.requested ?? 0, returned: payload.returned ?? 0 })
-        refreshMsRef.current = payload.refreshMs ?? DEFAULT_MACRO_INDICATOR_REFRESH_MS
-        setError(null)
-      } catch (requestError) {
-        if (isActive && (requestError as Error).name !== "AbortError") {
-          setError(requestError instanceof Error ? requestError.message : "Failed to load macro data")
-        }
-      } finally {
-        if (!isActive) return
-        setIsLoading(false)
-        timer = setTimeout(loadMacroData, refreshMsRef.current)
+  const indicators = payload?.indicators ?? []
+  const updatedAt = payload?.updatedAt ?? null
+  const fredEnabled = payload?.fredEnabled ?? null
+  const meta = payload
+    ? {
+        requested: payload.requested ?? EXPECTED_MACRO_INDICATOR_COUNT,
+        returned: payload.returned ?? indicators.length,
       }
-    }
-
-    loadMacroData()
-
-    return () => {
-      isActive = false
-      controller.abort()
-      if (timer) clearTimeout(timer)
-    }
-  }, [range])
+    : initialMeta
+  const isLoading = payload
+    ? priority.isValidating || rest.isValidating || (!mergedPayload && !fullCache.data && rest.isLoading)
+    : fullCache.isLoading || priority.isLoading || rest.isLoading
+  const error = payload ? null : priority.error?.message ?? rest.error?.message ?? fullCache.error?.message ?? null
 
   const macroItems = useMemo(() => buildMacroItems(indicators), [indicators])
+  const opportunityInputs = useMemo<OpportunityInputSeries[]>(
+    () =>
+      macroItems.map((item) => ({
+        key: item.key,
+        label: item.label,
+        source: item.source,
+        description: item.description,
+        value: item.value,
+        changePercent: item.changePercent,
+        timestamp: item.timestamp,
+        data: item.data,
+      })),
+    [macroItems],
+  )
+  const opportunities = useMemo(
+    () =>
+      buildTradingOpportunities({
+        assetClass: "macro",
+        marketName: "Macro",
+        series: opportunityInputs,
+      }),
+    [opportunityInputs],
+  )
   const macroHistoryData = useMemo(() => buildMacroHistoryData(macroItems), [macroItems])
 
   return (
@@ -208,74 +295,86 @@ export function MacroDashboard({
 
       {fredEnabled === false && <FredHint />}
 
+      <OpportunityRadar
+        assetClass="macro"
+        title={{ zh: "宏观机会雷达", en: "Macro Opportunity Radar" }}
+        subtitle={{
+          zh: "把利率、美元、信用、VIX、M2、通胀与就业合成风险资产顺风/逆风和冲击风险。",
+          en: "Combines rates, USD, credit, VIX, M2, inflation, and labor data into risk-asset tailwind/headwind and shock-risk reads.",
+        }}
+        opportunities={opportunities}
+        loading={isLoading}
+      />
+
       {error && (
         <Card className="border-destructive/40">
           <CardContent className="text-xs text-destructive">{error}</CardContent>
         </Card>
       )}
 
-      {isLoading && indicators.length === 0 ? (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-          {t("macro.loading")}
-        </div>
-      ) : (
-        <Tabs defaultValue="history" className="w-full">
-          <TabsList className="grid h-auto w-full max-w-xs grid-cols-2">
-            <TabsTrigger value="realtime" className="text-xs">
-              {t("macro.tab.realtime")}
-            </TabsTrigger>
-            <TabsTrigger value="history" className="text-xs">
-              {t("macro.tab.history")}
-            </TabsTrigger>
-          </TabsList>
+      <Tabs
+        value={tab}
+        onValueChange={(next) => {
+          if (isDashboardTabValue(next)) setTab(next)
+        }}
+        className="w-full"
+      >
+        <TabsList className="grid h-auto w-full max-w-xs grid-cols-2">
+          <TabsTrigger value="realtime" className="text-xs">
+            {t("macro.tab.realtime")}
+          </TabsTrigger>
+          <TabsTrigger value="history" className="text-xs">
+            {t("macro.tab.history")}
+          </TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="realtime" className="mt-3">
-            {selectedIndicatorKey && macroItems.length > 0 ? (
-              <MarketIndicatorDetail
-                items={macroItems}
-                selectedKey={selectedIndicatorKey}
-                backLabel={t("macro.detail.back")}
-                subtitle={t("macro.detail.subtitle")}
-                searchPlaceholder={t("macro.detail.search")}
-                emptyMessage={t("macro.detail.empty")}
-                addCompareLabel={t("macro.detail.addCompare")}
-                chartTitle={t("macro.detail.chartTitle")}
-                chartInfo={t("macro.detail.chartInfo")}
-                chartInfoSource="FRED · IMF/World Bank via FRED · Yahoo Finance · aligned timeline"
-                loadingLabel={t("macro.loading")}
-                noDataLabel={t("chart.noData")}
-                seriesCountLabel={t("compare.seriesCount")}
-                onBack={() => setSelectedIndicatorKey(null)}
-              />
-            ) : (
-              <MarketIndicatorCards
-                items={macroItems}
-                loading={isLoading}
-                error={error}
-                loadingLabel={t("macro.loading")}
-                noDataLabel={t("chart.noData")}
-                onSelectItem={setSelectedIndicatorKey}
-                dataPrefix="macro"
-              />
-            )}
-          </TabsContent>
-
-          <TabsContent value="history" className="mt-3">
-            <AlignedHistoryCompare
-              data={macroHistoryData}
-              title={t("macro.historyCompare.title")}
-              infoDescription={t("macro.historyCompare.info")}
-              infoSource="FRED · IMF/World Bank via FRED · Yahoo Finance · TradingView Lightweight Charts"
+        <TabsContent value="realtime" className="mt-3">
+          {selectedIndicatorKey && macroItems.length > 0 ? (
+            <MarketIndicatorDetail
+              items={macroItems}
+              selectedKey={selectedIndicatorKey}
+              backLabel={t("macro.detail.back")}
+              subtitle={t("macro.detail.subtitle")}
+              searchPlaceholder={t("macro.detail.search")}
+              emptyMessage={t("macro.detail.empty")}
+              addCompareLabel={t("macro.detail.addCompare")}
+              chartTitle={t("macro.detail.chartTitle")}
+              chartInfo={t("macro.detail.chartInfo")}
+              chartInfoSource="FRED · IMF/World Bank via FRED · Yahoo Finance · aligned timeline"
+              loadingLabel={t("macro.loading")}
+              noDataLabel={t("chart.noData")}
+              seriesCountLabel={t("compare.seriesCount")}
+              onBack={() => setSelectedIndicatorKey(null)}
+            />
+          ) : (
+            <MarketIndicatorCards
+              items={macroItems}
               loading={isLoading}
               error={error}
               loadingLabel={t("macro.loading")}
               noDataLabel={t("chart.noData")}
-              seriesCountLabel={t("compare.seriesCount")}
+              expectedCount={meta?.requested ?? EXPECTED_MACRO_INDICATOR_COUNT}
+              onSelectItem={setSelectedIndicatorKey}
+              dataPrefix="macro"
             />
-          </TabsContent>
-        </Tabs>
-      )}
+          )}
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-3">
+          <AlignedHistoryCompare
+            data={macroHistoryData}
+            title={t("macro.historyCompare.title")}
+            infoDescription={t("macro.historyCompare.info")}
+            infoSource="FRED · IMF/World Bank via FRED · Yahoo Finance · TradingView Lightweight Charts"
+            loading={isLoading}
+            error={error}
+            loadingLabel={t("macro.loading")}
+            noDataLabel={t("chart.noData")}
+            seriesCountLabel={t("compare.seriesCount")}
+            expectedSeriesCount={meta?.requested ?? EXPECTED_MACRO_INDICATOR_COUNT}
+          />
+        </TabsContent>
+      </Tabs>
     </DashboardFrame>
   )
 }

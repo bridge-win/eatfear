@@ -14,7 +14,6 @@ import { getTimeRange } from "@/lib/time-range"
 export const revalidate = 60
 
 const OKX = "https://www.okx.com"
-const BTC_INST = "BTC-USDT-SWAP"
 
 interface OkxResp<T> {
   code: string
@@ -64,7 +63,15 @@ interface OkxFundingPoint {
   realizedRate?: string
 }
 
-export async function GET() {
+function sanitizeCcy(value: string | null): string {
+  const upper = (value ?? "BTC").trim().toUpperCase()
+  return /^[A-Z0-9]{2,12}$/.test(upper) ? upper : "BTC"
+}
+
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const ccy = sanitizeCcy(url.searchParams.get("ccy"))
+  const instId = `${ccy}-USDT-SWAP`
   const range = getTimeRange("1y")
   // Fetch all upstream in parallel; each falls back gracefully on error.
   const [
@@ -77,10 +84,10 @@ export async function GET() {
     hashrateSeries,
     minerRevRaw,
   ] = await Promise.all([
-    okxPublic<string[]>(`/api/v5/market/candles?instId=${BTC_INST}&bar=1D&limit=300`),
-    okxPublic<OkxFundingPoint>(`/api/v5/public/funding-rate-history?instId=${BTC_INST}&limit=200`),
-    okxPublic<{ fundingRate?: string }>(`/api/v5/public/funding-rate?instId=${BTC_INST}`),
-    okxPublic<string[]>(`/api/v5/rubik/stat/contracts/open-interest-volume?ccy=BTC&period=1H&limit=200`),
+    okxPublic<string[]>(`/api/v5/market/candles?instId=${instId}&bar=1D&limit=300`),
+    okxPublic<OkxFundingPoint>(`/api/v5/public/funding-rate-history?instId=${instId}&limit=200`),
+    okxPublic<{ fundingRate?: string }>(`/api/v5/public/funding-rate?instId=${instId}`),
+    okxPublic<string[]>(`/api/v5/rubik/stat/contracts/open-interest-volume?ccy=${ccy}&period=1H&limit=200`),
     fetchFearGreedHistory(range, 1800),
     fetchYahooSeries("^VIX", range, "1d", 600),
     fetchBtcHashrateSeries(600),
@@ -141,6 +148,7 @@ export async function GET() {
   }))
 
   return NextResponse.json({
+    ccy,
     updatedAt: Date.now(),
     refreshSuggestionSec: 60,
     summary: {
@@ -153,10 +161,10 @@ export async function GET() {
     activeSignals: scored.activeSignals,
     recentWicks: scored.recentWicks,
     upstream: {
-      candles: candles.length > 0 ? `OKX daily candles · ${candles.length} bars` : "OKX candles unavailable",
+      candles: candles.length > 0 ? `OKX ${ccy} daily candles · ${candles.length} bars` : "OKX candles unavailable",
       fearGreed: fgr ? "alternative.me Fear & Greed" : "alternative.me unavailable",
       funding: fundingHistory.length > 0 ? "OKX funding-rate-history" : "OKX funding unavailable",
-      openInterest: oiUsdSeries.length > 0 ? "OKX Rubik OI-USD (1H)" : "OKX OI unavailable",
+      openInterest: oiUsdSeries.length > 0 ? `OKX ${ccy} Rubik OI-USD (1H)` : "OKX OI unavailable",
       vix: vix ? "Yahoo Finance ^VIX (daily)" : "VIX unavailable",
       hashrate: hashrateSeries ? `mempool.space hashrate · ${hashrateSeries.length} daily bars` : "mempool hashrate unavailable",
       minerRevenue: minerRevenueSeries.length > 0 ? `blockchain.info miners-revenue · ${minerRevenueSeries.length} bars` : "miner revenue unavailable",

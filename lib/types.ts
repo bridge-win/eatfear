@@ -104,6 +104,8 @@ export interface MacroIndicator {
   refreshMs?: number
   /** Optional dashboard color override. */
   color?: string
+  /** 0-100 research/practical relevance score used for display sorting context. */
+  relevanceScore?: number
   /** Plain-language investor rank bucket, if this indicator maps to the macro priority playbook. */
   macroRank?: number
   /** Plain-language investor category, e.g. "1 利率 / 央行政策". */

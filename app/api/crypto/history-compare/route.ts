@@ -80,6 +80,50 @@ function rollingReturnZScore(points: RawPoint[], windowSize: number): RawPoint[]
   })
 }
 
+function rollingReturnPct(points: RawPoint[], lookbackDays: number): RawPoint[] {
+  const sorted = dropOutOfRange(points).sort((a, b) => a.timestamp - b.timestamp)
+  return sorted.map((point, index) => {
+    const previous = sorted[index - lookbackDays]
+    if (!previous || previous.value === 0) return { timestamp: point.timestamp, value: 0 }
+    return { timestamp: point.timestamp, value: (point.value / previous.value - 1) * 100 }
+  })
+}
+
+function dailyChangePct(points: RawPoint[]): RawPoint[] {
+  const sorted = dropOutOfRange(points).sort((a, b) => a.timestamp - b.timestamp)
+  return sorted.map((point, index) => {
+    const previous = sorted[index - 1]
+    if (!previous || previous.value === 0) return { timestamp: point.timestamp, value: 0 }
+    return { timestamp: point.timestamp, value: (point.value / previous.value - 1) * 100 }
+  })
+}
+
+function rollingRealizedVolatilityPct(points: RawPoint[], windowSize: number): RawPoint[] {
+  const sorted = dropOutOfRange(points).sort((a, b) => a.timestamp - b.timestamp)
+  const returns = sorted.map((point, index) => {
+    const previous = sorted[index - 1]
+    if (!previous || previous.value === 0) return { timestamp: point.timestamp, value: 0 }
+    return { timestamp: point.timestamp, value: Math.log(point.value / previous.value) }
+  })
+
+  return returns.map((point, index) => {
+    const sample = returns.slice(Math.max(0, index - windowSize + 1), index + 1).map((row) => row.value)
+    const mean = sample.reduce((sum, value) => sum + value, 0) / sample.length
+    const variance = sample.reduce((sum, value) => sum + (value - mean) ** 2, 0) / sample.length
+    return { timestamp: point.timestamp, value: Math.sqrt(variance) * Math.sqrt(365) * 100 }
+  })
+}
+
+function drawdownPct(points: RawPoint[]): RawPoint[] {
+  const sorted = dropOutOfRange(points).sort((a, b) => a.timestamp - b.timestamp)
+  let peak = 0
+  return sorted.map((point) => {
+    peak = Math.max(peak, point.value)
+    if (peak === 0) return { timestamp: point.timestamp, value: 0 }
+    return { timestamp: point.timestamp, value: (point.value / peak - 1) * 100 }
+  })
+}
+
 function rollingValueZScore(points: RawPoint[], windowSize: number): RawPoint[] {
   const sorted = dropOutOfRange(points).sort((a, b) => a.timestamp - b.timestamp)
   if (sorted.length === 0) return []
@@ -195,12 +239,14 @@ interface SeriesSpec {
   key: string
   i18nKey: string
   infoI18nKey: string
+  labelVars?: Record<string, string | number>
   order: number
   paneIndex: number
   color: string
   source: string
   unit: CryptoIndicatorUnit
   refreshMs: number
+  relevanceScore?: number
   data: { time: number; value: number | null }[]
 }
 
@@ -263,7 +309,7 @@ function chooseCompleteCandidate(candidates: RawPoint[][], timeline: number[]): 
 /* ---------------------- per-source fetchers ---------------------- */
 
 interface OkxResponse<T> {
-  code: string
+  code: string | number
   data?: T[]
 }
 
@@ -282,24 +328,161 @@ interface OkxCandlePoint {
 
 const OKX = "https://www.okx.com"
 
-async function okxRubikSeries(path: string): Promise<string[][]> {
-  try {
-    const res = await fetch(`${OKX}${path}`, {
-      headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-      next: { revalidate },
-    })
-    if (!res.ok) return []
-    const json = (await res.json()) as OkxResponse<string[]>
-    if (json.code !== "0") return []
-    return (json.data ?? []) as string[][]
-  } catch {
-    return []
-  }
+/* OKX Rubik stat endpoints cap at 100 rows per request; market history-candles
+   and funding-rate-history also cap at 100. To cover ranges longer than
+   ~100 days we must paginate manually using begin/end (Rubik) or after
+   (candles/funding). MAX_PAGES caps total requests per endpoint to bound
+   latency and rate-limit pressure. */
+const OKX_RUBIK_PAGE_LIMIT = 100
+const OKX_CANDLE_PAGE_LIMIT = 100
+const OKX_FUNDING_PAGE_LIMIT = 100
+const OKX_MAX_PAGES = 60
+const OKX_RETRY_DELAYS_MS = [500, 1_250, 2_500] as const
+const OKX_RUBIK_REQUEST_SPACING_MS = 420
+/* OKX publishes hard retention windows for these Rubik derivatives stats;
+   skip requests that cannot cover the selected range's left edge. */
+const OKX_INSTRUMENT_HISTORY_EARLIEST_MS = Date.UTC(2024, 0, 1)
+const OKX_TOP_TRADER_HISTORY_EARLIEST_MS = Date.UTC(2024, 2, 22)
+const OKX_MARKET_LONG_SHORT_MAX_DAYS = 180
+
+type OkxDerivativeHistoryPeriod = "1D" | "1W"
+
+function okxDerivativeHistoryPeriod(daysWanted: number): {
+  period: OkxDerivativeHistoryPeriod
+  stepDays: number
+} {
+  return daysWanted > 450 ? { period: "1W", stepDays: 7 } : { period: "1D", stepDays: 1 }
 }
 
-async function okxDailyCandles(instId: string, limit: number): Promise<OkxCandlePoint[]> {
-  const path = `/api/v5/market/candles?instId=${encodeURIComponent(instId)}&bar=1D&limit=${limit}`
-  const rows = await okxRubikSeries(path)
+async function wait(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+let okxRubikQueue: Promise<void> = Promise.resolve()
+let okxRubikNextSlot = 0
+
+async function reserveOkxRubikSlot(): Promise<void> {
+  const previous = okxRubikQueue
+  let release: () => void = () => {}
+  okxRubikQueue = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await previous
+  const now = Date.now()
+  const waitMs = Math.max(0, okxRubikNextSlot - now)
+  okxRubikNextSlot = Math.max(now, okxRubikNextSlot) + OKX_RUBIK_REQUEST_SPACING_MS
+  release()
+  if (waitMs > 0) await wait(waitMs)
+}
+
+async function okxRubikSeries(path: string): Promise<string[][]> {
+  const shouldThrottle = path.startsWith("/api/v5/rubik/")
+  for (let attempt = 0; attempt <= OKX_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      if (shouldThrottle) await reserveOkxRubikSlot()
+      const res = await fetch(`${OKX}${path}`, {
+        headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
+        next: { revalidate },
+      })
+      const json = (await res.json()) as OkxResponse<string[]>
+      const code = String(json.code)
+      const rateLimited = res.status === 429 || code === "50011"
+      if (rateLimited && attempt < OKX_RETRY_DELAYS_MS.length) {
+        await wait(OKX_RETRY_DELAYS_MS[attempt])
+        continue
+      }
+      if (!res.ok || code !== "0") return []
+      return (json.data ?? []) as string[][]
+    } catch {
+      if (attempt >= OKX_RETRY_DELAYS_MS.length) return []
+      await wait(OKX_RETRY_DELAYS_MS[attempt])
+    }
+  }
+  return []
+}
+
+/* Paginate Rubik stat endpoints with begin/end. We move the end timestamp
+   backward by the oldest row returned each page until we either cover the
+   requested days, exhaust upstream data, or hit MAX_PAGES. */
+async function okxRubikPaginated(
+  buildPath: (begin: string, end: string, limit: number) => string,
+  daysWanted: number,
+  stepDays = 1,
+): Promise<string[][]> {
+  const desired = Math.max(60, Math.ceil(daysWanted / stepDays) + 7)
+  const collected = new Map<number, string[]>()
+  let end = Date.now()
+
+  for (let page = 0; page < OKX_MAX_PAGES; page++) {
+    const begin = end - (OKX_RUBIK_PAGE_LIMIT + 2) * stepDays * DAY_MS
+    const path = buildPath(String(Math.max(0, begin)), String(end), OKX_RUBIK_PAGE_LIMIT)
+    const rows = await okxRubikSeries(path)
+    if (rows.length === 0) break
+
+    let oldestTs = Number.POSITIVE_INFINITY
+    let added = 0
+    for (const row of rows) {
+      const ts = Number(row[0])
+      if (!Number.isFinite(ts)) continue
+      if (!collected.has(ts)) {
+        collected.set(ts, row)
+        added++
+      }
+      if (ts < oldestTs) oldestTs = ts
+    }
+    if (added === 0) break
+    if (collected.size >= desired) break
+    if (!Number.isFinite(oldestTs)) break
+    end = oldestTs - 1
+  }
+
+  return Array.from(collected.values()).sort((a, b) => Number(b[0]) - Number(a[0]))
+}
+
+/* Paginate market candles with after=oldestTs to walk backwards. The
+   history-candles endpoint exposes older data than market/candles, with a
+   per-request limit of 100. */
+async function okxCandleRows(
+  instId: string,
+  daysWanted: number,
+): Promise<string[][]> {
+  const desired = Math.max(60, Math.ceil(daysWanted) + 7)
+  const collected = new Map<number, string[]>()
+  let after: string | null = null
+
+  for (let page = 0; page < OKX_MAX_PAGES; page++) {
+    const params = new URLSearchParams({
+      instId,
+      bar: "1D",
+      limit: String(OKX_CANDLE_PAGE_LIMIT),
+    })
+    if (after) params.set("after", after)
+    const path = `/api/v5/market/history-candles?${params.toString()}`
+    const rows = await okxRubikSeries(path)
+    if (rows.length === 0) break
+
+    let oldestTs = Number.POSITIVE_INFINITY
+    let added = 0
+    for (const row of rows) {
+      const ts = Number(row[0])
+      if (!Number.isFinite(ts)) continue
+      if (!collected.has(ts)) {
+        collected.set(ts, row)
+        added++
+      }
+      if (ts < oldestTs) oldestTs = ts
+    }
+    if (added === 0) break
+    if (collected.size >= desired) break
+    if (!Number.isFinite(oldestTs)) break
+    after = String(oldestTs)
+  }
+
+  return Array.from(collected.values()).sort((a, b) => Number(b[0]) - Number(a[0]))
+}
+
+async function okxDailyCandles(instId: string, daysWanted: number): Promise<OkxCandlePoint[]> {
+  const rows = await okxCandleRows(instId, daysWanted)
   return rows
     .map((row) => {
       const timestamp = Number(row[0])
@@ -326,66 +509,95 @@ async function okxDailyCandles(instId: string, limit: number): Promise<OkxCandle
     .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.close))
 }
 
-async function okxDailyKlines(instId: string, limit: number): Promise<RawPoint[]> {
-  return okxDailyCandles(instId, limit).then((candles) =>
+async function okxDailyKlines(instId: string, daysWanted: number): Promise<RawPoint[]> {
+  return okxDailyCandles(instId, daysWanted).then((candles) =>
     candles.map((candle) => ({ timestamp: candle.timestamp, value: candle.close })),
   )
 }
 
-async function okxOiHistory(ccy: string, limit: number): Promise<RawPoint[]> {
-  /* OKX rubik daily OI — values returned as [ts, oiCcy, oiUsd]. */
-  const rows = await okxRubikSeries(
-    `/api/v5/rubik/stat/contracts/open-interest-volume?ccy=${ccy}&period=1D&limit=${limit}`,
+async function okxOiHistory(instId: string, daysWanted: number): Promise<RawPoint[]> {
+  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted)
+  const rows = await okxRubikPaginated(
+    (begin, end, limit) =>
+      `/api/v5/rubik/stat/contracts/open-interest-history?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
+    daysWanted,
+    stepDays,
   )
   return rows
-    .map((row) => ({ timestamp: Number(row[0]), value: Number(row[2]) }))
+    .map((row) => ({ timestamp: Number(row[0]), value: Number(row[3]) }))
     .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value))
 }
 
-async function okxLongShort(ccy: string, limit: number): Promise<RawPoint[]> {
-  const rows = await okxRubikSeries(
-    `/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=${ccy}&period=1D&limit=${limit}`,
+async function okxLongShort(ccy: string, daysWanted: number): Promise<RawPoint[]> {
+  const rows = await okxRubikPaginated(
+    (begin, end, limit) =>
+      `/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=${ccy}&period=1D&begin=${begin}&end=${end}&limit=${limit}`,
+    daysWanted,
+  )
+  return rows
+    .map((row) => ({ timestamp: toDayKey(Number(row[0])), value: Number(row[1]) }))
+    .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value))
+}
+
+async function okxContractLongShort(instId: string, daysWanted: number): Promise<RawPoint[]> {
+  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted)
+  const rows = await okxRubikPaginated(
+    (begin, end, limit) =>
+      `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
+    daysWanted,
+    stepDays,
   )
   return rows
     .map((row) => ({ timestamp: Number(row[0]), value: Number(row[1]) }))
     .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value))
 }
 
-async function okxContractLongShort(instId: string, limit: number): Promise<RawPoint[]> {
-  const rows = await okxRubikSeries(
-    `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract?instId=${instId}&period=1D&limit=${limit}`,
-  )
-  return rows
-    .map((row) => ({ timestamp: Number(row[0]), value: Number(row[1]) }))
-    .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value))
-}
-
-async function okxTopTraderPosition(instId: string, limit: number): Promise<{
+async function okxTopTraderPosition(instId: string, daysWanted: number): Promise<{
   account: RawPoint[]
   position: RawPoint[]
 }> {
-  const rows = await okxRubikSeries(
-    `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader?instId=${instId}&period=1D&limit=${limit}`,
-  )
+  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted)
+  const [accountRows, positionRows] = await Promise.all([
+    okxRubikPaginated(
+      (begin, end, limit) =>
+        `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
+      daysWanted,
+      stepDays,
+    ),
+    okxRubikPaginated(
+      (begin, end, limit) =>
+        `/api/v5/rubik/stat/contracts/long-short-position-ratio-contract-top-trader?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
+      daysWanted,
+      stepDays,
+    ),
+  ])
   return {
-    account: rows
+    account: accountRows
       .map((row) => ({ timestamp: Number(row[0]), value: Number(row[1]) }))
       .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value)),
-    position: rows
-      .map((row) => ({ timestamp: Number(row[0]), value: Number(row[2]) }))
+    position: positionRows
+      .map((row) => ({ timestamp: Number(row[0]), value: Number(row[1]) }))
       .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value)),
   }
 }
 
-async function okxTakerNet(ccy: string, limit: number): Promise<{
+async function okxTakerNet(ccy: string, daysWanted: number): Promise<{
   buy: RawPoint[]
   sell: RawPoint[]
   net: RawPoint[]
   cumulativeNet: RawPoint[]
 }> {
   const [contractRows, spotRows] = await Promise.all([
-    okxRubikSeries(`/api/v5/rubik/stat/taker-volume?ccy=${ccy}&instType=CONTRACTS&period=1D&limit=${limit}`),
-    okxRubikSeries(`/api/v5/rubik/stat/taker-volume?ccy=${ccy}&instType=SPOT&period=1D&limit=${limit}`),
+    okxRubikPaginated(
+      (begin, end, limit) =>
+        `/api/v5/rubik/stat/taker-volume?ccy=${ccy}&instType=CONTRACTS&period=1D&begin=${begin}&end=${end}&limit=${limit}`,
+      daysWanted,
+    ),
+    okxRubikPaginated(
+      (begin, end, limit) =>
+        `/api/v5/rubik/stat/taker-volume?ccy=${ccy}&instType=SPOT&period=1D&begin=${begin}&end=${end}&limit=${limit}`,
+      daysWanted,
+    ),
   ])
   const merged = new Map<number, { sell: number; buy: number }>()
   for (const row of [...contractRows, ...spotRows]) {
@@ -416,22 +628,148 @@ async function okxTakerNet(ccy: string, limit: number): Promise<{
   return { buy, sell, net, cumulativeNet: cumulative }
 }
 
-async function okxFundingHistory(instId: string, limit: number): Promise<RawPoint[]> {
-  try {
-    const res = await fetch(
-      `${OKX}/api/v5/public/funding-rate-history?instId=${encodeURIComponent(instId)}&limit=${limit}`,
-      { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate } },
-    )
-    if (!res.ok) return []
-    const json = (await res.json()) as OkxResponse<{ fundingTime: string; fundingRate: string }>
-    return (json.data ?? [])
-      .map((row) => ({
-        timestamp: Number(row.fundingTime),
-        value: Number(row.fundingRate) * 100,
-      }))
-      .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value))
-  } catch {
-    return []
+/* Funding rate updates every 8h (3 per day), so total records needed scales
+   with days. Paginate with after=oldestTs to walk backwards. */
+async function okxFundingHistory(instId: string, daysWanted: number): Promise<RawPoint[]> {
+  const desired = Math.max(180, Math.ceil(daysWanted) * 3 + 24)
+  const collected = new Map<number, number>()
+  let after: string | null = null
+
+  for (let page = 0; page < OKX_MAX_PAGES; page++) {
+    const params = new URLSearchParams({
+      instId,
+      limit: String(OKX_FUNDING_PAGE_LIMIT),
+    })
+    if (after) params.set("after", after)
+    try {
+      const res = await fetch(
+        `${OKX}/api/v5/public/funding-rate-history?${params.toString()}`,
+        { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate } },
+      )
+      if (!res.ok) break
+      const json = (await res.json()) as OkxResponse<{ fundingTime: string; fundingRate: string }>
+      const rows = json.data ?? []
+      if (rows.length === 0) break
+
+      let oldestTs = Number.POSITIVE_INFINITY
+      let added = 0
+      for (const row of rows) {
+        const ts = Number(row.fundingTime)
+        const v = Number(row.fundingRate) * 100
+        if (!Number.isFinite(ts) || !Number.isFinite(v)) continue
+        if (!collected.has(ts)) {
+          collected.set(ts, v)
+          added++
+        }
+        if (ts < oldestTs) oldestTs = ts
+      }
+      if (added === 0) break
+      if (collected.size >= desired) break
+      if (!Number.isFinite(oldestTs)) break
+      after = String(oldestTs)
+    } catch {
+      break
+    }
+  }
+
+  return Array.from(collected.entries())
+    .map(([ts, v]) => ({ timestamp: ts, value: v }))
+    .sort((a, b) => b.timestamp - a.timestamp)
+}
+
+interface OkxLiquidationGroup {
+  instId: string
+  details: {
+    side: "buy" | "sell"
+    posSide: "long" | "short"
+    bkPx: string
+    sz: string
+    ts: string
+  }[]
+}
+
+/* OKX USDT-margined swap face value: 1 contract = ctVal base-currency units.
+   Used to compute notional USD = sz × ctVal × bkPx. */
+const SWAP_CT_VAL: Record<string, number> = {
+  "BTC-USDT-SWAP": 0.01,
+  "ETH-USDT-SWAP": 0.01,
+  "SOL-USDT-SWAP": 0.1,
+  "XRP-USDT-SWAP": 100,
+  "BNB-USDT-SWAP": 0.01,
+  "DOGE-USDT-SWAP": 1000,
+  "ADA-USDT-SWAP": 100,
+  "AVAX-USDT-SWAP": 0.1,
+}
+
+/* OKX keeps ~90 days of liquidation order history. Paginate until cutoff
+   or OKX stops returning data. */
+async function okxLiquidationDaily(
+  instId: string,
+  daysWanted: number,
+): Promise<{ long: RawPoint[]; short: RawPoint[] }> {
+  const maxDays = Math.min(daysWanted, 90)
+  const cutoffMs = Date.now() - maxDays * DAY_MS
+  const ctVal = SWAP_CT_VAL[instId] ?? 0.01
+  const longByDay = new Map<number, number>()
+  const shortByDay = new Map<number, number>()
+  let after: string | null = null
+
+  for (let page = 0; page < 30; page++) {
+    const params = new URLSearchParams({
+      instType: "SWAP",
+      instId,
+      state: "filled",
+      limit: "100",
+    })
+    if (after) params.set("after", after)
+
+    let groups: OkxLiquidationGroup[] = []
+    try {
+      const res = await fetch(
+        `${OKX}/api/v5/public/liquidation-orders?${params.toString()}`,
+        { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate } },
+      )
+      if (!res.ok) break
+      const json = (await res.json()) as { code: string; data?: OkxLiquidationGroup[] }
+      if (String(json.code) !== "0") break
+      groups = json.data ?? []
+    } catch {
+      break
+    }
+
+    if (groups.length === 0) break
+
+    let oldestTs = Number.POSITIVE_INFINITY
+    let added = 0
+
+    for (const group of groups) {
+      for (const detail of group.details ?? []) {
+        const ts = Number(detail.ts)
+        const bkPx = Number(detail.bkPx)
+        const sz = Number(detail.sz)
+        if (!Number.isFinite(ts) || !Number.isFinite(bkPx) || !Number.isFinite(sz)) continue
+
+        const notionalUsd = sz * ctVal * bkPx
+        const dayKey = toDayKey(ts)
+        if (detail.posSide === "long") {
+          longByDay.set(dayKey, (longByDay.get(dayKey) ?? 0) + notionalUsd)
+        } else {
+          shortByDay.set(dayKey, (shortByDay.get(dayKey) ?? 0) + notionalUsd)
+        }
+        if (ts < oldestTs) oldestTs = ts
+        added++
+      }
+    }
+
+    if (added === 0) break
+    if (oldestTs <= cutoffMs) break
+    if (!Number.isFinite(oldestTs)) break
+    after = String(oldestTs)
+  }
+
+  return {
+    long: Array.from(longByDay.entries()).map(([ts, v]) => ({ timestamp: ts, value: v })),
+    short: Array.from(shortByDay.entries()).map(([ts, v]) => ({ timestamp: ts, value: v })),
   }
 }
 
@@ -460,6 +798,101 @@ async function blockchainSeries(chart: string, timespan: string): Promise<RawPoi
   return rows.map((p) => ({ timestamp: p.timestamp, value: p.value }))
 }
 
+const BTC_PRICE_KEYS = [
+  "btcPrice",
+  "btcMomentum7d",
+  "btcMomentum30d",
+  "btcMomentum90d",
+  "btcRealizedVol30d",
+  "btcDrawdown",
+  "btcReturnZ",
+] as const
+
+const BTC_SWAP_CANDLE_KEYS = [
+  ...BTC_PRICE_KEYS,
+  "btcVolumeUsd",
+  "btcVolumeZ",
+  "upperWick",
+  "lowerWick",
+  "basis",
+  "signalBuyScore",
+  "signalSellScore",
+  "signalRiskScore",
+  "signalDirection",
+] as const
+
+const OI_KEYS = [
+  "oi",
+  "oiChangePct",
+  "oiReturnZ",
+  "signalBuyScore",
+  "signalSellScore",
+  "signalRiskScore",
+  "signalDirection",
+] as const
+const FUNDING_KEYS = [
+  "funding",
+  "signalBuyScore",
+  "signalSellScore",
+  "signalRiskScore",
+  "signalDirection",
+] as const
+const LONG_SHORT_KEYS = [
+  "ls",
+  "signalBuyScore",
+  "signalSellScore",
+  "signalRiskScore",
+  "signalDirection",
+] as const
+const LIQ_KEYS = ["liqLong", "liqShort"] as const
+const MINING_COST_KEYS = ["miningElectricityCost", "miningComprehensiveCost"] as const
+const TOP_TRADER_KEYS = ["topTraderAccount", "topTraderPosition"] as const
+const SMART_MONEY_KEYS = ["smartBuy", "smartSell", "smartNet", "smartCum"] as const
+
+const STRICT_RANGE_COVERAGE_KEYS = new Set<string>([
+  "oi",
+  "oiChangePct",
+  "oiReturnZ",
+  "ls",
+  "contractLs",
+  ...TOP_TRADER_KEYS,
+])
+
+const SELECTED_INSTRUMENT_LABEL_KEYS = new Set<string>([
+  ...BTC_SWAP_CANDLE_KEYS,
+  ...OI_KEYS,
+  ...FUNDING_KEYS,
+  ...LONG_SHORT_KEYS,
+  ...LIQ_KEYS,
+  "contractLs",
+  ...TOP_TRADER_KEYS,
+  ...SMART_MONEY_KEYS,
+])
+
+const CROSS_SECTION_PRICE_KEY_BY_CCY: Readonly<Record<string, string>> = {
+  ETH: "ethPrice",
+  SOL: "solPrice",
+  XRP: "xrpPrice",
+  BNB: "bnbPrice",
+  DOGE: "dogePrice",
+}
+
+function getPositiveInteger(value: string | null): number | null {
+  if (!value) return null
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function getNonNegativeInteger(value: string | null): number {
+  if (!value) return 0
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0
+}
+
+function hasRequestedKey(requestedKeys: Set<string>, keys: readonly string[]): boolean {
+  return keys.some((key) => requestedKeys.has(key))
+}
+
 /* ----------------------------- handler ----------------------------- */
 
 export async function GET(request: Request) {
@@ -469,16 +902,32 @@ export async function GET(request: Request) {
   const miningCostParameters = resolveMiningCostParameters(url.searchParams)
   const days = getRangeDays(range.id)
   const ccy = (url.searchParams.get("ccy") ?? "BTC").toUpperCase()
+  const isBtc = ccy === "BTC"
   const instId = `${ccy}-USDT-SWAP`
   const blockchainSpan = getBlockchainTimespan(range.id)
-  const okxLimit = Math.max(60, Math.min(300, Math.ceil(days) + 7))
+  /* Total days requested from OKX endpoints. The per-call helpers paginate
+     internally (begin/end for Rubik stats, after for candles/funding) up to
+     OKX_MAX_PAGES, so this is no longer bounded by any single-request cap. */
+  const okxDays = Math.max(60, Math.ceil(days) + 7)
 
   const now = Date.now()
   let timeline = buildTimeline(days, now)
+  const timelineStart = timeline[0] ?? now
+  const okxInstrumentHistoryCoversRange = timelineStart >= OKX_INSTRUMENT_HISTORY_EARLIEST_MS
+  const okxTopTraderHistoryCoversRange = timelineStart >= OKX_TOP_TRADER_HISTORY_EARLIEST_MS
+  const okxMarketLongShortCoversRange = days <= OKX_MARKET_LONG_SHORT_MAX_DAYS
+  const indicatorLimit = getPositiveInteger(url.searchParams.get("limit"))
+  const indicatorOffset = getNonNegativeInteger(url.searchParams.get("offset"))
+  const configuredIndicators = getEnabledCryptoIndicators()
+  const offsetIndicators = configuredIndicators.slice(indicatorOffset)
+  const requestedIndicators =
+    indicatorLimit === null ? offsetIndicators : offsetIndicators.slice(0, indicatorLimit)
+  const requestedKeys = new Set(requestedIndicators.map((indicator) => indicator.key))
 
-  /* Fetch every series in parallel — the slowest leg sets total latency. */
+  /* Staged clients request the top ordered slice first; skip lower-priority
+     upstream calls until the background full-history request asks for them. */
   const [
-    btcPriceA, // blockchain.info (longer history)
+    btcPriceA, // blockchain.info (BTC only, longer history)
     btcSwapCandles, // OKX daily swap candles (fallback / derivatives metrics)
     btcSpotCandles,
     ethPrice,
@@ -492,6 +941,7 @@ export async function GET(request: Request) {
     contractLsRatio,
     topTrader,
     taker,
+    liq,
     fng,
     stablecoin,
     defiTvl,
@@ -519,61 +969,85 @@ export async function GET(request: Request) {
     nikkei,
     hangseng,
   ] = await Promise.all([
-    fetchBtcUsdDailyFromBlockchain(blockchainSpan, revalidate).then((r) =>
-      (r?.points ?? []).map((p) => ({ timestamp: p.timestamp, value: p.close })),
-    ),
-    okxDailyCandles(instId, okxLimit),
-    okxDailyCandles(`${ccy}-USDT`, okxLimit),
-    okxDailyKlines("ETH-USDT", okxLimit),
-    okxDailyKlines("SOL-USDT", okxLimit),
-    okxDailyKlines("XRP-USDT", okxLimit),
-    okxDailyKlines("BNB-USDT", okxLimit),
-    okxDailyKlines("DOGE-USDT", okxLimit),
-    okxOiHistory(ccy, okxLimit),
-    okxFundingHistory(instId, okxLimit),
-    okxLongShort(ccy, okxLimit),
-    okxContractLongShort(instId, okxLimit),
-    okxTopTraderPosition(instId, okxLimit),
-    okxTakerNet(ccy, okxLimit),
-    fetchFearGreedHistory(range, revalidate).then((r) =>
-      (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
-    ),
-    fetchStablecoinMarketCap(range, revalidate).then((r) =>
-      (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
-    ),
-    fetchDefiTvl(range, revalidate).then((r) =>
-      (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
-    ),
-    fetchMempoolHashrateHistory(revalidate),
-    blockchainSeries("hash-rate", blockchainSpan),
-    blockchainSeries("difficulty", blockchainSpan),
-    blockchainSeries("n-transactions", blockchainSpan),
-    blockchainSeries("n-unique-addresses", blockchainSpan),
-    blockchainSeries("mempool-size", blockchainSpan),
-    blockchainSeries("transaction-fees-usd", blockchainSpan),
-    blockchainSeries("avg-block-size", blockchainSpan),
-    deribitDvolDaily(days),
-    yahooPoints("DX-Y.NYB", range),
-    yahooPoints("^TNX", range), // US 10Y yield
-    yahooPoints("^IRX", range), // Short rate proxy (13W)
-    yahooPoints("^VIX", range),
-    yahooPoints("^GSPC", range),
-    yahooPoints("^IXIC", range),
-    yahooPoints("^RUT", range),
-    yahooPoints("GC=F", range),
-    yahooPoints("SI=F", range),
-    yahooPoints("HG=F", range),
-    yahooPoints("CL=F", range),
-    yahooPoints("NG=F", range),
-    yahooPoints("^N225", range),
-    yahooPoints("^HSI", range),
+    isBtc && hasRequestedKey(requestedKeys, BTC_PRICE_KEYS)
+      ? fetchBtcUsdDailyFromBlockchain(blockchainSpan, revalidate).then((r) =>
+          (r?.points ?? []).map((p) => ({ timestamp: p.timestamp, value: p.close })),
+        )
+      : [],
+    hasRequestedKey(requestedKeys, BTC_SWAP_CANDLE_KEYS) ? okxDailyCandles(instId, okxDays) : [],
+    requestedKeys.has("basis") ? okxDailyCandles(`${ccy}-USDT`, okxDays) : [],
+    requestedKeys.has("ethPrice") ? okxDailyKlines("ETH-USDT", okxDays) : [],
+    requestedKeys.has("solPrice") ? okxDailyKlines("SOL-USDT", okxDays) : [],
+    requestedKeys.has("xrpPrice") ? okxDailyKlines("XRP-USDT", okxDays) : [],
+    requestedKeys.has("bnbPrice") ? okxDailyKlines("BNB-USDT", okxDays) : [],
+    requestedKeys.has("dogePrice") ? okxDailyKlines("DOGE-USDT", okxDays) : [],
+    hasRequestedKey(requestedKeys, OI_KEYS) && okxInstrumentHistoryCoversRange
+      ? okxOiHistory(instId, okxDays)
+      : [],
+    hasRequestedKey(requestedKeys, FUNDING_KEYS) ? okxFundingHistory(instId, okxDays) : [],
+    hasRequestedKey(requestedKeys, LONG_SHORT_KEYS) && okxMarketLongShortCoversRange
+      ? okxLongShort(ccy, okxDays)
+      : [],
+    requestedKeys.has("contractLs") && okxInstrumentHistoryCoversRange
+      ? okxContractLongShort(instId, okxDays)
+      : [],
+    hasRequestedKey(requestedKeys, TOP_TRADER_KEYS) && okxTopTraderHistoryCoversRange
+      ? okxTopTraderPosition(instId, okxDays)
+      : { account: [], position: [] },
+    hasRequestedKey(requestedKeys, SMART_MONEY_KEYS)
+      ? okxTakerNet(ccy, okxDays)
+      : { buy: [], sell: [], net: [], cumulativeNet: [] },
+    hasRequestedKey(requestedKeys, LIQ_KEYS)
+      ? okxLiquidationDaily(instId, okxDays)
+      : { long: [], short: [] },
+    requestedKeys.has("fng")
+      ? fetchFearGreedHistory(range, revalidate).then((r) =>
+          (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
+        )
+      : [],
+    requestedKeys.has("stablecoinMcap")
+      ? fetchStablecoinMarketCap(range, revalidate).then((r) =>
+          (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
+        )
+      : [],
+    requestedKeys.has("defiTvl")
+      ? fetchDefiTvl(range, revalidate).then((r) =>
+          (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
+        )
+      : [],
+    hasRequestedKey(requestedKeys, MINING_COST_KEYS) ? fetchMempoolHashrateHistory(revalidate) : [],
+    requestedKeys.has("hashRate") || hasRequestedKey(requestedKeys, MINING_COST_KEYS)
+      ? blockchainSeries("hash-rate", blockchainSpan)
+      : [],
+    requestedKeys.has("difficulty") ? blockchainSeries("difficulty", blockchainSpan) : [],
+    requestedKeys.has("nTxs") ? blockchainSeries("n-transactions", blockchainSpan) : [],
+    requestedKeys.has("activeAddrs") ? blockchainSeries("n-unique-addresses", blockchainSpan) : [],
+    requestedKeys.has("mempool") ? blockchainSeries("mempool-size", blockchainSpan) : [],
+    requestedKeys.has("txFeesUsd") ? blockchainSeries("transaction-fees-usd", blockchainSpan) : [],
+    requestedKeys.has("avgBlockSize") ? blockchainSeries("avg-block-size", blockchainSpan) : [],
+    requestedKeys.has("dvol") ? deribitDvolDaily(days) : [],
+    requestedKeys.has("dxy") ? yahooPoints("DX-Y.NYB", range) : [],
+    requestedKeys.has("us10y") ? yahooPoints("^TNX", range) : [], // US 10Y yield
+    requestedKeys.has("us2y") ? yahooPoints("^IRX", range) : [], // Short rate proxy (13W)
+    requestedKeys.has("vix") ? yahooPoints("^VIX", range) : [],
+    requestedKeys.has("sp500") ? yahooPoints("^GSPC", range) : [],
+    requestedKeys.has("nasdaq") ? yahooPoints("^IXIC", range) : [],
+    requestedKeys.has("russell") ? yahooPoints("^RUT", range) : [],
+    requestedKeys.has("gold") ? yahooPoints("GC=F", range) : [],
+    requestedKeys.has("silver") ? yahooPoints("SI=F", range) : [],
+    requestedKeys.has("copper") ? yahooPoints("HG=F", range) : [],
+    requestedKeys.has("oil") ? yahooPoints("CL=F", range) : [],
+    requestedKeys.has("natgas") ? yahooPoints("NG=F", range) : [],
+    requestedKeys.has("nikkei") ? yahooPoints("^N225", range) : [],
+    requestedKeys.has("hangseng") ? yahooPoints("^HSI", range) : [],
   ])
 
   const btcPriceB = toRawPoints(btcSwapCandles, "close")
-  let btcPrice = chooseCompleteCandidate([btcPriceA, btcPriceB], timeline)
+  const priceCandidates = isBtc ? [btcPriceA, btcPriceB] : [btcPriceB]
+  let btcPrice = chooseCompleteCandidate(priceCandidates, timeline)
   if (range.id === "max" && btcPrice.length > 0) {
     timeline = buildTimelineFromStart(Math.min(...btcPrice.map((point) => point.timestamp)), now)
-    btcPrice = chooseCompleteCandidate([btcPriceA, btcPriceB], timeline)
+    btcPrice = chooseCompleteCandidate(priceCandidates, timeline)
   }
 
   /* Prefer mempool.space for production-cost curves because it is the same
@@ -618,6 +1092,12 @@ export async function GET(request: Request) {
   const btcUpperWick = toRawPoints(btcSwapCandles, "upperWickPct")
   const btcLowerWick = toRawPoints(btcSwapCandles, "lowerWickPct")
   const btcReturnZ = rollingReturnZScore(btcPrice, 30)
+  const btcMomentum7d = rollingReturnPct(btcPrice, 7)
+  const btcMomentum30d = rollingReturnPct(btcPrice, 30)
+  const btcMomentum90d = rollingReturnPct(btcPrice, 90)
+  const btcRealizedVol30d = rollingRealizedVolatilityPct(btcPrice, 30)
+  const btcDrawdown = drawdownPct(btcPrice)
+  const oiChangePct = dailyChangePct(oi)
   const oiReturnZ = rollingReturnZScore(oi, 30)
   const basis = buildBasis(btcSwapCandles, btcSpotCandles)
   const signalScores = buildDailySignalScores({
@@ -629,6 +1109,11 @@ export async function GET(request: Request) {
 
   const rawSeriesByKey = new Map<string, RawPoint[]>([
     ["btcPrice", btcPrice],
+    ["btcMomentum7d", btcMomentum7d],
+    ["btcMomentum30d", btcMomentum30d],
+    ["btcMomentum90d", btcMomentum90d],
+    ["btcRealizedVol30d", btcRealizedVol30d],
+    ["btcDrawdown", btcDrawdown],
     ["miningElectricityCost", miningElectricityCost],
     ["miningComprehensiveCost", miningComprehensiveCost],
     ["ethPrice", ethPrice],
@@ -649,6 +1134,7 @@ export async function GET(request: Request) {
     ["stablecoinMcap", stablecoin],
     ["defiTvl", defiTvl],
     ["oi", oi],
+    ["oiChangePct", oiChangePct],
     ["oiReturnZ", oiReturnZ],
     ["funding", funding],
     ["ls", lsRatio],
@@ -659,6 +1145,8 @@ export async function GET(request: Request) {
     ["smartSell", taker.sell],
     ["smartNet", taker.net],
     ["smartCum", taker.cumulativeNet],
+    ["liqLong", liq.long],
+    ["liqShort", liq.short],
     ["fng", fng],
     ["dvol", dvol],
     ["hashRate", hashRateEH],
@@ -684,29 +1172,32 @@ export async function GET(request: Request) {
     ["hangseng", hangseng],
   ])
 
-  const configuredIndicators = getEnabledCryptoIndicators()
-  const series: SeriesSpec[] = configuredIndicators
+  const selectedCrossSectionPriceKey = CROSS_SECTION_PRICE_KEY_BY_CCY[ccy]
+  const series: SeriesSpec[] = requestedIndicators
     .flatMap((config, configIndex) => {
-      /* Strip out-of-bounds samples up front; alignDaily then maps real source
-         observations onto the selected timeline. Keep partial but usable lines
-         so realtime crypto metrics are also visible in the history tab. */
+      const absoluteIndex = indicatorOffset + configIndex
+      if (config.key === selectedCrossSectionPriceKey) return []
       const safe = dropOutOfRange(rawSeriesByKey.get(config.key) ?? [])
       const aligned = alignDaily(safe, timeline)
-      if (!hasUsableCoverage(aligned)) return []
+      const hasCoverage = STRICT_RANGE_COVERAGE_KEYS.has(config.key)
+        ? hasCompleteCoverage(aligned)
+        : hasUsableCoverage(aligned)
+      if (!hasCoverage) return []
       return [{
         key: config.key,
         i18nKey: config.i18nKey,
         infoI18nKey: config.infoI18nKey,
-        order: configIndex + 1,
-        paneIndex: Math.floor(configIndex / 2),
+        labelVars: SELECTED_INSTRUMENT_LABEL_KEYS.has(config.key) ? { ccy } : undefined,
+        order: absoluteIndex + 1,
+        paneIndex: Math.floor(absoluteIndex / 2),
         color: config.color,
-        source: config.source,
+        source: config.key === "btcPrice" && !isBtc ? "OKX" : config.source,
         unit: config.unit,
         refreshMs: config.refreshMs,
+        relevanceScore: config.relevanceScore,
         data: timeline.map((t, i) => ({ time: t, value: aligned[i] })),
       }]
     })
-    .map((spec, index) => ({ ...spec, order: index + 1, paneIndex: Math.floor(index / 2) }))
   const refreshMs =
     series.length === 0
       ? DEFAULT_CRYPTO_HISTORY_REFRESH_MS

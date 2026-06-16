@@ -17,6 +17,7 @@ import {
   type UTCTimestamp,
   type WhitespaceData,
 } from "lightweight-charts"
+import { RefreshCw } from "lucide-react"
 
 import { InfoTooltip } from "@/components/info-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -81,6 +82,7 @@ interface HoverPaneTooltipItem {
   order?: number
   label: string
   color: string
+  time: string
   value: string
 }
 
@@ -90,6 +92,18 @@ interface HoverPaneTooltip {
   top: number
   width: number
   items: HoverPaneTooltipItem[]
+}
+
+interface TimeAxisLabel {
+  key: string
+  label: string
+  positionPct: number
+  align: "start" | "center" | "end"
+}
+
+interface VisibleLogicalRange {
+  from: number
+  to: number
 }
 
 export interface AlignedHistoryCompareProps {
@@ -102,6 +116,7 @@ export interface AlignedHistoryCompareProps {
   loadingLabel: string
   noDataLabel: string
   seriesCountLabel: string
+  expectedSeriesCount?: number
   maxSeriesPerPane?: number
   className?: string
 }
@@ -110,6 +125,9 @@ const toUtc = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp
 const LWC_VALUE_CAP = 8.9e13
 const COMPACT_WIDTH = 560
 const MAX_SERIES_PER_PANE = 2
+const DAY_MS = 24 * 60 * 60 * 1000
+const DESKTOP_TIME_LABEL_COUNT = 5
+const COMPACT_TIME_LABEL_COUNT = 3
 
 function formatRaw(value: number, unit: AlignedHistoryUnit): string {
   if (!Number.isFinite(value)) return "—"
@@ -282,7 +300,143 @@ function getTimelineRange(timeline: number[]): { from: UTCTimestamp; to: UTCTime
 function shouldShowTime(timeline: number[]): boolean {
   if (timeline.length < 2) return false
   const spanMs = timeline[timeline.length - 1] - timeline[0]
-  return spanMs <= 3 * 24 * 60 * 60 * 1000
+  return spanMs <= 3 * DAY_MS
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0")
+}
+
+function formatTimeAxisLabel(time: number, spanMs: number, includeDateForShortRange: boolean): string {
+  const date = new Date(time)
+  const year = date.getUTCFullYear()
+  const month = pad2(date.getUTCMonth() + 1)
+  const day = pad2(date.getUTCDate())
+  const hour = pad2(date.getUTCHours())
+  const minute = pad2(date.getUTCMinutes())
+  if (spanMs <= DAY_MS) {
+    return includeDateForShortRange ? `${month}-${day} ${hour}:${minute}` : `${hour}:${minute}`
+  }
+  if (spanMs <= 3 * DAY_MS) return `${month}-${day} ${hour}:${minute}`
+  if (spanMs > 8 * 365 * DAY_MS) return String(year)
+  if (spanMs > 370 * DAY_MS) return `${year}-${month}`
+  return `${month}-${day}`
+}
+
+function formatHoverTime(time: number): string {
+  const date = new Date(time * 1000)
+  const year = date.getUTCFullYear()
+  const month = pad2(date.getUTCMonth() + 1)
+  const day = pad2(date.getUTCDate())
+  const hour = pad2(date.getUTCHours())
+  const minute = pad2(date.getUTCMinutes())
+  return `${year}-${month}-${day} ${hour}:${minute}`
+}
+
+function isSameUtcDate(a: number, b: number): boolean {
+  const left = new Date(a)
+  const right = new Date(b)
+  return (
+    left.getUTCFullYear() === right.getUTCFullYear() &&
+    left.getUTCMonth() === right.getUTCMonth() &&
+    left.getUTCDate() === right.getUTCDate()
+  )
+}
+
+function getTimeAxisLabels(
+  timeline: number[],
+  isCompact: boolean,
+  visibleLogicalRange: VisibleLogicalRange | null,
+): TimeAxisLabel[] {
+  if (timeline.length === 0) return []
+  const labelCount = Math.min(isCompact ? COMPACT_TIME_LABEL_COUNT : DESKTOP_TIME_LABEL_COUNT, timeline.length)
+  const rangeFrom =
+    visibleLogicalRange && Number.isFinite(visibleLogicalRange.from)
+      ? Math.max(0, Math.min(timeline.length - 1, visibleLogicalRange.from))
+      : 0
+  const rangeTo =
+    visibleLogicalRange && Number.isFinite(visibleLogicalRange.to)
+      ? Math.max(rangeFrom, Math.min(timeline.length - 1, visibleLogicalRange.to))
+      : timeline.length - 1
+  const startIndex = Math.max(0, Math.min(timeline.length - 1, Math.floor(rangeFrom)))
+  const endIndex = Math.max(startIndex, Math.min(timeline.length - 1, Math.ceil(rangeTo)))
+  const start = timeline[startIndex]
+  const end = timeline[endIndex]
+  const spanMs = Math.max(end - start, 1)
+  const includeDateForShortRange = spanMs <= DAY_MS && !isSameUtcDate(start, end)
+  const spanLogical = Math.max(rangeTo - rangeFrom, 1)
+  const usedIndices = new Set<number>()
+
+  return Array.from({ length: labelCount })
+    .map((_, index) => {
+      const logical = rangeFrom + (spanLogical * index) / Math.max(labelCount - 1, 1)
+      const dataIndex = Math.max(0, Math.min(timeline.length - 1, Math.round(logical)))
+      const positionPct = ((logical - rangeFrom) / spanLogical) * 100
+      return { dataIndex, positionPct }
+    })
+    .filter(({ dataIndex }) => {
+      if (usedIndices.has(dataIndex)) return false
+      usedIndices.add(dataIndex)
+      return true
+    })
+    .map(({ dataIndex, positionPct }) => {
+      const time = timeline[dataIndex]
+      const align = positionPct < 8 ? "start" : positionPct > 92 ? "end" : "center"
+      return {
+        key: `${time}-${dataIndex}-${Math.round(positionPct * 100)}`,
+        label: formatTimeAxisLabel(time, spanMs, includeDateForShortRange),
+        positionPct,
+        align,
+      }
+    })
+}
+
+function HistoryPaneLoading({
+  paneIndex,
+  seriesCount,
+  maxSeriesPerPane,
+  loadingLabel,
+}: {
+  paneIndex: number
+  seriesCount: number
+  maxSeriesPerPane: number
+  loadingLabel: string
+}) {
+  const rowCount = Math.max(1, Math.min(seriesCount, maxSeriesPerPane))
+  return (
+    <section
+      data-history-loading-group
+      data-history-loading-pane={paneIndex}
+      className="border-t border-border/50 pt-px first:border-t-0 first:pt-0 sm:pt-0.5"
+    >
+      <div className="mb-px grid grid-cols-2 items-center gap-x-1.5 gap-y-px">
+        {Array.from({ length: rowCount }, (_, index) => (
+          <div
+            key={index}
+            data-history-loading-series
+            className="grid h-3.5 min-w-0 grid-cols-[1.35rem_auto_minmax(0,1fr)_4.1rem_2.8rem] items-center gap-0.5 sm:grid-cols-[1.55rem_auto_minmax(0,1fr)_4.5rem_3.2rem] sm:gap-1"
+          >
+            <span className="text-[8px] font-semibold leading-none text-muted-foreground sm:text-[9px]">
+              #{String(paneIndex * maxSeriesPerPane + index + 1).padStart(2, "0")}
+            </span>
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/30" />
+            <span className="h-2.5 min-w-0 animate-pulse rounded bg-muted" />
+            <span className="h-2.5 animate-pulse rounded bg-muted" />
+            <span className="h-2.5 animate-pulse rounded bg-muted" />
+          </div>
+        ))}
+      </div>
+      <div className="h-[42px] w-full rounded-sm border border-dashed border-border/60 bg-muted/25 sm:h-[62px]">
+        <div className="flex h-full items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
+          <RefreshCw className="h-3 w-3 animate-spin" />
+          {loadingLabel}
+        </div>
+      </div>
+      <div className="h-3.5 w-full pt-px sm:h-4">
+        <div className="h-full border-t border-slate-500/25 dark:border-slate-400/25" />
+      </div>
+    </section>
+  )
 }
 
 export function AlignedHistoryCompare({
@@ -295,6 +449,7 @@ export function AlignedHistoryCompare({
   loadingLabel,
   noDataLabel,
   seriesCountLabel,
+  expectedSeriesCount,
   maxSeriesPerPane = MAX_SERIES_PER_PANE,
   className,
 }: AlignedHistoryCompareProps) {
@@ -305,6 +460,7 @@ export function AlignedHistoryCompare({
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [hoverState, setHoverState] = useState<HoverState | null>(null)
   const [cardWidth, setCardWidth] = useState(0)
+  const [visibleLogicalRange, setVisibleLogicalRange] = useState<VisibleLogicalRange | null>(null)
   const groups = useMemo(() => (data ? getGroups(data, maxSeriesPerPane) : []), [data, maxSeriesPerPane])
   const timeline = useMemo(() => (data ? getTimeline(data) : []), [data])
   const isCompact = cardWidth > 0 && cardWidth < COMPACT_WIDTH
@@ -340,7 +496,8 @@ export function AlignedHistoryCompare({
     const grid = gridRef.current
 
     const isDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false
-    const textColor = isDark ? "rgba(229,231,235,0.85)" : "rgba(30,41,59,0.85)"
+    const textColor = isDark ? "rgba(248,250,252,0.96)" : "rgba(15,23,42,0.96)"
+    const axisColor = isDark ? "rgba(203,213,225,0.42)" : "rgba(71,85,105,0.38)"
     const gridColor = isDark ? "rgba(148,163,184,0.10)" : "rgba(148,163,184,0.14)"
     const sharedRange = getTimelineRange(timeline)
     const timeVisible = shouldShowTime(timeline)
@@ -349,12 +506,14 @@ export function AlignedHistoryCompare({
       timelineAnchorData.length > 1
         ? ({ from: 0 as Logical, to: (timelineAnchorData.length - 1) as Logical } satisfies LogicalRange)
         : null
+    setVisibleLogicalRange(
+      sharedLogicalRange ? { from: Number(sharedLogicalRange.from), to: Number(sharedLogicalRange.to) } : null,
+    )
 
     const panes: PaneChart[] = []
-    groups.forEach((group, groupIndex) => {
+    groups.forEach((group) => {
       const containerEl = grid.querySelector<HTMLDivElement>(`[data-pane="${group.paneIndex}"]`)
       if (!containerEl) return
-      const showsSharedXAxis = groupIndex === groups.length - 1
       const chart = createChart(containerEl, {
         autoSize: true,
         layout: {
@@ -366,14 +525,16 @@ export function AlignedHistoryCompare({
         grid: { vertLines: { visible: false }, horzLines: { color: gridColor } },
         rightPriceScale: {
           visible: true,
-          borderVisible: false,
+          borderVisible: true,
+          borderColor: axisColor,
           scaleMargins: isCompact ? { top: 0.18, bottom: 0.18 } : { top: 0.1, bottom: 0.1 },
           entireTextOnly: true,
           minimumWidth: isCompact ? 52 : 84,
         },
         timeScale: {
-          visible: showsSharedXAxis,
+          visible: false,
           borderVisible: false,
+          borderColor: axisColor,
           timeVisible,
           secondsVisible: false,
           rightOffset: 0,
@@ -450,6 +611,7 @@ export function AlignedHistoryCompare({
     let syncing = false
     const syncRange = (sourceIndex: number) => (range: LogicalRange | null) => {
       if (syncing || !range) return
+      setVisibleLogicalRange({ from: Number(range.from), to: Number(range.to) })
       syncing = true
       try {
         for (let index = 0; index < panes.length; index += 1) {
@@ -555,14 +717,22 @@ export function AlignedHistoryCompare({
       0,
     )
   }, [groups, hidden])
+  const timeAxisLabels = useMemo(
+    () => getTimeAxisLabels(timeline, isCompact, visibleLogicalRange),
+    [isCompact, timeline, visibleLogicalRange],
+  )
+  const displaySeriesCount = Math.max(seriesCount, expectedSeriesCount ?? seriesCount)
+  const pendingSeriesCount = loading ? Math.max(0, displaySeriesCount - seriesCount) : 0
+  const pendingPaneCount = Math.ceil(pendingSeriesCount / maxSeriesPerPane)
 
   const hoverPaneTooltips = useMemo<HoverPaneTooltip[]>(() => {
     const grid = gridRef.current
     if (!hoverState || !grid) return []
 
     const gridRect = grid.getBoundingClientRect()
-    const tooltipWidth = isCompact ? 172 : 220
+    const tooltipWidth = Math.min(isCompact ? 260 : 340, Math.max(180, gridRect.width - 8))
     const left = Math.min(Math.max(hoverState.x + 8, 4), Math.max(4, gridRect.width - tooltipWidth - 4))
+    const hoverTime = formatHoverTime(hoverState.time)
 
     return chartsRef.current.flatMap((pane) => {
       const items: HoverPaneTooltipItem[] = pane.specs
@@ -574,6 +744,7 @@ export function AlignedHistoryCompare({
             order: spec.order,
             label: spec.label,
             color: spec.color,
+            time: hoverTime,
             value: value === null ? "—" : formatRaw(value, spec.unit),
           }
         })
@@ -605,7 +776,10 @@ export function AlignedHistoryCompare({
           </div>
           {data && seriesCount > 0 && (
             <span className="h-4 w-[7.75rem] overflow-hidden truncate text-right text-[9px] leading-4 text-muted-foreground sm:w-36">
-              {visibleSeriesCount}/{seriesCount} {seriesCountLabel}
+              {visibleSeriesCount}/{displaySeriesCount} {seriesCountLabel}
+              {loading && (
+                <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground/60" />
+              )}
             </span>
           )}
         </div>
@@ -613,13 +787,37 @@ export function AlignedHistoryCompare({
       <CardContent className="px-2.5 pt-0">
         {error ? (
           <p className="py-12 text-center text-xs text-destructive">{error}</p>
-        ) : loading && !data ? (
-          <p className="py-12 text-center text-xs text-muted-foreground">{loadingLabel}</p>
+        ) : loading && (!data || seriesCount === 0 || timeline.length === 0) ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              {loadingLabel}
+            </div>
+            <div className="relative flex flex-col gap-px sm:gap-0.5">
+              {Array.from(
+                {
+                  length: Math.max(
+                    1,
+                    Math.ceil(Math.min(displaySeriesCount || maxSeriesPerPane * 3, maxSeriesPerPane * 6) / maxSeriesPerPane),
+                  ),
+                },
+                (_, index) => (
+                  <HistoryPaneLoading
+                    key={index}
+                    paneIndex={index}
+                    seriesCount={Math.min(maxSeriesPerPane, Math.max(1, displaySeriesCount - index * maxSeriesPerPane))}
+                    maxSeriesPerPane={maxSeriesPerPane}
+                    loadingLabel={loadingLabel}
+                  />
+                ),
+              )}
+            </div>
+          </div>
         ) : !data || seriesCount === 0 || timeline.length === 0 ? (
           <p className="py-12 text-center text-xs text-muted-foreground">{noDataLabel}</p>
         ) : (
           <div ref={gridRef} className="relative flex flex-col gap-px sm:gap-0.5">
-            {groups.map((group, groupIndex) => (
+            {groups.map((group) => (
               <section
                 key={group.paneIndex}
                 data-history-group={group.key}
@@ -693,13 +891,45 @@ export function AlignedHistoryCompare({
                 </div>
                 <div
                   data-pane={group.paneIndex}
-                  className={cn(
-                    "w-full",
-                    groupIndex === groups.length - 1 ? "h-[56px] sm:h-[78px]" : "h-[46px] sm:h-[68px]",
-                  )}
+                  className="h-[42px] w-full sm:h-[62px]"
                 />
+                <div
+                  data-history-time-axis
+                  aria-hidden="true"
+                  className="h-3.5 w-full pt-px sm:h-4"
+                  style={{ paddingRight: isCompact ? 52 : 84 }}
+                >
+                  <div className="relative h-full border-t border-slate-500/45 dark:border-slate-400/35">
+                    {timeAxisLabels.map((label) => (
+                      <span
+                        key={label.key}
+                        data-history-time-label
+                        className={cn(
+                          "absolute top-0.5 whitespace-nowrap text-[9px] font-semibold leading-3 text-slate-700 dark:text-slate-200 sm:text-[10px]",
+                          label.align === "center" && "-translate-x-1/2",
+                          label.align === "end" && "-translate-x-full",
+                        )}
+                        style={{ left: `${label.positionPct}%` }}
+                      >
+                        {label.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </section>
             ))}
+            {Array.from({ length: pendingPaneCount }, (_, index) => {
+              const loadedBeforePane = seriesCount + index * maxSeriesPerPane
+              return (
+                <HistoryPaneLoading
+                  key={`loading-${index}`}
+                  paneIndex={groups.length + index}
+                  seriesCount={Math.min(maxSeriesPerPane, displaySeriesCount - loadedBeforePane)}
+                  maxSeriesPerPane={maxSeriesPerPane}
+                  loadingLabel={loadingLabel}
+                />
+              )
+            })}
             {hoverPaneTooltips.map((tooltip) => (
               <div
                 key={tooltip.key}
@@ -713,12 +943,13 @@ export function AlignedHistoryCompare({
                     <div
                       key={item.key}
                       data-history-hover-item
-                      className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-1"
+                      className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1"
                     >
                       <span className="h-1.5 w-1.5 rounded-full" style={{ background: item.color }} />
                       <span className="truncate font-semibold tabular-nums">
                         {item.order ? `#${String(item.order).padStart(2, "0")} ` : ""}{item.label}:{item.value}
                       </span>
+                      <span className="shrink-0 text-muted-foreground tabular-nums">{item.time}</span>
                     </div>
                   ))}
                 </div>

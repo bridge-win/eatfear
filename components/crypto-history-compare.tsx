@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo } from "react"
 
 import {
   AlignedHistoryCompare,
@@ -9,19 +9,33 @@ import {
   type AlignedHistorySeries,
   type AlignedHistoryUnit,
 } from "@/components/aligned-history-compare"
+import { getCryptoSeriesLabel } from "@/components/crypto-series-label"
+import { jsonFetcher, usePersistentSWR, writeStoredJson } from "@/lib/client-persistence"
+import { DEFAULT_CRYPTO_HISTORY_REFRESH_MS, getEnabledCryptoIndicators } from "@/lib/crypto-indicator-config"
 import { useT } from "@/lib/i18n"
 import { type TimeRangeId } from "@/lib/time-range"
-import { DEFAULT_CRYPTO_HISTORY_REFRESH_MS } from "@/lib/crypto-indicator-config"
+
+const CRYPTO_INITIAL_HISTORY_LIMIT = 12
+
+const CROSS_SECTION_PRICE_KEY_BY_CCY: Readonly<Record<string, string>> = {
+  ETH: "ethPrice",
+  SOL: "solPrice",
+  XRP: "xrpPrice",
+  BNB: "bnbPrice",
+  DOGE: "dogePrice",
+}
 
 export interface CryptoHistorySeries {
   key: string
   i18nKey: string
   infoI18nKey: string
+  labelVars?: Record<string, string | number>
   order: number
   paneIndex: number
   color: string
   source: string
   unit: AlignedHistoryUnit
+  relevanceScore?: number
   data: { time: number; value: number | null }[]
 }
 
@@ -33,6 +47,54 @@ export interface CryptoHistoryPayload {
   refreshMs: number
   paneCount: number
   updatedAt: number
+}
+
+function buildCryptoHistoryUrl(ccy: string, range: TimeRangeId, params: { limit?: number; offset?: number } = {}): string {
+  const searchParams = new URLSearchParams({ ccy, range })
+  if (params.limit !== undefined) searchParams.set("limit", String(params.limit))
+  if (params.offset !== undefined) searchParams.set("offset", String(params.offset))
+  return `/api/crypto/history-compare?${searchParams.toString()}`
+}
+
+function mergeCryptoHistoryPayloads(
+  priority: CryptoHistoryPayload | undefined,
+  rest: CryptoHistoryPayload | undefined,
+): CryptoHistoryPayload | null {
+  if (!priority && !rest) return null
+  const base = priority ?? rest
+  if (!base) return null
+
+  const seriesByKey = new Map<string, CryptoHistorySeries>()
+  for (const payload of [priority, rest]) {
+    for (const series of payload?.series ?? []) {
+      seriesByKey.set(series.key, series)
+    }
+  }
+
+  const series = Array.from(seriesByKey.values())
+    .sort((a, b) => a.order - b.order)
+    .map((seriesItem, index) => ({
+      ...seriesItem,
+      order: index + 1,
+      paneIndex: Math.floor(index / 2),
+    }))
+  const timeline =
+    (priority?.timeline.length ?? 0) >= (rest?.timeline.length ?? 0)
+      ? priority?.timeline ?? base.timeline
+      : rest?.timeline ?? base.timeline
+  const refreshMs = Math.max(
+    30_000,
+    Math.min(priority?.refreshMs ?? DEFAULT_CRYPTO_HISTORY_REFRESH_MS, rest?.refreshMs ?? DEFAULT_CRYPTO_HISTORY_REFRESH_MS),
+  )
+
+  return {
+    ...base,
+    timeline,
+    series,
+    refreshMs,
+    paneCount: series.length === 0 ? 0 : Math.max(...series.map((item) => item.paneIndex)) + 1,
+    updatedAt: Math.max(priority?.updatedAt ?? 0, rest?.updatedAt ?? 0, base.updatedAt),
+  }
 }
 
 export interface CryptoHistoryCompareProps {
@@ -48,52 +110,52 @@ export function useCryptoHistoryPayload(
   instId = "BTC-USDT-SWAP",
   range: TimeRangeId,
   enabled = true,
+  initialLimit = CRYPTO_INITIAL_HISTORY_LIMIT,
 ): {
   payload: CryptoHistoryPayload | null
   loading: boolean
   error: string | null
 } {
-  const [payload, setPayload] = useState<CryptoHistoryPayload | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const refreshMsRef = useRef(DEFAULT_CRYPTO_HISTORY_REFRESH_MS)
   const ccy = instId.split("-")[0] ?? "BTC"
+  const fullStorageKey = `crypto-history:${ccy}:${range}:full`
+  const priorityUrl = enabled && initialLimit > 0 ? buildCryptoHistoryUrl(ccy, range, { limit: initialLimit }) : null
+  const restUrl = enabled ? buildCryptoHistoryUrl(ccy, range, { offset: initialLimit }) : null
+  const priority = usePersistentSWR<CryptoHistoryPayload>(
+    `crypto-history:${ccy}:${range}:priority:${initialLimit}`,
+    priorityUrl,
+    jsonFetcher,
+    { revalidateIfStale: true },
+  )
+  const rest = usePersistentSWR<CryptoHistoryPayload>(
+    `crypto-history:${ccy}:${range}:rest:${initialLimit}`,
+    restUrl,
+    jsonFetcher,
+    {
+      refreshInterval: (payload) => payload?.refreshMs ?? DEFAULT_CRYPTO_HISTORY_REFRESH_MS,
+    },
+  )
+  const fullCache = usePersistentSWR<CryptoHistoryPayload>(fullStorageKey, null, jsonFetcher)
+  const mergedPayload = useMemo(() => mergeCryptoHistoryPayloads(priority.data, rest.data), [priority.data, rest.data])
+  const hasCompleteNetworkPayload = priority.data !== undefined && rest.data !== undefined
+  const networkPayload = hasCompleteNetworkPayload ? mergedPayload : null
+  const payload = networkPayload ?? fullCache.data ?? priority.data ?? null
 
   useEffect(() => {
-    if (!enabled) {
-      setLoading(false)
-      return
-    }
-    let active = true
-    let timer: ReturnType<typeof setTimeout> | null = null
-    setLoading(true)
+    if (mergedPayload && hasCompleteNetworkPayload) writeStoredJson(fullStorageKey, mergedPayload)
+  }, [fullStorageKey, hasCompleteNetworkPayload, mergedPayload])
 
-    async function load() {
-      try {
-        const response = await fetch(`/api/crypto/history-compare?ccy=${encodeURIComponent(ccy)}&range=${range}`)
-        if (!response.ok) throw new Error(`history-compare ${response.status}`)
-        const json = (await response.json()) as CryptoHistoryPayload
-        if (!active) return
-        refreshMsRef.current = json.refreshMs || DEFAULT_CRYPTO_HISTORY_REFRESH_MS
-        setPayload(json)
-        setError(null)
-      } catch (requestError) {
-        if (active) setError(requestError instanceof Error ? requestError.message : "load failed")
-      } finally {
-        if (!active) return
-        setLoading(false)
-        timer = setTimeout(load, refreshMsRef.current)
-      }
-    }
-
-    load()
-    return () => {
-      active = false
-      if (timer) clearTimeout(timer)
-    }
-  }, [ccy, enabled, range])
+  const loading = payload
+    ? priority.isValidating || rest.isValidating || (!mergedPayload && !fullCache.data && rest.isLoading)
+    : fullCache.isLoading || priority.isLoading || rest.isLoading
+  const error = payload ? null : priority.error?.message ?? rest.error?.message ?? fullCache.error?.message ?? null
 
   return { payload, loading, error }
+}
+
+export function getExpectedCryptoHistorySeriesCount(instId: string): number {
+  const ccy = (instId.split("-")[0] ?? "BTC").toUpperCase()
+  const omittedKey = CROSS_SECTION_PRICE_KEY_BY_CCY[ccy]
+  return getEnabledCryptoIndicators().filter((indicator) => indicator.key !== omittedKey).length
 }
 
 export function CryptoHistoryCompare({
@@ -109,21 +171,23 @@ export function CryptoHistoryCompare({
   const payload = controlledPayload === undefined ? fetched.payload : controlledPayload
   const loading = controlledLoading ?? fetched.loading
   const error = controlledError ?? fetched.error
+  const expectedSeriesCount = getExpectedCryptoHistorySeriesCount(instId)
 
   const data: AlignedHistoryData | null = useMemo(() => {
     if (!payload) return null
     const groupsByPane = new Map<number, AlignedHistorySeries[]>()
     for (const spec of payload.series) {
+      const label = getCryptoSeriesLabel(t, spec)
       const series: AlignedHistorySeries = {
         key: spec.key,
         order: spec.order,
-        label: t(spec.i18nKey),
+        label,
         color: spec.color,
         unit: spec.unit,
         data: spec.data,
         info: {
-          title: `#${String(spec.order).padStart(2, "0")} ${t(spec.i18nKey)}`,
-          description: t(spec.infoI18nKey),
+          title: `#${String(spec.order).padStart(2, "0")} ${label}`,
+          description: t(spec.infoI18nKey, spec.labelVars),
           source: spec.source,
         },
       }
@@ -159,6 +223,7 @@ export function CryptoHistoryCompare({
       loadingLabel={t("compare.loading")}
       noDataLabel={t("chart.noData")}
       seriesCountLabel={t("compare.seriesCount")}
+      expectedSeriesCount={expectedSeriesCount}
       className={className}
     />
   )
