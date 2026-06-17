@@ -12,6 +12,7 @@ import { CrashAlertBanner } from "@/components/crash-alert-banner"
 import { MarketIndicatorCards, type MarketIndicatorItem } from "@/components/market-indicator-cards"
 import { MarketIndicatorDetail } from "@/components/market-indicator-detail"
 import { OpportunityRadar } from "@/components/opportunity-radar"
+import { StockPanicSignalCard } from "@/components/stock-panic-signal-card"
 import { DashboardFrame } from "@/components/page-frame"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TimeRangeSelector } from "@/components/time-range-selector"
@@ -468,6 +469,8 @@ export function StockDashboard({
         </div>
         <TimeRangeSelector value={range} onChange={setRange} />
       </header>
+
+      <StockPanicSignalCard />
 
       <OpportunityRadar
         assetClass="stock"
