@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react"
 
 import { BlackSwanOpportunityCard } from "@/components/black-swan-opportunity-card"
+import { CryptoBuyWindowCard } from "@/components/crypto-buy-window-card"
+import { PanicWindowBanner } from "@/components/panic-window-banner"
 import {
   CryptoHistoryCompare,
   getExpectedCryptoHistorySeriesCount,
@@ -144,11 +146,15 @@ export function CryptoDashboard({
         </div>
       </header>
 
+      <PanicWindowBanner />
+
       <div className="flex flex-wrap items-stretch gap-2">
         <BlackSwanOpportunityCard instId={instId} className="flex-1 min-w-[12rem]" />
         <CryptoRegimeScoreCard instId={instId} className="flex-1 min-w-[12rem]" />
         <CyclePositionCard className="flex-1 min-w-[12rem]" />
       </div>
+
+      <CryptoBuyWindowCard />
 
       {optionsCurrency && <OptionsMaxPainCard currency={optionsCurrency} />}
 
