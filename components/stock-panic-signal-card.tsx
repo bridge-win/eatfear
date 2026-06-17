@@ -123,10 +123,10 @@ export function StockPanicSignalCard({ className }: { className?: string }) {
     if (!windowBand || windowBand === "none") return null
     if (windowBand === "active") {
       return {
-        label: locale === "zh" ? "买入窗口开启" : "Buy Window Active",
+        label: locale === "zh" ? "历史性偏低估区间" : "Historically Attractive",
         sub: locale === "zh"
-          ? "多项恐慌信号同时触发，历史数据显示此类时点后12个月正收益概率极高。"
-          : "Multiple panic signals triggered. Historical data shows high probability of positive returns 12 months forward.",
+          ? "多项恐慌指标同时偏高。历史上此类条件对应较好的6–12个月远期收益，但不是择时信号——指标可能持续数月而价格继续下跌（如2008年）。倾向分批加仓而非一次抄底。"
+          : "Multiple panic gauges elevated together. Such conditions historically map to above-average 6–12 month forward returns — but this is not a timing signal: gauges can stay extreme for months while prices fall further (e.g. 2008). Lean in via staged buying, don't try to call the bottom.",
         className: "border-emerald-500/40 bg-emerald-500/8 text-emerald-700 dark:text-emerald-300",
       }
     }
@@ -139,25 +139,25 @@ export function StockPanicSignalCard({ className }: { className?: string }) {
 
   const tooltipContent = locale === "zh"
     ? [
-        "美股恐慌窗口监测（0–100分）",
+        "美股恐慌条件监测（0–100分，远期胜率视角，非择时信号）",
         "",
-        "① VIX ≥ 40（权重45%）：学术研究和实证数据均显示，VIX高于40时买入标普500，随后12个月100%正收益（2016–2024）。",
-        "② 高收益债利差 ≥ 600bps（权重30%）：ICE BofA高收益债OAS超过600bps意味着信用市场承压、强制抛售接近尾声，历史上常在股市底部附近。",
-        "③ 标普500从52周高点回撤 ≥ 20%（权重25%）：正式熊市区域，结合其他信号放大买入信号。",
+        "① VIX ≥ 40（权重45%）：自1990年起，VIX收盘高于40后，标普500在12个月后约90%概率上涨（均值约+30%）——并非“100%”。2008年VIX持续高于40达8个月，期间标普继续下跌约50%，是典型失败案例。",
+        "② 高收益债利差（权重30%）：ICE BofA高收益债OAS长期中位数约400–500bps，因此400bps是常态而非“偏高”。真正的压力区在800bps以上（2011、2016），恐慌区在1000bps以上（2008达2182、2020达1087）。利差见顶通常滞后于股市见底，是压力计而非抄底信号。",
+        "③ 标普500从52周高点回撤 ≥ 20%（权重25%）：正式熊市区域。",
         "",
-        "窗口触发条件：2个以上信号进入极端买入区，或同时有多个偏高信号叠加。",
-        "来源：Yahoo Finance、FRED（BAMLH0A0HYM2）",
+        "重要：以上指标可能持续数月处于极值而价格继续下跌（结构性熊市）。研究显示，对多数人而言定投/分批买入长期胜过抄底择时。请视为“偏低估的条件区间”，倾向加快定投，而非一次性抄底。",
+        "来源：Yahoo Finance、FRED（BAMLH0A0HYM2）、Wells Fargo、Hartford Funds、Vanguard",
         "约5分钟刷新。不构成投资建议。",
       ].join("\n")
     : [
-        "US Equity Panic Window Monitor (0–100)",
+        "US Equity Panic-Conditions Monitor (0–100; forward-odds view, not a timing signal)",
         "",
-        "① VIX ≥ 40 (45% weight): Academic studies and empirical data show buying the S&P 500 when VIX exceeds 40 yields 100% positive 12-month returns (2016–2024).",
-        "② HY Spread ≥ 600 bps (30% weight): ICE BofA HY OAS above 600 bps signals forced selling near exhaustion and historically precedes equity recoveries.",
-        "③ SPX 52-week drawdown ≥ 20% (25% weight): Official bear market territory — amplifies other buy signals.",
+        "① VIX ≥ 40 (45% weight): Since 1990, the S&P 500 has been higher 12 months after a >40 close ~90% of the time (avg ~+30%) — NOT 100%. In 2008 VIX stayed above 40 for ~8 months while stocks fell another ~50% (the textbook failure case).",
+        "② HY Spread (30% weight): ICE BofA HY OAS has a long-run median of ~400–500 bps, so 400 is baseline, not 'elevated'. Real distress is 800+ bps (2011, 2016); panic is 1000+ (2008: 2182, 2020: 1087). Spread peaks LAG equity bottoms — this is a stress gauge, not an exhaustion/buy trigger.",
+        "③ SPX 52-week drawdown ≥ 20% (25% weight): Official bear-market territory.",
         "",
-        "Window triggers when 2+ signals reach extreme or multiple signals are elevated.",
-        "Sources: Yahoo Finance, FRED (BAMLH0A0HYM2)",
+        "Important: these gauges can stay at extremes for months while prices keep falling (structural bears). Research shows dollar-cost averaging beats dip-timing for most people. Read this as 'historically attractive conditions' — accelerate scheduled buying, don't try to call the bottom.",
+        "Sources: Yahoo Finance, FRED (BAMLH0A0HYM2), Wells Fargo, Hartford Funds, Vanguard",
         "Refreshes ~5 min. Not investment advice.",
       ].join("\n")
 
@@ -167,7 +167,7 @@ export function StockPanicSignalCard({ className }: { className?: string }) {
         <div className="flex items-center gap-1.5">
           <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
           <p className="text-xs font-semibold tracking-tight text-foreground">
-            {locale === "zh" ? "美股恐慌买入窗口" : "Panic Buy Window"}
+            {locale === "zh" ? "美股恐慌条件监测" : "Panic Conditions"}
           </p>
         </div>
         <div className="flex items-center gap-1.5">

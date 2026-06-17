@@ -93,16 +93,16 @@ export function PanicWindowBanner({ className }: PanicWindowBannerProps) {
   const isExtreme = tier === "extreme"
 
   const title = isExtreme
-    ? locale === "zh" ? "极端买入窗口已开启" : "Extreme Buy Window Active"
-    : locale === "zh" ? "买入窗口已开启" : "Buy Window Active"
+    ? locale === "zh" ? "跨市场极端低估条件" : "Cross-Market Deep-Value Conditions"
+    : locale === "zh" ? "历史性偏低估条件" : "Historically Attractive Conditions"
 
   const subtitle = isExtreme
     ? locale === "zh"
-      ? `${signals.length}个跨市场指标同时触发极端信号。历史研究：此类叠加信号后12个月正收益概率极高。`
-      : `${signals.length} cross-market indicators at extreme readings. Historical studies: very high probability of positive returns 12 months forward.`
+      ? `${signals.length}个跨市场指标同时处于历史极值（${signals.join("、")}）。过往此类条件对应较好的6–12个月远期收益，但这是概率视角而非择时信号——指标可能持续数月而价格继续下跌。`
+      : `${signals.length} cross-market gauges at historic extremes (${signals.join(", ")}). Such conditions historically map to above-average 6–12 month forward returns — a probabilistic view, not a timing signal: gauges can stay extreme for months while prices fall further.`
     : locale === "zh"
-      ? `触发指标：${signals.join("、")}。恐慌性抛售信号，建议分批布局。`
-      : `Triggered: ${signals.join(", ")}. Panic-selling signal — consider staged accumulation.`
+      ? `偏高的指标：${signals.join("、")}。属于偏低估的条件区间。研究显示对多数人而言分批/定投长期优于抄底择时——倾向加快定投而非一次性抄底。`
+      : `Elevated gauges: ${signals.join(", ")}. These are historically attractive conditions. Research shows staged/DCA buying beats dip-timing for most — lean in via scheduled buying rather than calling the bottom.`
 
   return (
     <div

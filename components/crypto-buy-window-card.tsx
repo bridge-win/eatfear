@@ -130,62 +130,64 @@ export function CryptoBuyWindowCard({ className }: { className?: string }) {
     if (!payload?.windowBand || payload.windowBand === "none") return null
     if (payload.windowBand === "extreme") {
       return {
-        label: locale === "zh" ? "极端买入窗口" : "Extreme Buy Window",
+        label: locale === "zh" ? "历史性极端低估区间" : "Historic Deep-Value Zone",
         sub: locale === "zh"
-          ? "≥2个指标进入历史极值区。学术研究显示此类叠加信号后12个月+200%以上历史概率极高。"
-          : "≥2 indicators at historic extremes. Academic studies show >200% forward returns in comparable setups.",
+          ? "≥2个链上/情绪指标进入历史极值区。过往周期此类条件多对应深度价值——但样本仅3–4个周期，且指标可能持续数月而价格继续下跌。倾向分批建仓，而非一次抄底。"
+          : "≥2 on-chain/sentiment gauges at historic extremes. Past cycles saw deep value here — but the sample is only 3–4 cycles, and gauges can persist for months while price falls further. Scale in; don't call the bottom.",
         className: "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
       }
     }
     if (payload.windowBand === "active") {
       return {
-        label: locale === "zh" ? "买入窗口开启" : "Buy Window Active",
+        label: locale === "zh" ? "历史性偏低估区间" : "Historically Cheap Zone",
         sub: locale === "zh"
-          ? "多项链上与情绪指标同时进入买入区，历史上对应强力积累时机。"
-          : "Multiple on-chain and sentiment indicators in buy zones — historically strong accumulation timing.",
+          ? "多项链上与情绪指标同时偏低。历史上对应较好的远期收益，但属于6–12个月的概率视角，并非择时信号。"
+          : "On-chain and sentiment gauges low together. Historically maps to above-average forward returns — a 6–12 month probabilistic view, not a timing signal.",
         className: "border-teal-500/40 bg-teal-500/8 text-teal-700 dark:text-teal-300",
       }
     }
     return {
       label: locale === "zh" ? "信号观察中" : "Signals Building",
-      sub: locale === "zh" ? "部分指标接近买入区，持续监控中。" : "Some indicators approaching buy zones.",
+      sub: locale === "zh" ? "部分指标接近低估区，持续监控中。" : "Some gauges approaching cheap zones.",
       className: "border-amber-500/40 bg-amber-500/8 text-amber-700 dark:text-amber-300",
     }
   }, [payload?.windowBand, locale])
 
   const tooltipContent = locale === "zh"
     ? [
-        "BTC 周期买入窗口监测",
+        "BTC 周期低估条件监测（远期概率视角，非择时信号）",
         "",
-        "① Mayer 倍数（40%权重）：BTC 现价 / 200日均线",
-        "  < 0.8 = 历史主要积累区 | < 0.6 = 历史99%底部以上（极端买入）",
+        "① Mayer 倍数（40%权重）：BTC 现价 / 200日均线，长期均值约1.3–1.5",
+        "  < 0.8 = 历史偏便宜（但非罕见，约1/3时间在0.95下方；2018/2022曾在此下方再跌30–50%）",
+        "  < 0.6 = 罕见的深度低估（历史周期低点约0.41/0.48/0.51）。注：经典Mayer法则其实是 >2.4 为过热卖出。",
         "",
         "② Puell 倍数（35%权重）：日矿工收入 / 365日均值",
-        "  < 0.5 = 矿工底部。2022年12月触发 → 随后12个月 +294%",
-        "  经ScienceDirect 2025年学术研究交叉验证（三个BTC周期）",
+        "  < 0.5 = 矿工压力/积累区。2022年低点后12个月约+155%（+294%为抄到最低点并持有至2024峰值的事后数字）。",
+        "  属于on-chain估值指标家族（MVRV/Puell等，ScienceDirect 2025研究），但Puell本身并非被单独证明最优。",
         "",
-        "③ 恐慌指数（25%权重）：alternative.me 恐贪指数",
-        "  < 20 = 历史高胜率买入窗口 | < 10 = 极端恐慌",
+        "③ 恐慌指数（25%权重）：alternative.me 加密恐贪指数（2018年2月起）",
+        "  < 20 = 远期收益偏高，但中途回撤大；指数2018熊市期间长期处于极度恐慌而价格继续大跌。",
         "",
-        "窗口触发：≥2信号进入买入区。极端窗口：≥2信号进入极端买入区。",
-        "来源：OKX · blockchain.info · alternative.me",
+        "重要：这些指标可能持续数月处于极值而价格继续下跌。研究显示定投/分批长期多优于抄底择时。请视为“偏低估的条件”而非买入触发。",
+        "来源：OKX · blockchain.info · alternative.me · Glassnode · CoinDesk",
         "约5分钟刷新。不构成投资建议。",
       ].join("\n")
     : [
-        "BTC Cycle Buy Window Monitor",
+        "BTC Cycle Cheap-Conditions Monitor (forward-odds view, not a timing signal)",
         "",
-        "① Mayer Multiple (40% weight): BTC price / 200d SMA",
-        "  <0.8 = major accumulation zone | <0.6 = extreme buy (top 99th pct historically)",
+        "① Mayer Multiple (40% weight): BTC price / 200d SMA; long-run avg ~1.3–1.5",
+        "  <0.8 = historically cheap (not rare — ~1/3 of days sit below 0.95; fell another 30–50% below it in 2018/2022)",
+        "  <0.6 = rare deep value (cycle lows ~0.41/0.48/0.51). Note: the canonical Mayer rule is actually >2.4 = overbought/sell.",
         "",
         "② Puell Multiple (35% weight): daily miner revenue / 365d avg",
-        "  <0.5 = miner bottom. Dec 2022 signal → +294% in 12 months.",
-        "  Cross-validated by ScienceDirect 2025 academic study (3 BTC cycles).",
+        "  <0.5 = miner-stress/accumulation zone. ~+155% in 12m after the 2022 low (the +294% figure was buying the exact bottom and holding to the 2024 peak).",
+        "  Part of the on-chain valuation family (MVRV/Puell, ScienceDirect 2025) — but Puell itself isn't proven the single best metric.",
         "",
-        "③ Fear & Greed (25% weight): alternative.me index",
-        "  <20 = historically high-win-rate buy windows | <10 = extreme panic",
+        "③ Fear & Greed (25% weight): alternative.me crypto index (since Feb 2018)",
+        "  <20 = above-average forward returns but large interim drawdowns; fear stayed extreme through the entire 2018 bear as price kept falling.",
         "",
-        "Window: ≥2 signals in buy zone. Extreme: ≥2 in extreme buy.",
-        "Sources: OKX · blockchain.info · alternative.me",
+        "Important: these gauges can stay extreme for months while price falls further. Research shows DCA/scaling beats dip-timing for most. Read as 'cheap conditions', not a buy trigger.",
+        "Sources: OKX · blockchain.info · alternative.me · Glassnode · CoinDesk",
         "Refreshes ~5 min. Not investment advice.",
       ].join("\n")
 
@@ -195,7 +197,7 @@ export function CryptoBuyWindowCard({ className }: { className?: string }) {
         <div className="flex items-center gap-1.5">
           <Bitcoin className="h-3.5 w-3.5 text-muted-foreground" />
           <p className="text-xs font-semibold tracking-tight text-foreground">
-            {locale === "zh" ? "BTC 周期买入窗口" : "BTC Cycle Buy Window"}
+            {locale === "zh" ? "BTC 周期低估监测" : "BTC Cycle Value Monitor"}
           </p>
         </div>
         <div className="flex items-center gap-1.5">

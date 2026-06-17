@@ -6,14 +6,19 @@ import { getTimeRange } from "@/lib/time-range"
 
 export const revalidate = 300
 
-// VIX thresholds (academic: >40 = 100% pos 12m returns since 2016)
+// VIX thresholds. Since 1990, S&P is higher 12m after a >40 close ~90% of the
+// time (avg ~+30%) — NOT 100%; 2008 stayed >40 for ~8 months while stocks fell
+// another ~50%. Treat as a long-horizon "attractive zone", not a timing trigger.
 const VIX_EXTREME = 40
 const VIX_ELEVATED = 30
 const VIX_WATCH = 20
 
-// ICE BofA US HY OAS thresholds (bps): >600 = credit distress / forced selling done
-const HY_EXTREME = 600
-const HY_ELEVATED = 400
+// ICE BofA US HY OAS thresholds (bps). Long-run median ~400-500, so 400 is NOT
+// elevated — it is baseline. Real distress is 800+ (2011, 2016); panic is 1000+
+// (2008: 2182, 2020: 1087). Spread peaks LAG equity bottoms, so this is a stress
+// gauge, not an exhaustion/buy signal.
+const HY_EXTREME = 800
+const HY_ELEVATED = 550
 
 // SPX drawdown thresholds from 52-week high
 const SPX_DRAW_EXTREME = -30
