@@ -5,6 +5,7 @@ import { useMemo, useState } from "react"
 import { BlackSwanOpportunityCard } from "@/components/black-swan-opportunity-card"
 import { CryptoBuyWindowCard } from "@/components/crypto-buy-window-card"
 import { PanicWindowBanner } from "@/components/panic-window-banner"
+import { SmartMoneyTracker } from "@/components/smart-money-tracker"
 import {
   CryptoHistoryCompare,
   getExpectedCryptoHistorySeriesCount,
@@ -180,7 +181,8 @@ export function CryptoDashboard({
           <TabsTrigger value="realtime" className="text-xs">{t("crypto.tab.realtime")}</TabsTrigger>
           <TabsTrigger value="history" className="text-xs">{t("crypto.tab.history")}</TabsTrigger>
         </TabsList>
-        <TabsContent value="realtime" className="mt-3">
+        <TabsContent value="realtime" className="mt-3 space-y-3">
+          <SmartMoneyTracker ccy={instId.split("-")[0]} range={range} variant="cards" />
           {selectedSeriesKey && cryptoHistory.payload ? (
             <CryptoIndicatorDetail
               payload={cryptoHistory.payload}

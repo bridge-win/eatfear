@@ -63,12 +63,12 @@ function zoneScore(z: BuyWindowSignalZone): number {
 }
 
 export async function GET() {
-  const range2y = getTimeRange("5y")
+  const range3mo = getTimeRange("3mo")
 
   const [closes, minerRevRaw, fgr] = await Promise.all([
     fetchOkxCloses(),
     fetchBlockchainInfoSeries("miners-revenue", "2years", revalidate),
-    fetchFearGreedHistory(range2y, revalidate),
+    fetchFearGreedHistory(range3mo, revalidate),
   ])
 
   // ── Mayer Multiple ─────────────────────────────────────────
