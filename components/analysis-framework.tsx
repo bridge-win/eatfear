@@ -68,20 +68,26 @@ const SIGNAL_PILLARS: SignalPillar[] = [
     bullets: [
       {
         text: {
-          zh: "Mayer Multiple：历史周期低点约 0.41–0.51；>2.4 进入峰值区间",
-          en: "Mayer Multiple: cycle lows historically near 0.41–0.51; >2.4 = peak zone",
+          zh: "MVRV Z-Score：RIBF 2026 同行评审支持；Z<0 更适合底部，顶部振幅逐周期下降，应用分位而非固定 Z>7",
+          en: "MVRV Z-Score: peer-reviewed RIBF 2026 support; Z<0 works better for bottoms, while peak amplitude decays by cycle, so use percentiles instead of fixed Z>7",
         },
       },
       {
         text: {
-          zh: "Puell Multiple：<0.5 = 矿工投降区间；>4 = 矿工收入峰值",
-          en: "Puell Multiple: <0.5 = miner capitulation zone; >4 = revenue peak",
+          zh: "Puell Multiple：<0.5 = 矿工投降区间；>4 = 收入过热背景；减半会机械扭曲读数，应看历史分位",
+          en: "Puell Multiple: <0.5 = miner capitulation zone; >4 = overheated revenue context; halvings mechanically distort the reading, so use historical percentiles",
         },
       },
       {
         text: {
-          zh: "MVRV Z-Score：<0 = 历史吸引区间；>7 = 峰值高风险",
-          en: "MVRV Z-Score: <0 = historically attractive; >7 = peak risk",
+          zh: "Pi Cycle：极低置信度；111dMA 上穿 2×350dMA，样本只有 3 次且错过 2021 年 11 月顶部",
+          en: "Pi Cycle: very low confidence; 111dMA crossing 2x350dMA has only 3 historical samples and missed the Nov 2021 top",
+        },
+      },
+      {
+        text: {
+          zh: "所有链上阈值都来自 2–3 个周期的拟合，应作为 regime 背景而非精确触发器",
+          en: "All on-chain threshold bands are fit on only 2-3 cycles; treat them as regime context, not precise triggers",
         },
       },
     ],
@@ -93,20 +99,26 @@ const SIGNAL_PILLARS: SignalPillar[] = [
     bullets: [
       {
         text: {
-          zh: "资金费率：>0.1%/8h = 极端多头拥挤；<−0.01%/8h = 空头集中 / 恐慌",
-          en: "Funding rate: >0.1%/8h = extreme long crowding; <−0.01%/8h = fear/shorts pile in",
+          zh: "资金费率：>0.05%/8h = 过热，>0.10%/8h = 极端；资金费率 carry 在 2025 拥挤后年化转负",
+          en: "Funding rate: >0.05%/8h = overheated, >0.10%/8h = extreme; funding carry turned negative annualized in 2025 as the trade crowded",
         },
       },
       {
         text: {
-          zh: "多空比：>70% 多头 / >4:1 = 极端拥挤；期货贴水 = 罕见底部信号",
-          en: "L/S ratio: >70% long / >4:1 = extreme crowding; backwardation = rare bottom signal",
+          zh: "DVOL：30–40 = 平静，60–90 = 恐慌，100+ = 极端；它只提示波动幅度，不提示方向",
+          en: "DVOL: 30-40 = calm, 60-90 = fear, 100+ = panic; it signals move magnitude, not direction",
         },
       },
       {
         text: {
-          zh: "Basis（年化）：2024年2月峰值 25%；2025年末跌至 4.5%；负值 = 恐慌",
-          en: "Basis (annualized): peaked 25% Feb 2024; collapsed to 4.5% late 2025; negative = fear",
+          zh: "OI：每张合约都有多空双方，方向天然模糊；必须与价格、资金费率和 basis 一起看",
+          en: "OI: every contract has a long and a short, so direction is ambiguous; pair it with price, funding, and basis",
+        },
+      },
+      {
+        text: {
+          zh: "爆仓热力图：由 OI 和假设杠杆估算，不是可观察订单簿；广泛传播后会自我失效",
+          en: "Liquidation heatmaps: estimated from OI and assumed leverage, not observed order books; widely watched maps can become self-defeating",
         },
       },
     ],
@@ -214,6 +226,26 @@ const CITATIONS: Citation[] = [
     },
   },
   {
+    authors: "Liu, Tsyvinski, Wu (2022, JoF)",
+    title: "Common Risk Factors in Cryptocurrency",
+    url: "https://doi.org/10.1111/jofi.13119",
+    signal: { zh: "CMKT / CSMB / CMOM 三因子", en: "CMKT / CSMB / CMOM three-factor model" },
+    note: {
+      zh: "市场、规模和动量因子解释加密横截面收益",
+      en: "Market, size, and momentum factors capture crypto cross-sectional returns",
+    },
+  },
+  {
+    authors: "Grobys, Näsman, Sandretto (2026, RIBF)",
+    title: "Using on-chain data to predict Bitcoin cycles",
+    url: "https://doi.org/10.1016/j.ribaf.2026.103486",
+    signal: { zh: "链上周期信号", en: "On-chain cycle signals" },
+    note: {
+      zh: "同行评审验证 NUPL、MVRV Z-Score、CVDD；阈值仍需按周期衰减处理",
+      en: "Peer-reviewed evidence on NUPL, MVRV Z-Score, and CVDD; thresholds still need cycle-decay treatment",
+    },
+  },
+  {
     authors: "BIS Working Paper 1087",
     title: "Crypto carry and funding rate dynamics",
     url: "https://www.bis.org/publ/work1087.htm",
@@ -231,6 +263,26 @@ const CITATIONS: Citation[] = [
     note: {
       zh: "高 basis-momentum 做多做空组合年化 ~222%",
       en: "High-basis-momentum long-short achieved ~222% annualized — strongest cross-sectional factor",
+    },
+  },
+  {
+    authors: "Gilchrist & Zakrajšek (2012, AER)",
+    title: "Credit Spreads and Business Cycle Fluctuations",
+    url: "https://doi.org/10.1257/aer.102.4.1692",
+    signal: { zh: "Excess Bond Premium", en: "Excess Bond Premium" },
+    note: {
+      zh: "EBP 对衰退预测强，但不适合精确底部择时",
+      en: "EBP is strong for recession prediction, but weak for exact bottom timing",
+    },
+  },
+  {
+    authors: "Lopez-Salido, Stein, Zakrajšek (2017, QJE)",
+    title: "Credit-Market Sentiment and the Business Cycle",
+    url: "https://doi.org/10.1093/qje/qjx014",
+    signal: { zh: "信用情绪", en: "Credit sentiment" },
+    note: {
+      zh: "过低信用利差往往预示未来增长恶化，而非即时底部信号",
+      en: "Low credit spreads can predict later deterioration, not immediate bottom timing",
     },
   },
   {
@@ -264,11 +316,48 @@ interface ThresholdRow {
 
 const THRESHOLD_ROWS: ThresholdRow[] = [
   { signal: "VIX", watch: "20", elevated: "30", extreme: "40" },
-  { signal: "HY Spread", watch: "—", elevated: "550bps", extreme: "800bps" },
+  { signal: "HY OAS", watch: "—", elevated: "550bps", extreme: "800bps" },
   { signal: "SPX Drawdown", watch: "—", elevated: "−20%", extreme: "−30%" },
-  { signal: "BTC Funding", watch: "±0.03%/8h", elevated: "±0.07%/8h", extreme: "±0.10%/8h" },
+  { signal: "DVOL", watch: "30-40", elevated: "60-90", extreme: "100+" },
+  { signal: "BTC Funding", watch: "±0.03%/8h", elevated: "±0.05%/8h", extreme: "±0.10%/8h" },
   { signal: "BTC Mayer", watch: "—", elevated: "<0.7", extreme: "<0.5" },
   { signal: "Fear & Greed", watch: "<30", elevated: "<20", extreme: "<10" },
+]
+
+interface ReliabilityTier {
+  tier: string
+  title: { zh: string; en: string }
+  signals: { zh: string; en: string }[]
+}
+
+const RELIABILITY_TIERS: ReliabilityTier[] = [
+  {
+    tier: "Tier 1",
+    title: { zh: "同行评审", en: "Peer-reviewed" },
+    signals: [
+      { zh: "MVRV Z-Score（RIBF 2026）", en: "MVRV Z-Score (RIBF 2026)" },
+      { zh: "LTW 加密三因子（JoF 2022）", en: "LTW crypto factors (JoF 2022)" },
+      { zh: "EBP（AER 2012）", en: "EBP (AER 2012)" },
+    ],
+  },
+  {
+    tier: "Tier 2",
+    title: { zh: "经验稳健，非完整同行评审", en: "Empirically robust, not fully peer-reviewed" },
+    signals: [
+      { zh: "Realized Price", en: "Realized Price" },
+      { zh: "SOPR", en: "SOPR" },
+      { zh: "Funding rate", en: "Funding rate" },
+      { zh: "DVOL", en: "DVOL" },
+    ],
+  },
+  {
+    tier: "Tier 3",
+    title: { zh: "分析师回测，2–3 个周期样本", en: "Analyst backtests, 2-3 cycle samples" },
+    signals: [
+      { zh: "Puell / Mayer / Reserve Risk", en: "Puell / Mayer / Reserve Risk" },
+      { zh: "NVT / Pi Cycle", en: "NVT / Pi Cycle" },
+    ],
+  },
 ]
 
 export default function AnalysisFramework() {
@@ -470,6 +559,23 @@ export default function AnalysisFramework() {
                 </h2>
               </div>
             </div>
+            <div className="rounded-lg border bg-card/80 px-4 py-3">
+              <div className="grid gap-3 md:grid-cols-3">
+                {RELIABILITY_TIERS.map((tier) => (
+                  <div key={tier.tier} className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="outline" className="rounded-sm px-1.5 text-[10px]">
+                        {tier.tier}
+                      </Badge>
+                      <p className="text-xs font-semibold">{t(tier.title, locale)}</p>
+                    </div>
+                    <p className="text-[11px] leading-5 text-muted-foreground">
+                      {tier.signals.map((signal) => t(signal, locale)).join(" · ")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div className="rounded-lg border bg-card/80 overflow-hidden">
               <table className="w-full text-xs">
                 <thead>
@@ -504,6 +610,11 @@ export default function AnalysisFramework() {
                 </tbody>
               </table>
             </div>
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              {locale === "zh"
+                ? "加密链上阈值大多来自 2–3 个周期的分析师归纳，请作为 regime 背景使用，而不是精确买卖触发器。"
+                : "Crypto on-chain thresholds are mostly analyst-derived from 2-3 cycles; use them as regime context, not precise trading triggers."}
+            </p>
           </section>
 
           {/* Section 6: Footer disclaimer */}
