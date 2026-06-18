@@ -21,7 +21,6 @@ import { RefreshCw } from "lucide-react"
 
 import { InfoTooltip } from "@/components/info-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { scheduleIdleTask } from "@/lib/client-performance"
 import { cn } from "@/lib/utils"
 
 export type AlignedHistoryUnit = "usd" | "cny" | "pct" | "ratio" | "raw" | "count"
@@ -129,9 +128,8 @@ const MAX_SERIES_PER_PANE = 2
 const DAY_MS = 24 * 60 * 60 * 1000
 const DESKTOP_TIME_LABEL_COUNT = 5
 const COMPACT_TIME_LABEL_COUNT = 3
-const INITIAL_RENDERED_PANES = 2
+const INITIAL_RENDERED_PANES = 1
 const RENDERED_PANE_CHUNK = 4
-const RENDER_MORE_DELAY_MS = 2_500
 const MAX_PENDING_PANE_PLACEHOLDERS = 4
 
 function formatRaw(value: number, unit: AlignedHistoryUnit): string {
@@ -266,10 +264,10 @@ function getNearestValue(values: Map<number, number> | undefined, time: number):
   return previousValue ?? nextValue
 }
 
-function getTimeline(data: AlignedHistoryData): number[] {
-  const timeline = new Set<number>(data.timeline ?? [])
-  for (const group of data.groups) {
-    for (const series of group.series) {
+function getTimelineForGroups(baseTimeline: number[] | undefined, groups: SeriesGroup[]): number[] {
+  const timeline = new Set<number>(baseTimeline ?? [])
+  for (const group of groups) {
+    for (const series of group.specs) {
       for (const point of series.data) {
         if (Number.isFinite(point.time)) timeline.add(point.time)
       }
@@ -281,9 +279,7 @@ function getTimeline(data: AlignedHistoryData): number[] {
 function getGroups(data: AlignedHistoryData, maxSeriesPerPane: number): SeriesGroup[] {
   const groups: SeriesGroup[] = []
   for (const group of data.groups) {
-    const specs = group.series.filter((series) =>
-      series.data.some((point) => point.value !== null && Number.isFinite(point.value)),
-    )
+    const specs = group.series.filter((series) => series.data.length > 0)
     for (let index = 0; index < specs.length; index += maxSeriesPerPane) {
       const chunk = specs.slice(index, index + maxSeriesPerPane)
       groups.push({
@@ -460,6 +456,7 @@ export function AlignedHistoryCompare({
 }: AlignedHistoryCompareProps) {
   const cardRef = useRef<HTMLDivElement | null>(null)
   const gridRef = useRef<HTMLDivElement | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const chartsRef = useRef<PaneChart[]>([])
   const hiddenRef = useRef<Set<string>>(new Set())
   const [hidden, setHidden] = useState<Set<string>>(new Set())
@@ -468,12 +465,15 @@ export function AlignedHistoryCompare({
   const [visibleLogicalRange, setVisibleLogicalRange] = useState<VisibleLogicalRange | null>(null)
   const [renderedPaneCount, setRenderedPaneCount] = useState(0)
   const groups = useMemo(() => (data ? getGroups(data, maxSeriesPerPane) : []), [data, maxSeriesPerPane])
-  const timeline = useMemo(() => (data ? getTimeline(data) : []), [data])
   const isCompact = cardWidth > 0 && cardWidth < COMPACT_WIDTH
   const seriesCount = useMemo(() => groups.reduce((count, group) => count + group.specs.length, 0), [groups])
   const renderedGroups = useMemo(
     () => groups.slice(0, renderedPaneCount),
     [groups, renderedPaneCount],
+  )
+  const timeline = useMemo(
+    () => (data ? getTimelineForGroups(data.timeline, renderedGroups) : []),
+    [data, renderedGroups],
   )
   const renderedSeriesCount = useMemo(
     () => renderedGroups.reduce((count, group) => count + group.specs.length, 0),
@@ -487,21 +487,24 @@ export function AlignedHistoryCompare({
     }
 
     setRenderedPaneCount(Math.min(INITIAL_RENDERED_PANES, groups.length))
-    let cancelNext = () => {}
-    const renderMore = () => {
-      startTransition(() => {
-        setRenderedPaneCount((previous) => {
-          const next = Math.min(groups.length, previous + RENDERED_PANE_CHUNK)
-          if (next < groups.length) {
-            cancelNext = scheduleIdleTask(renderMore, RENDER_MORE_DELAY_MS)
-          }
-          return next
-        })
-      })
-    }
-    cancelNext = scheduleIdleTask(renderMore, RENDER_MORE_DELAY_MS)
-    return () => cancelNext()
   }, [groups])
+
+  useEffect(() => {
+    const sentinel = loadMoreRef.current
+    if (!sentinel || renderedPaneCount >= groups.length) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return
+        startTransition(() => {
+          setRenderedPaneCount((previous) => Math.min(groups.length, previous + RENDERED_PANE_CHUNK))
+        })
+      },
+      { rootMargin: "160px 0px", threshold: 0.1 },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [groups.length, renderedPaneCount])
 
   useEffect(() => {
     hiddenRef.current = hidden
@@ -957,17 +960,18 @@ export function AlignedHistoryCompare({
               </section>
             ))}
             {Array.from({ length: pendingPaneCount }, (_, index) => {
-              const loadedBeforePane = seriesCount + index * maxSeriesPerPane
+              const loadedBeforePane = renderedSeriesCount + index * maxSeriesPerPane
               return (
                 <HistoryPaneLoading
                   key={`loading-${index}`}
-                  paneIndex={groups.length + index}
-                  seriesCount={Math.min(maxSeriesPerPane, displaySeriesCount - loadedBeforePane)}
+                  paneIndex={renderedPaneCount + index}
+                  seriesCount={Math.min(maxSeriesPerPane, Math.max(1, displaySeriesCount - loadedBeforePane))}
                   maxSeriesPerPane={maxSeriesPerPane}
                   loadingLabel={loadingLabel}
                 />
               )
             })}
+            {isRenderingMorePanes && <div ref={loadMoreRef} className="h-px" aria-hidden="true" />}
             {hoverPaneTooltips.map((tooltip) => (
               <div
                 key={tooltip.key}

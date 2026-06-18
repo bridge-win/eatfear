@@ -30,6 +30,7 @@ import {
   usePersistentSWR,
   type DashboardTabValue,
 } from "@/lib/client-persistence"
+import { useDelayedIdleRender } from "@/lib/client-performance"
 import { useT } from "@/lib/i18n"
 import { buildTradingOpportunities, type OpportunityInputSeries } from "@/lib/opportunity-engine"
 import { isTimeRangeId, type TimeRangeId } from "@/lib/time-range"
@@ -65,6 +66,7 @@ export function CryptoDashboard({
   const [range, setRange] = usePersistentState("crypto:range", CRYPTO_DEFAULT_RANGE, isTimeRangeId)
   const [tab, setTab] = usePersistentState<DashboardTabValue>("crypto:tab", "history", isDashboardTabValue)
   const [selectedSeriesKey, setSelectedSeriesKey] = useState<string | null>(null)
+  const canHydrateDashboard = useDelayedIdleRender(`crypto:${instId}:${range}:hydrate`, 2_000, 1_000)
   const instrumentsPayload = usePersistentSWR<CryptoInstrumentsPayload>(
     "crypto:instruments",
     "/api/crypto/instruments",
@@ -80,7 +82,7 @@ export function CryptoDashboard({
     instrumentsPayload.data?.instruments && instrumentsPayload.data.instruments.length > 0
       ? instrumentsPayload.data.instruments
       : FALLBACK_INSTRUMENTS
-  const cryptoHistory = useCryptoHistoryPayload(instId, range)
+  const cryptoHistory = useCryptoHistoryPayload(instId, range, canHydrateDashboard)
   const t = useT()
   const optionsCurrency = useMemo(() => {
     const base = instId.split("-")[0]
@@ -147,16 +149,18 @@ export function CryptoDashboard({
         </div>
       </header>
 
-      <PanicWindowBanner />
+      {canHydrateDashboard && <PanicWindowBanner />}
 
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <BlackSwanOpportunityCard instId={instId} className="h-full min-w-0" />
-        <CryptoRegimeScoreCard instId={instId} className="h-full min-w-0" />
-        <CyclePositionCard className="h-full min-w-0" />
-        <CryptoBuyWindowCard className="h-full min-w-0" />
-      </div>
+      {canHydrateDashboard && (
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <BlackSwanOpportunityCard instId={instId} className="h-full min-w-0" />
+          <CryptoRegimeScoreCard instId={instId} className="h-full min-w-0" />
+          <CyclePositionCard className="h-full min-w-0" />
+          <CryptoBuyWindowCard className="h-full min-w-0" />
+        </div>
+      )}
 
-      {optionsCurrency && <OptionsMaxPainCard currency={optionsCurrency} />}
+      {canHydrateDashboard && optionsCurrency && <OptionsMaxPainCard currency={optionsCurrency} />}
 
       <OpportunityRadar
         assetClass="crypto"
@@ -181,7 +185,7 @@ export function CryptoDashboard({
           <TabsTrigger value="history" className="text-xs">{t("crypto.tab.history")}</TabsTrigger>
         </TabsList>
         <TabsContent value="realtime" className="mt-3 space-y-3">
-          <SmartMoneyTracker ccy={instId.split("-")[0]} range={range} variant="cards" />
+          {canHydrateDashboard && <SmartMoneyTracker ccy={instId.split("-")[0]} range={range} variant="cards" />}
           {selectedSeriesKey && cryptoHistory.payload ? (
             <CryptoIndicatorDetail
               payload={cryptoHistory.payload}

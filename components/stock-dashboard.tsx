@@ -24,7 +24,7 @@ import {
   writeStoredJson,
   type DashboardTabValue,
 } from "@/lib/client-persistence"
-import { useDeferredRender } from "@/lib/client-performance"
+import { useDelayedIdleRender } from "@/lib/client-performance"
 import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-shared"
 import { CrashDetector } from "@/lib/crash-detector"
 import { useT } from "@/lib/i18n"
@@ -336,6 +336,7 @@ export function StockDashboard({
   const crashDetectorRef = useRef(new CrashDetector())
   const t = useT()
   const fullStorageKey = `stock:${range}:full`
+  const canHydrateDashboard = useDelayedIdleRender(`stock:${range}:hydrate`, 2_000, 1_000)
 
   const initialPayload = useMemo<StockDashboardPayload | undefined>(() => {
     const hasStocks =
@@ -367,13 +368,13 @@ export function StockDashboard({
 
   const priority = usePersistentSWR<StockDashboardPayload>(
     `stock:${range}:priority:${STOCK_INITIAL_HISTORY_LIMIT}`,
-    buildStockDashboardKey(range, "priority"),
+    canHydrateDashboard ? buildStockDashboardKey(range, "priority") : null,
     fetchStockDashboardPayload,
     { revalidateIfStale: true },
   )
   const rest = usePersistentSWR<StockDashboardPayload>(
     `stock:${range}:rest:${STOCK_INITIAL_HISTORY_LIMIT}`,
-    buildStockDashboardKey(range, "rest"),
+    canHydrateDashboard ? buildStockDashboardKey(range, "rest") : null,
     fetchStockDashboardPayload,
     {
       refreshInterval: STOCK_DASHBOARD_REFRESH_MS,
@@ -457,7 +458,7 @@ export function StockDashboard({
       }),
     [opportunityInputs],
   )
-  const canRenderHistory = useDeferredRender(`${tab}:${range}:${payload ? "ready" : "empty"}`, 1_000)
+  const canRenderHistory = useDelayedIdleRender(`${tab}:${range}:${payload ? "ready" : "empty"}`, 2_500, 1_000)
   const stockHistoryData = useMemo(
     () => (canRenderHistory ? buildStockHistoryData(stockItems) : null),
     [canRenderHistory, stockItems],
@@ -473,9 +474,9 @@ export function StockDashboard({
         <TimeRangeSelector value={range} onChange={setRange} />
       </header>
 
-      <PanicWindowBanner />
+      {canHydrateDashboard && <PanicWindowBanner />}
 
-      <StockPanicSignalCard />
+      {canHydrateDashboard && <StockPanicSignalCard />}
 
       <OpportunityRadar
         assetClass="stock"

@@ -10,7 +10,6 @@ import { LanguageToggle } from "@/components/language-toggle"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { useT } from "@/lib/i18n"
-import { scheduleIdleTask } from "@/lib/client-performance"
 import { cn } from "@/lib/utils"
 
 export const navItems = [
@@ -32,32 +31,99 @@ export function isMainNavPath(pathname: string) {
   return navItems.some((item) => isItemActive(pathname, item.href))
 }
 
+function applyPendingNavHighlight(href: NavHref) {
+  if (typeof document === "undefined") return
+
+  const isDark = document.documentElement.classList.contains("dark")
+  const activeBackground = isDark ? "rgb(250, 250, 250)" : "rgb(33, 33, 33)"
+  const activeColor = isDark ? "rgb(33, 33, 33)" : "rgb(250, 250, 250)"
+
+  for (const item of document.querySelectorAll<HTMLElement>("[data-main-nav-href]")) {
+    const isPending = item.dataset.mainNavHref === href
+    item.dataset.pendingActive = isPending ? "true" : "false"
+    if (isPending) {
+      item.style.setProperty("transition", "none", "important")
+      item.style.setProperty("background-color", activeBackground, "important")
+      item.style.setProperty("color", activeColor, "important")
+    } else {
+      item.style.removeProperty("transition")
+      item.style.removeProperty("background-color")
+      item.style.removeProperty("color")
+    }
+  }
+}
+
+function clearPendingNavHighlight() {
+  if (typeof document === "undefined") return
+
+  for (const item of document.querySelectorAll<HTMLElement>("[data-main-nav-href]")) {
+    delete item.dataset.pendingActive
+    item.style.removeProperty("transition")
+    item.style.removeProperty("background-color")
+    item.style.removeProperty("color")
+  }
+}
+
 export function SiteHeader() {
   const pathname = usePathname()
   const router = useRouter()
   const t = useT()
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const [optimisticHref, setOptimisticHref] = React.useState<NavHref | null>(null)
+  const pendingPushRef = React.useRef<NavHref | null>(null)
   const activePathname = optimisticHref ?? pathname
 
   React.useEffect(() => {
-    return scheduleIdleTask(() => {
-      for (const item of navItems) router.prefetch(item.href)
-    }, 1_000)
-  }, [router])
-
-  React.useEffect(() => {
+    pendingPushRef.current = null
+    clearPendingNavHighlight()
     if (optimisticHref && isItemActive(pathname, optimisticHref)) setOptimisticHref(null)
   }, [optimisticHref, pathname])
 
-  const prefetchRoute = React.useCallback((href: NavHref) => {
-    router.prefetch(href)
-  }, [router])
-
   const markRoutePending = React.useCallback((href: NavHref) => {
-    if (!isItemActive(pathname, href)) setOptimisticHref(href)
-    prefetchRoute(href)
-  }, [pathname, prefetchRoute])
+    if (isItemActive(pathname, href)) return
+    applyPendingNavHighlight(href)
+    React.startTransition(() => {
+      setOptimisticHref(href)
+    })
+  }, [pathname])
+
+  const pushRoute = React.useCallback((href: NavHref) => {
+    if (isItemActive(pathname, href)) return
+    markRoutePending(href)
+    if (pendingPushRef.current === href) return
+    pendingPushRef.current = href
+    window.setTimeout(() => router.push(href), 0)
+  }, [markRoutePending, pathname, router])
+
+  const canHandleNavigationEvent = React.useCallback((
+    event: React.MouseEvent<HTMLAnchorElement> | React.PointerEvent<HTMLAnchorElement>,
+  ) => {
+    return !(
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.currentTarget.target
+    )
+  }, [])
+
+  const handlePointerDown = React.useCallback((event: React.PointerEvent<HTMLAnchorElement>, href: NavHref) => {
+    if (!canHandleNavigationEvent(event)) return
+    pushRoute(href)
+  }, [canHandleNavigationEvent, pushRoute])
+
+  const navigate = React.useCallback((event: React.MouseEvent<HTMLAnchorElement>, href: NavHref) => {
+    if (
+      !canHandleNavigationEvent(event)
+    ) {
+      return
+    }
+
+    event.preventDefault()
+    pushRoute(href)
+  }, [canHandleNavigationEvent, pushRoute])
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -87,12 +153,11 @@ export function SiteHeader() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      prefetch
-                      onPointerEnter={() => prefetchRoute(item.href)}
-                      onPointerDown={() => markRoutePending(item.href)}
-                      onFocus={() => prefetchRoute(item.href)}
-                      onClick={() => {
-                        markRoutePending(item.href)
+                      prefetch={false}
+                      data-main-nav-href={item.href}
+                      onPointerDown={(event) => handlePointerDown(event, item.href)}
+                      onClick={(event) => {
+                        navigate(event, item.href)
                         setMobileOpen(false)
                       }}
                       className={cn(
@@ -109,11 +174,10 @@ export function SiteHeader() {
           </Sheet>
           <Link
             href="/home"
-            prefetch
-            onPointerEnter={() => prefetchRoute("/home")}
-            onPointerDown={() => markRoutePending("/home")}
-            onFocus={() => prefetchRoute("/home")}
-            onClick={() => markRoutePending("/home")}
+            prefetch={false}
+            data-main-nav-href="/home"
+            onPointerDown={(event) => handlePointerDown(event, "/home")}
+            onClick={(event) => navigate(event, "/home")}
             className="flex items-center gap-2"
           >
             <TrendingDown className="h-5 w-5 text-primary" />
@@ -128,11 +192,10 @@ export function SiteHeader() {
               <Link
                 key={item.href}
                 href={item.href}
-                prefetch
-                onPointerEnter={() => prefetchRoute(item.href)}
-                onPointerDown={() => markRoutePending(item.href)}
-                onFocus={() => prefetchRoute(item.href)}
-                onClick={() => markRoutePending(item.href)}
+                prefetch={false}
+                data-main-nav-href={item.href}
+                onPointerDown={(event) => handlePointerDown(event, item.href)}
+                onClick={(event) => navigate(event, item.href)}
                 className={cn(
                   "rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
                   isActive && "bg-foreground text-background hover:bg-foreground hover:text-background",

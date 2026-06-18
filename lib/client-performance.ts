@@ -22,3 +22,22 @@ export function useDeferredRender(renderKey: string, timeout = 180): boolean {
 
   return ready
 }
+
+export function useDelayedIdleRender(renderKey: string, delay = 1_000, idleTimeout = 500): boolean {
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    let cancelIdle = () => {}
+    setReady(false)
+    const handle = globalThis.setTimeout(() => {
+      cancelIdle = scheduleIdleTask(() => setReady(true), idleTimeout)
+    }, delay)
+
+    return () => {
+      globalThis.clearTimeout(handle)
+      cancelIdle()
+    }
+  }, [delay, idleTimeout, renderKey])
+
+  return ready
+}

@@ -23,7 +23,7 @@ import {
   writeStoredJson,
   type DashboardTabValue,
 } from "@/lib/client-persistence"
-import { useDeferredRender } from "@/lib/client-performance"
+import { useDelayedIdleRender } from "@/lib/client-performance"
 import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-shared"
 import { DEFAULT_MACRO_INDICATOR_REFRESH_MS, getConfiguredMacroIndicatorMetas } from "@/lib/macro-indicator-config"
 import { useT } from "@/lib/i18n"
@@ -189,6 +189,7 @@ export function MacroDashboard({
   const [selectedIndicatorKey, setSelectedIndicatorKey] = useState<string | null>(null)
   const t = useT()
   const fullStorageKey = `macro:${range}:full`
+  const canHydrateDashboard = useDelayedIdleRender(`macro:${range}:hydrate`, 2_000, 1_000)
   const initialPayload = useMemo<MacroApiResponse | undefined>(() => {
     if (!initialIndicators || initialIndicators.length === 0) return undefined
     const rangeOption = getTimeRange(MACRO_DEFAULT_RANGE)
@@ -205,13 +206,13 @@ export function MacroDashboard({
   }, [initialFredEnabled, initialIndicators, initialMeta, initialUpdatedAt])
   const priority = usePersistentSWR<MacroApiResponse>(
     `macro:${range}:priority:${MACRO_INITIAL_HISTORY_LIMIT}`,
-    buildMacroApiUrl(range, { limit: MACRO_INITIAL_HISTORY_LIMIT }),
+    canHydrateDashboard ? buildMacroApiUrl(range, { limit: MACRO_INITIAL_HISTORY_LIMIT }) : null,
     jsonFetcher,
     { revalidateIfStale: true },
   )
   const rest = usePersistentSWR<MacroApiResponse>(
     `macro:${range}:rest:${MACRO_INITIAL_HISTORY_LIMIT}`,
-    buildMacroApiUrl(range, { offset: MACRO_INITIAL_HISTORY_LIMIT }),
+    canHydrateDashboard ? buildMacroApiUrl(range, { offset: MACRO_INITIAL_HISTORY_LIMIT }) : null,
     jsonFetcher,
     {
       refreshInterval: (payload) => payload?.refreshMs ?? DEFAULT_MACRO_INDICATOR_REFRESH_MS,
@@ -270,7 +271,7 @@ export function MacroDashboard({
       }),
     [opportunityInputs],
   )
-  const canRenderHistory = useDeferredRender(`${tab}:${range}:${payload ? "ready" : "empty"}`, 1_000)
+  const canRenderHistory = useDelayedIdleRender(`${tab}:${range}:${payload ? "ready" : "empty"}`, 2_500, 1_000)
   const macroHistoryData = useMemo(
     () => (canRenderHistory ? buildMacroHistoryData(macroItems) : null),
     [canRenderHistory, macroItems],
