@@ -13,7 +13,7 @@ import { useT } from "@/lib/i18n"
 import { scheduleIdleTask } from "@/lib/client-performance"
 import { cn } from "@/lib/utils"
 
-const navItems = [
+export const navItems = [
   { href: "/home", key: "nav.home" },
   { href: "/crypto", key: "nav.crypto" },
   { href: "/stock", key: "nav.stock" },
@@ -28,22 +28,17 @@ function isItemActive(pathname: string, href: string) {
   return href === "/home" ? pathname === "/home" : pathname === href || pathname.startsWith(`${href}/`)
 }
 
+export function isMainNavPath(pathname: string) {
+  return navItems.some((item) => isItemActive(pathname, item.href))
+}
+
 export function SiteHeader() {
   const pathname = usePathname()
   const router = useRouter()
   const t = useT()
   const [mobileOpen, setMobileOpen] = React.useState(false)
-  // Optimistic active item — updated immediately on click so the UI responds
-  // without waiting for pathname to reflect the completed navigation.
-  const [pendingHref, setPendingHref] = React.useState<NavHref | null>(null)
-  const [isPending, startTransition] = React.useTransition()
-
-  // Clear optimistic state once the real pathname catches up.
-  React.useEffect(() => {
-    if (pendingHref && isItemActive(pathname, pendingHref)) {
-      setPendingHref(null)
-    }
-  }, [pathname, pendingHref])
+  const [optimisticHref, setOptimisticHref] = React.useState<NavHref | null>(null)
+  const activePathname = optimisticHref ?? pathname
 
   React.useEffect(() => {
     return scheduleIdleTask(() => {
@@ -51,18 +46,18 @@ export function SiteHeader() {
     }, 1_000)
   }, [router])
 
-  const prefetchRoute = React.useCallback((href: string) => {
+  React.useEffect(() => {
+    if (optimisticHref && isItemActive(pathname, optimisticHref)) setOptimisticHref(null)
+  }, [optimisticHref, pathname])
+
+  const prefetchRoute = React.useCallback((href: NavHref) => {
     router.prefetch(href)
   }, [router])
 
-  const navigate = React.useCallback((href: NavHref) => {
-    setPendingHref(href)
-    startTransition(() => {
-      router.push(href)
-    })
-  }, [router])
-
-  const activeHref = pendingHref ?? null
+  const markRoutePending = React.useCallback((href: NavHref) => {
+    if (!isItemActive(pathname, href)) setOptimisticHref(href)
+    prefetchRoute(href)
+  }, [pathname, prefetchRoute])
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -87,27 +82,40 @@ export function SiteHeader() {
               </SheetHeader>
               <nav className="flex flex-col gap-1 px-2">
                 {navItems.map((item) => {
-                  const isActive = activeHref ? activeHref === item.href : isItemActive(pathname, item.href)
+                  const isActive = isItemActive(activePathname, item.href)
                   return (
-                    <button
+                    <Link
                       key={item.href}
-                      type="button"
+                      href={item.href}
+                      prefetch
                       onPointerEnter={() => prefetchRoute(item.href)}
+                      onPointerDown={() => markRoutePending(item.href)}
                       onFocus={() => prefetchRoute(item.href)}
-                      onClick={() => { setMobileOpen(false); navigate(item.href) }}
+                      onClick={() => {
+                        markRoutePending(item.href)
+                        setMobileOpen(false)
+                      }}
                       className={cn(
-                        "rounded-md px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                        "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
                         isActive && "bg-foreground text-background hover:bg-foreground hover:text-background",
                       )}
                     >
                       {t(item.key)}
-                    </button>
+                    </Link>
                   )
                 })}
               </nav>
             </SheetContent>
           </Sheet>
-          <Link href="/home" className="flex items-center gap-2">
+          <Link
+            href="/home"
+            prefetch
+            onPointerEnter={() => prefetchRoute("/home")}
+            onPointerDown={() => markRoutePending("/home")}
+            onFocus={() => prefetchRoute("/home")}
+            onClick={() => markRoutePending("/home")}
+            className="flex items-center gap-2"
+          >
             <TrendingDown className="h-5 w-5 text-primary" />
             <span className="text-lg font-bold">eatfear</span>
           </Link>
@@ -115,22 +123,23 @@ export function SiteHeader() {
 
         <nav className="hidden flex-wrap items-center gap-2 md:flex">
           {navItems.map((item) => {
-            const isActive = activeHref ? activeHref === item.href : isItemActive(pathname, item.href)
+            const isActive = isItemActive(activePathname, item.href)
             return (
-              <button
+              <Link
                 key={item.href}
-                type="button"
+                href={item.href}
+                prefetch
                 onPointerEnter={() => prefetchRoute(item.href)}
+                onPointerDown={() => markRoutePending(item.href)}
                 onFocus={() => prefetchRoute(item.href)}
-                onClick={() => navigate(item.href)}
+                onClick={() => markRoutePending(item.href)}
                 className={cn(
                   "rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
                   isActive && "bg-foreground text-background hover:bg-foreground hover:text-background",
-                  isPending && pendingHref === item.href && "opacity-80",
                 )}
               >
                 {t(item.key)}
-              </button>
+              </Link>
             )
           })}
         </nav>

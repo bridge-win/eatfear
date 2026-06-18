@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react"
 
-import { SiteHeader } from "@/components/site-header"
 import { cn } from "@/lib/utils"
 
 interface AppFrameProps {
@@ -13,7 +12,6 @@ interface AppFrameProps {
 export function AppFrame({ children, className }: AppFrameProps) {
   return (
     <div className={cn("min-h-svh bg-background", className)}>
-      <SiteHeader />
       {children}
     </div>
   )
