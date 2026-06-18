@@ -28,6 +28,7 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+  --font-size-scale: 1.08;
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -101,6 +102,19 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --text-xs: calc(0.75rem * var(--font-size-scale));
+  --text-sm: calc(0.875rem * var(--font-size-scale));
+  --text-base: calc(1rem * var(--font-size-scale));
+  --text-lg: calc(1.125rem * var(--font-size-scale));
+  --text-xl: calc(1.25rem * var(--font-size-scale));
+  --text-2xl: calc(1.5rem * var(--font-size-scale));
+  --text-3xl: calc(1.875rem * var(--font-size-scale));
+  --text-4xl: calc(2.25rem * var(--font-size-scale));
+  --text-5xl: calc(3rem * var(--font-size-scale));
+  --text-6xl: calc(3.75rem * var(--font-size-scale));
+  --text-7xl: calc(4.5rem * var(--font-size-scale));
+  --text-8xl: calc(6rem * var(--font-size-scale));
+  --text-9xl: calc(8rem * var(--font-size-scale));
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -124,5 +138,56 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: calc(1rem * var(--font-size-scale));
+  }
+}
+
+@layer utilities {
+  .text-\[8px\] {
+    font-size: calc(8px * var(--font-size-scale));
+  }
+
+  .text-\[9px\] {
+    font-size: calc(9px * var(--font-size-scale));
+  }
+
+  .text-\[9\.5px\] {
+    font-size: calc(9.5px * var(--font-size-scale));
+  }
+
+  .text-\[10px\] {
+    font-size: calc(10px * var(--font-size-scale));
+  }
+
+  .text-\[10\.5px\] {
+    font-size: calc(10.5px * var(--font-size-scale));
+  }
+
+  .text-\[11px\] {
+    font-size: calc(11px * var(--font-size-scale));
+  }
+
+  .text-\[12px\] {
+    font-size: calc(12px * var(--font-size-scale));
+  }
+
+  .text-\[13px\] {
+    font-size: calc(13px * var(--font-size-scale));
+  }
+
+  @media (min-width: 40rem) {
+    .sm\:text-\[9px\] {
+      font-size: calc(9px * var(--font-size-scale));
+    }
+
+    .sm\:text-\[10px\] {
+      font-size: calc(10px * var(--font-size-scale));
+    }
+  }
+
+  @media (min-width: 48rem) {
+    .md\:text-\[1\.7rem\] {
+      font-size: calc(1.7rem * var(--font-size-scale));
+    }
   }
 }

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { Menu, TrendingDown } from "lucide-react"
 
 import { CommandPalette } from "@/components/command-palette"
+import { FontSizeToggle } from "@/components/font-size-toggle"
 import { LanguageToggle } from "@/components/language-toggle"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
@@ -209,6 +210,7 @@ export function SiteHeader() {
 
         <div className="flex items-center justify-end gap-2">
           <CommandPalette />
+          <FontSizeToggle />
           <ThemeToggle />
           <LanguageToggle />
         </div>
