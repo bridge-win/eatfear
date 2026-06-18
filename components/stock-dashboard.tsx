@@ -457,7 +457,7 @@ export function StockDashboard({
       }),
     [opportunityInputs],
   )
-  const canRenderHistory = useDeferredRender(`${tab}:${range}:${payload ? "ready" : "empty"}`)
+  const canRenderHistory = useDeferredRender(`${tab}:${range}:${payload ? "ready" : "empty"}`, 1_000)
   const stockHistoryData = useMemo(
     () => (canRenderHistory ? buildStockHistoryData(stockItems) : null),
     [canRenderHistory, stockItems],

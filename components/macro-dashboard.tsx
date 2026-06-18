@@ -270,7 +270,7 @@ export function MacroDashboard({
       }),
     [opportunityInputs],
   )
-  const canRenderHistory = useDeferredRender(`${tab}:${range}:${payload ? "ready" : "empty"}`)
+  const canRenderHistory = useDeferredRender(`${tab}:${range}:${payload ? "ready" : "empty"}`, 1_000)
   const macroHistoryData = useMemo(
     () => (canRenderHistory ? buildMacroHistoryData(macroItems) : null),
     [canRenderHistory, macroItems],

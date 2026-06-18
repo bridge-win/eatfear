@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { startTransition, useEffect, useMemo, useRef, useState } from "react"
 import {
   ColorType,
   CrosshairMode,
@@ -129,8 +129,10 @@ const MAX_SERIES_PER_PANE = 2
 const DAY_MS = 24 * 60 * 60 * 1000
 const DESKTOP_TIME_LABEL_COUNT = 5
 const COMPACT_TIME_LABEL_COUNT = 3
-const INITIAL_RENDERED_PANES = 4
-const RENDERED_PANE_CHUNK = 6
+const INITIAL_RENDERED_PANES = 2
+const RENDERED_PANE_CHUNK = 4
+const RENDER_MORE_DELAY_MS = 2_500
+const MAX_PENDING_PANE_PLACEHOLDERS = 4
 
 function formatRaw(value: number, unit: AlignedHistoryUnit): string {
   if (!Number.isFinite(value)) return "—"
@@ -487,15 +489,17 @@ export function AlignedHistoryCompare({
     setRenderedPaneCount(Math.min(INITIAL_RENDERED_PANES, groups.length))
     let cancelNext = () => {}
     const renderMore = () => {
-      setRenderedPaneCount((previous) => {
-        const next = Math.min(groups.length, previous + RENDERED_PANE_CHUNK)
-        if (next < groups.length) {
-          cancelNext = scheduleIdleTask(renderMore, 900)
-        }
-        return next
+      startTransition(() => {
+        setRenderedPaneCount((previous) => {
+          const next = Math.min(groups.length, previous + RENDERED_PANE_CHUNK)
+          if (next < groups.length) {
+            cancelNext = scheduleIdleTask(renderMore, RENDER_MORE_DELAY_MS)
+          }
+          return next
+        })
       })
     }
-    cancelNext = scheduleIdleTask(renderMore, 900)
+    cancelNext = scheduleIdleTask(renderMore, RENDER_MORE_DELAY_MS)
     return () => cancelNext()
   }, [groups])
 
@@ -757,7 +761,7 @@ export function AlignedHistoryCompare({
   const displaySeriesCount = Math.max(seriesCount, expectedSeriesCount ?? seriesCount)
   const isRenderingMorePanes = !!data && renderedPaneCount < groups.length
   const pendingSeriesCount = loading || isRenderingMorePanes ? Math.max(0, displaySeriesCount - renderedSeriesCount) : 0
-  const pendingPaneCount = Math.ceil(pendingSeriesCount / maxSeriesPerPane)
+  const pendingPaneCount = Math.min(MAX_PENDING_PANE_PLACEHOLDERS, Math.ceil(pendingSeriesCount / maxSeriesPerPane))
 
   const hoverPaneTooltips = useMemo<HoverPaneTooltip[]>(() => {
     const grid = gridRef.current

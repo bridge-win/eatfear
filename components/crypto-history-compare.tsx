@@ -173,7 +173,7 @@ export function CryptoHistoryCompare({
   const loading = controlledLoading ?? fetched.loading
   const error = controlledError ?? fetched.error
   const expectedSeriesCount = getExpectedCryptoHistorySeriesCount(instId)
-  const canRenderCharts = useDeferredRender(`${instId}:${range}:${payload ? "ready" : "empty"}`)
+  const canRenderCharts = useDeferredRender(`${instId}:${range}:${payload ? "ready" : "empty"}`, 1_000)
 
   const data: AlignedHistoryData | null = useMemo(() => {
     if (!canRenderCharts || !payload) return null
