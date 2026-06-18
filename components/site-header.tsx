@@ -3,8 +3,9 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, TrendingDown } from "lucide-react"
+import { Menu } from "lucide-react"
 
+import { BrandLogoMark } from "@/components/brand-logo"
 import { CommandPalette } from "@/components/command-palette"
 import { FontSizeToggle } from "@/components/font-size-toggle"
 import { LanguageToggle } from "@/components/language-toggle"
@@ -143,7 +144,7 @@ export function SiteHeader() {
             <SheetContent side="left" className="w-64">
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
-                  <TrendingDown className="h-5 w-5 text-primary" />
+                  <BrandLogoMark className="h-6 w-6" />
                   eatfear
                 </SheetTitle>
               </SheetHeader>
@@ -181,7 +182,7 @@ export function SiteHeader() {
             onClick={(event) => navigate(event, "/home")}
             className="flex items-center gap-2"
           >
-            <TrendingDown className="h-5 w-5 text-primary" />
+            <BrandLogoMark className="h-6 w-6" />
             <span className="text-lg font-bold">eatfear</span>
           </Link>
         </div>

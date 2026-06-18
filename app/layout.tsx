@@ -17,6 +17,7 @@ export const metadata: Metadata = {
   description: "Monitor cryptocurrency and stock market crashes with automated alerts",
   generator: "v0.app",
   icons: {
+    shortcut: "/favicon.ico",
     icon: [
       {
         url: "/icon-light-32x32.png",

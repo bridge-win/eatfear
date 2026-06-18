@@ -9,10 +9,11 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { SubscriptionCard } from "@/components/subscription-card"
 import { AlertHistoryTable } from "@/components/alert-history-table"
-import { TrendingDown, ArrowLeft, Bell, Mail, Send } from "lucide-react"
+import { ArrowLeft, Bell, Mail, Send } from "lucide-react"
 import Link from "next/link"
 import type { Subscription } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
+import { BrandLogoMark } from "@/components/brand-logo"
 
 interface Profile {
   id: string
@@ -201,7 +202,7 @@ export default function ProfilePage() {
               </Button>
             </Link>
             <div className="flex items-center gap-2">
-              <TrendingDown className="h-6 w-6 text-primary" />
+              <BrandLogoMark className="h-7 w-7" />
               <span className="text-xl font-bold">eatfear</span>
             </div>
           </div>

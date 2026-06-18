@@ -1,26 +1,30 @@
 <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <style>
-    @media (prefers-color-scheme: light) {
-      .background { fill: black; }
-      .foreground { fill: white; }
-    }
-    @media (prefers-color-scheme: dark) {
-      .background { fill: white; }
-      .foreground { fill: black; }
-    }
-  </style>
-  <g clip-path="url(#clip0_7960_43945)">
-    <rect class="background" width="180" height="180" rx="37" />
-    <g style="transform: scale(95%); transform-origin: center">
-      <path class="foreground"
-        d="M101.141 53H136.632C151.023 53 162.689 64.6662 162.689 79.0573V112.904H148.112V79.0573C148.112 78.7105 148.098 78.3662 148.072 78.0251L112.581 112.898C112.701 112.902 112.821 112.904 112.941 112.904H148.112V126.672H112.941C98.5504 126.672 86.5638 114.891 86.5638 100.5V66.7434H101.141V100.5C101.141 101.15 101.191 101.792 101.289 102.422L137.56 66.7816C137.255 66.7563 136.945 66.7434 136.632 66.7434H101.141V53Z" />
-      <path class="foreground"
-        d="M65.2926 124.136L14 66.7372H34.6355L64.7495 100.436V66.7372H80.1365V118.47C80.1365 126.278 70.4953 129.958 65.2926 124.136Z" />
-    </g>
-  </g>
   <defs>
-    <clipPath id="clip0_7960_43945">
-      <rect width="180" height="180" fill="white" />
-    </clipPath>
+    <linearGradient id="eatfear-surface" x1="24" x2="156" y1="18" y2="164" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#172033"/>
+      <stop offset="0.45" stop-color="#070A12"/>
+      <stop offset="1" stop-color="#0D111C"/>
+    </linearGradient>
+    <linearGradient id="eatfear-signal" x1="40" x2="141" y1="124" y2="55" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF4D5E"/>
+      <stop offset="0.47" stop-color="#FF9F43"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <filter id="eatfear-glow" x="12" y="18" width="156" height="140" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
   </defs>
+  <rect width="180" height="180" rx="42" fill="url(#eatfear-surface)"/>
+  <path d="M22 92C49 61 87 47 158 42" stroke="#22D3EE" stroke-opacity="0.16" stroke-width="2"/>
+  <path d="M26 126C59 99 98 88 154 91" stroke="#FF4D5E" stroke-opacity="0.14" stroke-width="2"/>
+  <g filter="url(#eatfear-glow)" opacity="0.75">
+    <path d="M43 116L72 88L94 107L137 58" stroke="url(#eatfear-signal)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <path d="M43 116L72 88L94 107L137 58" stroke="url(#eatfear-signal)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M47 56H100M47 88H80M47 122H108" stroke="#F8FAFC" stroke-opacity="0.92" stroke-width="12" stroke-linecap="round"/>
+  <path d="M43 116L72 88L94 107L137 58" stroke="url(#eatfear-signal)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="72" cy="88" r="8" fill="#070A12" stroke="#22D3EE" stroke-width="5"/>
+  <circle cx="94" cy="107" r="8" fill="#070A12" stroke="#FF9F43" stroke-width="5"/>
+  <circle cx="137" cy="58" r="8" fill="#070A12" stroke="#67E8F9" stroke-width="5"/>
+  <rect x="6" y="6" width="168" height="168" rx="38" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="3"/>
 </svg>
