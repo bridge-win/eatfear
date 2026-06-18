@@ -10,6 +10,114 @@ export const CUSTOM_CRYPTO_SIGNAL_KEYS = new Set([
   "signalDirection",
 ])
 
+interface IndicatorSignalGuide {
+  family: string
+  use: string
+  failure: string
+  confirmation: string
+}
+
+function getIndicatorSignalGuide(key: string): IndicatorSignalGuide {
+  if (key.includes("Momentum") || key === "btcPrice" || key.endsWith("Price")) {
+    return {
+      family: "Trend / momentum",
+      use: "Read direction from 7D/30D/90D alignment, then confirm with volume and volatility. Strong trends need rising participation, not only price.",
+      failure: "Fails when macro liquidity reverses, leverage is crowded, or price is only mean-reverting inside a range.",
+      confirmation: "Confirm with Volume Z, stablecoin liquidity, Nasdaq/SP500, DXY, and VIX.",
+    }
+  }
+  if (key.includes("Volume") || key.includes("ReturnZ") || key.includes("Wick")) {
+    return {
+      family: "Volatility / price structure",
+      use: "Use extremes to detect capitulation, exhaustion, or breakout confirmation. A wick or z-score is a setup-quality input, not a standalone entry.",
+      failure: "Fails in persistent cascades where extreme keeps getting more extreme, especially before OI/funding reset.",
+      confirmation: "Confirm with OI change, funding, liquidation proxies, CVD/taker flow, and next-bar acceptance.",
+    }
+  }
+  if (["oi", "oiChangePct", "oiReturnZ", "funding", "basis", "ls", "contractLs", "topTraderAccount", "topTraderPosition", "liqLong", "liqShort"].includes(key)) {
+    return {
+      family: "Derivatives crowding",
+      use: "Treat high funding, rising OI, rich basis, and one-sided long/short ratios as leverage quality checks. They improve trend confidence only when not extreme.",
+      failure: "Fails when OI comes from hedged basis trades, venue-specific positioning, or a strong trend that keeps shorts/longs trapped.",
+      confirmation: "Confirm with spot premium, exchange reserves, volume, liquidations, and price acceptance after a flush.",
+    }
+  }
+  if (["stablecoinMcap", "defiTvl"].includes(key)) {
+    return {
+      family: "Liquidity / flow",
+      use: "Rising stablecoin supply or TVL improves the market's ability to support risk; contraction lowers signal confidence.",
+      failure: "Fails when stablecoins are idle, regulatory flows dominate, or liquidity stays outside the asset being traded.",
+      confirmation: "Confirm with ETF/fund flows, exchange stablecoin reserves, spot premium, and price breadth.",
+    }
+  }
+  if (["fng"].includes(key)) {
+    return {
+      family: "Sentiment / attention",
+      use: "Use extreme fear as a contrarian watch condition and extreme greed as a risk-reduction warning.",
+      failure: "Fails when trend regimes keep sentiment extreme for weeks or when news justifies the emotion.",
+      confirmation: "Confirm with drawdown, wicks, funding reset, SOPR/MVRV-style valuation, and volume.",
+    }
+  }
+  if (["activeAddrs", "nTxs", "txFeesUsd", "hashRate", "difficulty", "mempool", "avgBlockSize", "miningComprehensiveCost", "miningElectricityCost"].includes(key)) {
+    return {
+      family: "On-chain / miner cycle",
+      use: "Use on-chain and miner data as slow cycle context: adoption, congestion, miner stress, and long-term value zones.",
+      failure: "Fails for short-term timing because exchange, ETF, Lightning, custody, and batching activity can bypass visible on-chain settlement.",
+      confirmation: "Confirm with price trend, MVRV/SOPR-style value metrics, stablecoins, and derivatives reset.",
+    }
+  }
+  if (["dvol"].includes(key)) {
+    return {
+      family: "Options volatility",
+      use: "Read implied volatility as stress, optionality cost, and expected move. Low IV favors owning convexity; high IV demands smaller size or premium discipline.",
+      failure: "Fails around event risk when realized volatility jumps through implied volatility.",
+      confirmation: "Confirm with realized volatility, options skew, funding/OI, and event calendar.",
+    }
+  }
+  if (["nasdaq", "sp500", "russell", "hangseng", "nikkei", "dxy", "vix", "us10y", "us2y", "gold", "silver", "oil", "copper", "natgas"].includes(key)) {
+    return {
+      family: "Macro / cross-asset regime",
+      use: "Use cross-asset data to decide whether crypto risk is trading with global liquidity, rates, dollar, volatility, and equity beta.",
+      failure: "Fails during crypto-native catalysts, exchange stress, regulatory shocks, or temporary decoupling.",
+      confirmation: "Confirm with BTC trend, stablecoin liquidity, ETF/fund flows, and derivatives crowding.",
+    }
+  }
+  return {
+    family: "Auxiliary signal",
+    use: "Use this as a supporting condition inside the multi-signal framework, not as a standalone trade trigger.",
+    failure: "Fails when the data is stale, partial, highly venue-specific, or contradicted by price and risk conditions.",
+    confirmation: "Confirm with trend, liquidity, crowding, macro, and risk layers.",
+  }
+}
+
+function appendSignalGuide(description: string, guide: IndicatorSignalGuide): string {
+  const chinese = /[\u4e00-\u9fff]/.test(description)
+  const labels = chinese
+    ? {
+        title: "信号使用解读：",
+        family: "方法族",
+        use: "怎么用",
+        failure: "什么时候失效",
+        confirmation: "需要确认",
+      }
+    : {
+        title: "Signal usage:",
+        family: "Method family",
+        use: "How to use",
+        failure: "When it fails",
+        confirmation: "Confirm with",
+      }
+  return [
+    description,
+    "",
+    labels.title,
+    `- ${labels.family}: ${guide.family}.`,
+    `- ${labels.use}: ${guide.use}`,
+    `- ${labels.failure}: ${guide.failure}`,
+    `- ${labels.confirmation}: ${guide.confirmation}`,
+  ].join("\n")
+}
+
 function formatValue(value: number, unit: CryptoHistorySeries["unit"]): string {
   if (!Number.isFinite(value)) return "—"
   const abs = Math.abs(value)
@@ -80,7 +188,9 @@ export function getCryptoIndicatorDescription({
     fallback === series.infoI18nKey
       ? t("compare.info.default", { label: getCryptoSeriesBaseLabel(t, series) })
       : fallback
-  if (!CUSTOM_CRYPTO_SIGNAL_KEYS.has(series.key)) return baseDescription
+  const signalGuide = getIndicatorSignalGuide(series.key)
+  const guidedDescription = appendSignalGuide(baseDescription, signalGuide)
+  if (!CUSTOM_CRYPTO_SIGNAL_KEYS.has(series.key)) return guidedDescription
 
   const retZ = getLatest(payload, "btcReturnZ")
   const volZ = getLatest(payload, "btcVolumeZ")
@@ -112,7 +222,7 @@ export function getCryptoIndicatorDescription({
   ]
 
   return [
-    baseDescription,
+    guidedDescription,
     "",
     "Data sources and latest values:",
     `- OKX 1D candles: ${payload.ccy} return Z=${retZ === null ? "—" : retZ.toFixed(2)}, volume Z=${volZ === null ? "—" : volZ.toFixed(2)}, upper wick=${upperWick === null ? "—" : formatValue(upperWick, "pct")}, lower wick=${lowerWick === null ? "—" : formatValue(lowerWick, "pct")}.`,

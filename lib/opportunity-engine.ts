@@ -491,6 +491,83 @@ export const SOURCE_ROADMAP: readonly SourceRoadmapItem[] = [
     },
   },
   {
+    id: "glassnode-onchain",
+    title: "Glassnode on-chain metric guides",
+    category: "crypto_native",
+    status: "planned",
+    url: "https://docs.glassnode.com/",
+    useCase: {
+      zh: "MVRV、SOPR、NUPL、Puell、HODL waves 和 Accumulation Trend Score。",
+      en: "MVRV, SOPR, NUPL, Puell, HODL waves, and Accumulation Trend Score.",
+    },
+  },
+  {
+    id: "cryptoquant-flow",
+    title: "CryptoQuant exchange flow and premium metrics",
+    category: "crypto_native",
+    status: "planned",
+    url: "https://cryptoquant.com/asset/btc/summary",
+    useCase: {
+      zh: "交易所储备、净流入、Coinbase Premium、矿工储备、SSR 和 cohort 指标。",
+      en: "Exchange reserves, netflows, Coinbase premium, miner reserves, SSR, and cohort metrics.",
+    },
+  },
+  {
+    id: "coinmetrics-network",
+    title: "Coin Metrics network and stablecoin metrics",
+    category: "crypto_native",
+    status: "planned",
+    url: "https://docs.coinmetrics.io/",
+    useCase: {
+      zh: "实现市值、稳定币供给、网络活动和资产参考利率的高质量备选源。",
+      en: "High-quality alternate source for realized cap, stablecoins, network activity, and reference rates.",
+    },
+  },
+  {
+    id: "kaiko-liquidity",
+    title: "Kaiko market depth and liquidity feeds",
+    category: "derivatives",
+    status: "research",
+    url: "https://docs.kaiko.com/",
+    useCase: {
+      zh: "盘口深度、买卖价差、滑点和交易所流动性质量，用于仓位和执行约束。",
+      en: "Depth, spreads, slippage, and venue liquidity quality for sizing and execution constraints.",
+    },
+  },
+  {
+    id: "farside-etf",
+    title: "Farside BTC ETF flows",
+    category: "crypto_native",
+    status: "research",
+    url: "https://farside.co.uk/btc/",
+    useCase: {
+      zh: "美国现货 BTC ETF 单日净流入、发行商广度、GBTC 拖累和累计资金流。",
+      en: "US spot BTC ETF daily net flows, issuer breadth, GBTC drag, and cumulative flow.",
+    },
+  },
+  {
+    id: "coinshares-funds",
+    title: "CoinShares digital asset fund flows",
+    category: "text_sentiment",
+    status: "research",
+    url: "https://coinshares.com/insights/research-data/",
+    useCase: {
+      zh: "周频机构资金流，按资产和地区确认风险偏好。",
+      en: "Weekly institutional fund flows by asset and region for risk-appetite confirmation.",
+    },
+  },
+  {
+    id: "deribit-options",
+    title: "Deribit options and volatility data",
+    category: "derivatives",
+    status: "wired",
+    url: "https://docs.deribit.com/",
+    useCase: {
+      zh: "DVOL、期权持仓墙、最大痛点、隐含波动率和期限结构。",
+      en: "DVOL, options OI walls, max pain, implied volatility, and term structure.",
+    },
+  },
+  {
     id: "sec-news",
     title: "RSS and filing text",
     category: "text_sentiment",

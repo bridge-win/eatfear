@@ -8,10 +8,16 @@ import { AppFrame } from "@/components/page-frame"
 import {
   DATA_CATEGORY_CATALOG,
   SIGNAL_METHOD_CATALOG,
-  SOURCE_ROADMAP,
   getValidationChecklist,
   type LocalizedText,
 } from "@/lib/opportunity-engine"
+import {
+  CORE_SOURCE_GROUPS,
+  PAPER_RESEARCH_CORPUS,
+  SIGNAL_LAYERS,
+  getTopPractitionerMethods,
+  type PractitionerPriority,
+} from "@/lib/research-corpus"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -29,6 +35,12 @@ function statusClass(status: "wired" | "planned" | "research"): string {
   if (status === "wired") return "border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
   if (status === "planned") return "border-amber-500/40 text-amber-700 dark:text-amber-300"
   return "border-blue-500/40 text-blue-700 dark:text-blue-300"
+}
+
+function priorityClass(priority: PractitionerPriority): string {
+  if (priority === "P0") return "border-emerald-500/40 text-emerald-700 dark:text-emerald-300"
+  if (priority === "P1") return "border-amber-500/40 text-amber-700 dark:text-amber-300"
+  return "border-slate-500/40 text-muted-foreground"
 }
 
 export function MethodologyDashboard() {
@@ -53,6 +65,31 @@ export function MethodologyDashboard() {
           </header>
 
           <MethodologySummaryStrip />
+
+          <section className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-bold">{locale === "zh" ? "首页使用框架" : "Homepage Operating Framework"}</h2>
+            </div>
+            <div className="grid gap-1.5 lg:grid-cols-3">
+              {SIGNAL_LAYERS.map((layer, index) => (
+                <article key={layer.id} className="rounded-md border bg-card/80 px-3 py-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-sm font-semibold">
+                      L{index + 1} · {layer.title}
+                    </h3>
+                    <Badge variant="outline" className="h-5 rounded-sm px-1.5 text-[10px]">
+                      {layer.primaryFamilies.slice(0, 2).join(" / ")}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{layer.description}</p>
+                  <p className="mt-2 rounded-sm bg-muted px-2 py-1 text-[10px] leading-4 text-muted-foreground">
+                    {layer.actionRule}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </section>
 
           <section className="space-y-2">
             <div className="flex items-center gap-1.5">
@@ -111,6 +148,64 @@ export function MethodologyDashboard() {
             </div>
           </section>
 
+          <section className="grid gap-3 xl:grid-cols-[1fr_1fr]">
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-bold">{locale === "zh" ? "论文证据样本" : "Academic Evidence Sample"}</h2>
+              </div>
+              <div className="grid gap-1.5 md:grid-cols-2">
+                {PAPER_RESEARCH_CORPUS.slice(0, 12).map((paper) => (
+                  <a
+                    key={paper.id}
+                    href={paper.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-md border bg-card/80 px-3 py-2.5 transition-colors hover:bg-muted/40"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="line-clamp-2 text-sm font-semibold">{paper.title}</h3>
+                      <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    </div>
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      {paper.authors} · {paper.year} · {paper.families.join(" / ")}
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-muted-foreground">{paper.takeaway}</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <FlaskConical className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-bold">{locale === "zh" ? "实战信号样本" : "Practitioner Signal Sample"}</h2>
+              </div>
+              <div className="grid gap-1.5 md:grid-cols-2">
+                {getTopPractitionerMethods(12).map((method) => (
+                  <a
+                    key={method.id}
+                    href={method.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-md border bg-card/80 px-3 py-2.5 transition-colors hover:bg-muted/40"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="line-clamp-2 text-sm font-semibold">{method.method}</h3>
+                      <Badge variant="outline" className={cn("h-5 rounded-sm px-1.5 text-[10px]", priorityClass(method.priority))}>
+                        {method.priority}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      {method.source} · {method.category}
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-muted-foreground">{method.interpretation}</p>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </section>
+
           <section className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-2">
               <div className="flex items-center gap-1.5">
@@ -118,7 +213,7 @@ export function MethodologyDashboard() {
                 <h2 className="text-sm font-bold">{locale === "zh" ? "数据源路线" : "Source Roadmap"}</h2>
               </div>
               <div className="grid gap-1.5 md:grid-cols-2">
-                {SOURCE_ROADMAP.map((source) => (
+                {CORE_SOURCE_GROUPS.map((source) => (
                   <a
                     key={source.id}
                     href={source.url}
@@ -132,7 +227,7 @@ export function MethodologyDashboard() {
                         {statusLabel(source.status, locale)}
                       </Badge>
                     </div>
-                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{text(source.useCase, locale)}</p>
+                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{source.useCase}</p>
                   </a>
                 ))}
               </div>

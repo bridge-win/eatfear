@@ -72,7 +72,7 @@ export function SiteHeader() {
               </nav>
             </SheetContent>
           </Sheet>
-          <Link href="/crypto" className="flex items-center gap-2">
+          <Link href="/home" className="flex items-center gap-2">
             <TrendingDown className="h-5 w-5 text-primary" />
             <span className="text-lg font-bold">eatfear</span>
           </Link>

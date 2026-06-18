@@ -67,6 +67,8 @@ export const buildIndicatorInfo = (indicator: MacroIndicator): IndicatorInfoProp
     meaning ? `意义：${meaning}` : null,
     `影响方向：${impact}`,
     indicator.meaning && indicator.description ? `说明：${indicator.description}` : null,
+    "使用解读：先看该指标自身趋势和最新变化，再和同组指标、价格趋势、波动率、信用/美元/流动性一起确认。",
+    "失效场景：数据滞后、修订、单一市场噪音或与价格趋势强烈背离时，不能把它当作独立交易触发器。",
   ].filter((part): part is string => Boolean(part))
 
   return {

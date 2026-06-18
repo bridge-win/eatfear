@@ -16,6 +16,7 @@ import {
   type SignalMethodId,
   type TradingOpportunity,
 } from "@/lib/opportunity-engine"
+import { RESEARCH_CORPUS_STATS } from "@/lib/research-corpus"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -300,13 +301,22 @@ export function MethodologySummaryStrip() {
   const wired = SOURCE_ROADMAP.filter((item) => item.status === "wired").length
   const planned = SOURCE_ROADMAP.filter((item) => item.status === "planned").length
   return (
-    <div className="grid gap-1.5 sm:grid-cols-3">
+    <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
       <article className="rounded-md border bg-card/80 px-3 py-2">
         <div className="flex items-center gap-1.5">
           <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
           <p className="text-[11px] font-semibold">{locale === "zh" ? "方法库" : "Method Library"}</p>
         </div>
         <p className="mt-1 text-lg font-bold tabular-nums">{SIGNAL_METHOD_CATALOG.length}</p>
+      </article>
+      <article className="rounded-md border bg-card/80 px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <BookOpen className="h-3.5 w-3.5 text-blue-600" />
+          <p className="text-[11px] font-semibold">{locale === "zh" ? "论文 / 实战" : "Papers / Playbooks"}</p>
+        </div>
+        <p className="mt-1 text-lg font-bold tabular-nums">
+          {RESEARCH_CORPUS_STATS.paperCount}/{RESEARCH_CORPUS_STATS.practitionerMethodCount}
+        </p>
       </article>
       <article className="rounded-md border bg-card/80 px-3 py-2">
         <div className="flex items-center gap-1.5">
