@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { ClientDataCacheProvider } from "@/lib/client-persistence"
 import { I18nProvider } from "@/lib/i18n"
 import "./globals.css"
 
@@ -43,7 +44,9 @@ export default function RootLayout({
       <body className={`font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <I18nProvider>
-            {children}
+            <ClientDataCacheProvider>
+              {children}
+            </ClientDataCacheProvider>
             <Toaster />
           </I18nProvider>
         </ThemeProvider>

@@ -149,13 +149,12 @@ export function CryptoDashboard({
 
       <PanicWindowBanner />
 
-      <div className="flex flex-wrap items-stretch gap-2">
-        <BlackSwanOpportunityCard instId={instId} className="flex-1 min-w-[12rem]" />
-        <CryptoRegimeScoreCard instId={instId} className="flex-1 min-w-[12rem]" />
-        <CyclePositionCard className="flex-1 min-w-[12rem]" />
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <BlackSwanOpportunityCard instId={instId} className="h-full min-w-0" />
+        <CryptoRegimeScoreCard instId={instId} className="h-full min-w-0" />
+        <CyclePositionCard className="h-full min-w-0" />
+        <CryptoBuyWindowCard className="h-full min-w-0" />
       </div>
-
-      <CryptoBuyWindowCard />
 
       {optionsCurrency && <OptionsMaxPainCard currency={optionsCurrency} />}
 

@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import { ExternalLink, Newspaper, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { InfoTooltip } from "@/components/info-tooltip"
 import { DashboardFrame } from "@/components/page-frame"
+import { jsonFetcher, usePersistentSWR } from "@/lib/client-persistence"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import type { MarketNewsArticle } from "@/lib/types"
@@ -18,6 +19,7 @@ interface NewsApiResponse {
 }
 
 type ToneKind = "neutral" | "riskOn" | "riskOff"
+const REFRESH_MS = 5 * 60 * 1000
 
 const getToneKind = (tone?: number): ToneKind => {
   if (tone === undefined) return "neutral"
@@ -40,51 +42,20 @@ const isCryptoArticle = (article: MarketNewsArticle) => {
 }
 
 export function NewsDashboard() {
-  const [articles, setArticles] = useState<MarketNewsArticle[]>([])
-  const [updatedAt, setUpdatedAt] = useState<number | null>(null)
-  const [source, setSource] = useState<string>("Yahoo Finance + CoinDesk + Federal Reserve")
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const { locale, t } = useI18n()
   const dateLocale = locale === "zh" ? "zh-CN" : "en-US"
-
-  useEffect(() => {
-    let isActive = true
-
-    async function loadNews() {
-      try {
-        const response = await fetch("/api/news")
-        const payload = (await response.json()) as NewsApiResponse
-
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Failed to load market news")
-        }
-
-        if (!isActive) return
-
-        setArticles(payload.articles)
-        setUpdatedAt(payload.updatedAt)
-        setSource(payload.source ?? "Yahoo Finance + CoinDesk + Federal Reserve")
-        setError(null)
-      } catch (requestError) {
-        if (isActive) {
-          setError(requestError instanceof Error ? requestError.message : "Failed to load market news")
-        }
-      } finally {
-        if (isActive) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadNews()
-    const interval = setInterval(loadNews, 5 * 60 * 1000)
-
-    return () => {
-      isActive = false
-      clearInterval(interval)
-    }
-  }, [])
+  const swr = usePersistentSWR<NewsApiResponse>(
+    "market-news",
+    "/api/news",
+    jsonFetcher,
+    { refreshInterval: REFRESH_MS },
+  )
+  const payload = swr.data ?? null
+  const articles = payload?.articles ?? []
+  const updatedAt = payload?.updatedAt ?? null
+  const source = payload?.source ?? "Yahoo Finance + CoinDesk + Federal Reserve"
+  const isLoading = swr.isLoading && articles.length === 0
+  const error = articles.length > 0 ? null : swr.error?.message ?? payload?.error ?? null
 
   const topDomains = useMemo(() => {
     const counts = articles.reduce<Record<string, number>>((accumulator, article) => {

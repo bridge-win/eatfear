@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { X, Zap } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { jsonFetcher, usePersistentSWR } from "@/lib/client-persistence"
 import { useI18n } from "@/lib/i18n"
 
 interface PanicWindowBannerProps {
@@ -26,6 +27,7 @@ interface StockPanicSignal {
 }
 
 type BannerTier = "extreme" | "active" | null
+const REFRESH_MS = 5 * 60 * 1000
 
 function isBuyZone(zone: string): boolean {
   return zone === "extreme_buy" || zone === "buy"
@@ -33,34 +35,21 @@ function isBuyZone(zone: string): boolean {
 
 export function PanicWindowBanner({ className }: PanicWindowBannerProps) {
   const { locale } = useI18n()
-  const [cryptoData, setCryptoData] = useState<CryptoBuyWindow | null>(null)
-  const [stockData, setStockData] = useState<StockPanicSignal | null>(null)
   const [dismissed, setDismissed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function poll() {
-      try {
-        const [cr, sr] = await Promise.allSettled([
-          fetch("/api/crypto/buy-window").then((r) => (r.ok ? (r.json() as Promise<CryptoBuyWindow>) : null)),
-          fetch("/api/stock/panic-signal").then((r) => (r.ok ? (r.json() as Promise<StockPanicSignal>) : null)),
-        ])
-        if (cancelled) return
-        if (cr.status === "fulfilled" && cr.value) setCryptoData(cr.value)
-        if (sr.status === "fulfilled" && sr.value) setStockData(sr.value)
-      } catch {
-        // silent fallback
-      }
-    }
-
-    void poll()
-    const interval = setInterval(() => { void poll() }, 5 * 60 * 1000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [])
+  const crypto = usePersistentSWR<CryptoBuyWindow>(
+    "panic-banner:crypto-buy-window",
+    "/api/crypto/buy-window",
+    jsonFetcher,
+    { refreshInterval: REFRESH_MS },
+  )
+  const stock = usePersistentSWR<StockPanicSignal>(
+    "panic-banner:stock-panic-signal",
+    "/api/stock/panic-signal",
+    jsonFetcher,
+    { refreshInterval: REFRESH_MS },
+  )
+  const cryptoData = crypto.data ?? null
+  const stockData = stock.data ?? null
 
   // Re-show banner if new signals come in after dismissal
   useEffect(() => {

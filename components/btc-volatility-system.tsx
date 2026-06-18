@@ -16,6 +16,7 @@ import { type ApiKeyStatus } from "@/components/api-key-warning"
 import { type DataSourceId, getDataSourceEndpoint } from "@/components/data-source-selector"
 import { InfoTooltip } from "@/components/info-tooltip"
 import { SeriesChart } from "@/components/series-chart"
+import { usePersistentSWR } from "@/lib/client-persistence"
 import { useT } from "@/lib/i18n"
 import { getTimeRange, type TimeRangeId } from "@/lib/time-range"
 
@@ -140,6 +141,11 @@ interface DerivativesResponse {
   contractLongShortRatioHistory: LongShortRatioPoint[]
   topTraderPositionHistory: TopTraderRatioPoint[]
   takerVolumeHistory: TakerVolumePoint[]
+}
+
+type DerivativesPayload = DerivativesResponse & {
+  error?: string
+  apiKeyStatus?: ApiKeyStatus
 }
 
 const MAX_KLINES = 80
@@ -546,6 +552,15 @@ function SignalBadge({ direction }: { direction: SignalDirection }) {
   return <Badge variant="secondary">Neutral</Badge>
 }
 
+async function fetchDerivativesPayload(url: string): Promise<DerivativesPayload> {
+  const response = await fetch(url, { cache: "no-store" })
+  const payload = (await response.json()) as DerivativesPayload
+  if (!response.ok && !payload.ticker) {
+    throw new Error(payload.error ?? "Failed to load derivatives data")
+  }
+  return payload
+}
+
 interface BtcVolatilitySystemProps {
   instId?: string
   range?: TimeRangeId
@@ -562,6 +577,13 @@ export function BtcVolatilitySystem({
   const t = useT()
   const base = instId.split("-")[0] ?? "BTC"
   const rangeOption = getTimeRange(range)
+  const apiEndpoint = getDataSourceEndpoint(sourceId)
+  const derivatives = usePersistentSWR<DerivativesPayload>(
+    `crypto:derivatives:${sourceId}:${instId}:${range}`,
+    `${apiEndpoint}?instId=${encodeURIComponent(instId)}&range=${range}`,
+    fetchDerivativesPayload,
+    { refreshInterval: DERIVATIVES_POLL_MS },
+  )
 
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "live" | "reconnecting" | "offline">(
     "connecting",
@@ -593,76 +615,54 @@ export function BtcVolatilitySystem({
   const lastSignalKeyRef = useRef("")
 
   useEffect(() => {
-    let isActive = true
     lastSignalKeyRef.current = ""
     setHistorySignals([])
+  }, [instId, range, sourceId])
 
-    const apiEndpoint = getDataSourceEndpoint(sourceId)
+  useEffect(() => {
+    const payload = derivatives.data
+    if (!payload) return
 
-    async function loadDerivativesData() {
-      try {
-        setConnectionStatus((status) => (status === "live" ? "live" : "connecting"))
-        const response = await fetch(
-          `${apiEndpoint}?instId=${encodeURIComponent(instId)}&range=${range}`,
-          { cache: "no-store" },
-        )
-        const payload = (await response.json()) as DerivativesResponse & {
-          error?: string
-          apiKeyStatus?: ApiKeyStatus
-        }
+    onApiKeyStatusChange?.(payload.apiKeyStatus ?? null)
+    setDataSourceLabel(payload.source)
+    setPrice(payload.ticker?.price ?? 0)
+    setPriceChange24h(payload.ticker?.changePercent24h ?? 0)
+    setVolume24hBase(payload.ticker?.volume24hUsd ?? 0)
+    setOneMinuteKlines((payload.oneMinuteKlines ?? []).slice(-MAX_KLINES))
+    setFiveMinuteKlines((payload.fiveMinuteKlines ?? []).slice(-MAX_KLINES))
+    setRangeKlines(payload.rangeKlines ?? [])
+    setOrderBook(payload.orderBook ?? emptyOrderBook)
+    setOpenInterest(payload.openInterest?.btc ?? 0)
+    setOpenInterestUsd(payload.openInterest?.usd ?? 0)
+    setOpenInterestHistory(
+      (payload.openInterestHistory ?? []).map((point) => ({ time: point.time, value: point.valueUsd })),
+    )
+    setFundingRate(payload.fundingRate?.rate ?? 0)
+    setNextFundingTime(payload.fundingRate?.nextFundingTime ?? 0)
+    setFundingRateHistory(payload.fundingRateHistory ?? [])
+    setLongShortAccountRatioHistory(payload.longShortAccountRatioHistory ?? [])
+    setContractLongShortRatioHistory(payload.contractLongShortRatioHistory ?? [])
+    setTopTraderPositionHistory(payload.topTraderPositionHistory ?? [])
+    setTakerVolumeHistory(payload.takerVolumeHistory ?? [])
+    setSpotPrice(payload.spotPrice ?? 0)
+    setPerpPremium(payload.perpPremium ?? 0)
+    setDataError(payload.error ?? null)
+    setConnectionStatus("live")
+  }, [derivatives.data, onApiKeyStatusChange])
 
-        if (!isActive) return
-
-        // Handle API key status
-        if (payload.apiKeyStatus) {
-          onApiKeyStatusChange?.(payload.apiKeyStatus)
-        } else {
-          onApiKeyStatusChange?.(null)
-        }
-
-        if (!response.ok && !payload.ticker) {
-          throw new Error(payload.error ?? "Failed to load derivatives data")
-        }
-
-        setDataSourceLabel(payload.source)
-        setPrice(payload.ticker?.price ?? 0)
-        setPriceChange24h(payload.ticker?.changePercent24h ?? 0)
-        setVolume24hBase(payload.ticker?.volume24hUsd ?? 0)
-        setOneMinuteKlines((payload.oneMinuteKlines ?? []).slice(-MAX_KLINES))
-        setFiveMinuteKlines((payload.fiveMinuteKlines ?? []).slice(-MAX_KLINES))
-        setRangeKlines(payload.rangeKlines ?? [])
-        setOrderBook(payload.orderBook ?? emptyOrderBook)
-        setOpenInterest(payload.openInterest?.btc ?? 0)
-        setOpenInterestUsd(payload.openInterest?.usd ?? 0)
-        setOpenInterestHistory(
-          (payload.openInterestHistory ?? []).map((point) => ({ time: point.time, value: point.valueUsd })),
-        )
-        setFundingRate(payload.fundingRate?.rate ?? 0)
-        setNextFundingTime(payload.fundingRate?.nextFundingTime ?? 0)
-        setFundingRateHistory(payload.fundingRateHistory ?? [])
-        setLongShortAccountRatioHistory(payload.longShortAccountRatioHistory ?? [])
-        setContractLongShortRatioHistory(payload.contractLongShortRatioHistory ?? [])
-        setTopTraderPositionHistory(payload.topTraderPositionHistory ?? [])
-        setTakerVolumeHistory(payload.takerVolumeHistory ?? [])
-        setSpotPrice(payload.spotPrice ?? 0)
-        setPerpPremium(payload.perpPremium ?? 0)
-        setDataError(null)
-        setConnectionStatus("live")
-      } catch (error) {
-        if (!isActive) return
-        setDataError(error instanceof Error ? error.message : "Failed to load derivatives data")
-        setConnectionStatus("offline")
-      }
+  useEffect(() => {
+    if (derivatives.error && !derivatives.data) {
+      setDataError(derivatives.error.message)
+      setConnectionStatus("offline")
+      onApiKeyStatusChange?.(null)
+      return
     }
-
-    loadDerivativesData()
-    const interval = setInterval(loadDerivativesData, DERIVATIVES_POLL_MS)
-
-    return () => {
-      isActive = false
-      clearInterval(interval)
+    if (!derivatives.data) {
+      setConnectionStatus("connecting")
+      return
     }
-  }, [instId, range, sourceId, onApiKeyStatusChange])
+    setConnectionStatus(derivatives.isValidating ? "reconnecting" : "live")
+  }, [derivatives.data, derivatives.error, derivatives.isValidating, onApiKeyStatusChange])
 
   useEffect(() => {
     const tick = setInterval(() => setLiveNow(Date.now()), 1000)

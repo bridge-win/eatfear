@@ -44,12 +44,12 @@ export function ScoreIndexCard({
   return (
     <div
       className={cn(
-        "min-w-[10.5rem] shrink-0 rounded-lg border bg-card/95 px-3 py-2.5 text-left shadow-sm backdrop-blur-sm",
+        "min-w-0 shrink-0 rounded-md border bg-card/95 px-2.5 py-2 text-left shadow-sm backdrop-blur-sm",
         className,
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-semibold tracking-tight text-foreground">{label}</p>
+        <p className="text-sm font-semibold tracking-tight text-foreground">{label}</p>
         <HoverCard openDelay={120} closeDelay={180}>
           <HoverCardTrigger asChild>
             <button
@@ -77,7 +77,7 @@ export function ScoreIndexCard({
       <p
         aria-label={valueAriaLabel}
         className={cn(
-          "mt-1 text-2xl font-bold tabular-nums leading-none tracking-tight md:text-3xl",
+          "mt-1 text-2xl font-bold tabular-nums leading-none tracking-tight md:text-[1.7rem]",
           toneClassName ?? "text-foreground",
         )}
       >
@@ -88,7 +88,7 @@ export function ScoreIndexCard({
       </p>
 
       {signal && (
-        <p className={cn("mt-1 text-xs font-medium leading-snug", toneClassName ?? "text-muted-foreground")}>
+        <p className={cn("mt-1 text-[13px] font-medium leading-snug", toneClassName ?? "text-muted-foreground")}>
           {signal}
         </p>
       )}

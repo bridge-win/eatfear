@@ -279,12 +279,12 @@ export function CyclePositionCard({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "min-w-[10.5rem] shrink-0 rounded-lg border bg-card/95 px-3 py-2.5 text-left shadow-sm backdrop-blur-sm",
+        "min-w-0 shrink-0 rounded-md border bg-card/95 px-2.5 py-2 text-left shadow-sm backdrop-blur-sm",
         className,
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-semibold tracking-tight text-foreground">
+        <p className="text-sm font-semibold tracking-tight text-foreground">
           {locale === "zh" ? "周期位置" : "Cycle Position"}
         </p>
         <HoverCard openDelay={120} closeDelay={180}>
@@ -313,7 +313,7 @@ export function CyclePositionCard({ className }: { className?: string }) {
 
       <p
         className={cn(
-          "mt-1 text-2xl font-bold tabular-nums leading-none tracking-tight md:text-3xl",
+          "mt-1 text-2xl font-bold tabular-nums leading-none tracking-tight md:text-[1.7rem]",
           toneClass,
         )}
       >
@@ -322,7 +322,7 @@ export function CyclePositionCard({ className }: { className?: string }) {
       </p>
 
       {signal && (
-        <p className={cn("mt-1 text-xs font-medium leading-snug", toneClass)}>
+        <p className={cn("mt-1 text-[13px] font-medium leading-snug", toneClass)}>
           {signal}
         </p>
       )}

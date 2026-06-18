@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import {
   Area,
   AreaChart,
@@ -17,6 +17,7 @@ import { TrendingDown, TrendingUp } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { InfoTooltip } from "@/components/info-tooltip"
+import { usePersistentSWR } from "@/lib/client-persistence"
 import { useI18n, useT } from "@/lib/i18n"
 import { type TimeRangeId } from "@/lib/time-range"
 import { cn } from "@/lib/utils"
@@ -43,6 +44,8 @@ interface SmartMoneyResponse {
   }
   updatedAt: number
 }
+
+const REFRESH_MS = 5 * 60 * 1000
 
 const formatCompact = (value: number, base: string) => {
   const abs = Math.abs(value)
@@ -76,47 +79,24 @@ function SmartMoneyMetric({
   )
 }
 
+async function fetchSmartMoney(url: string): Promise<SmartMoneyResponse> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`smart-money api ${res.status}`)
+  return res.json() as Promise<SmartMoneyResponse>
+}
+
 export function SmartMoneyTracker({ ccy = "BTC", range, className, variant = "full" }: SmartMoneyTrackerProps) {
   const t = useT()
   const { locale } = useI18n()
-  const [payload, setPayload] = useState<SmartMoneyResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let isActive = true
-    const controller = new AbortController()
-    setLoading(true)
-
-    async function load() {
-      try {
-        const res = await fetch(
-          `/api/crypto/smart-money?ccy=${encodeURIComponent(ccy)}&range=${range}`,
-          { signal: controller.signal },
-        )
-        if (!res.ok) throw new Error(`smart-money api ${res.status}`)
-        const json = (await res.json()) as SmartMoneyResponse
-        if (isActive) {
-          setPayload(json)
-          setError(null)
-        }
-      } catch (e) {
-        if (isActive && (e as Error).name !== "AbortError") {
-          setError(e instanceof Error ? e.message : "load failed")
-        }
-      } finally {
-        if (isActive) setLoading(false)
-      }
-    }
-
-    load()
-    const timer = window.setInterval(load, 5 * 60 * 1000)
-    return () => {
-      isActive = false
-      controller.abort()
-      window.clearInterval(timer)
-    }
-  }, [ccy, range])
+  const swr = usePersistentSWR<SmartMoneyResponse>(
+    `crypto:smart-money:${ccy}:${range}`,
+    `/api/crypto/smart-money?ccy=${encodeURIComponent(ccy)}&range=${range}`,
+    fetchSmartMoney,
+    { refreshInterval: REFRESH_MS },
+  )
+  const payload = swr.data ?? null
+  const loading = swr.isLoading && !payload
+  const error = payload ? null : swr.error?.message ?? null
 
   const chartData = useMemo(
     () =>

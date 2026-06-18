@@ -1,9 +1,21 @@
 "use client"
 
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react"
-import useSWR, { type KeyedMutator, type SWRConfiguration } from "swr"
+import { createElement, useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from "react"
+import useSWR, { SWRConfig, type KeyedMutator, type SWRConfiguration } from "swr"
 
 const STORAGE_PREFIX = "eatfear:v1:"
+const DEFAULT_DEDUPING_INTERVAL_MS = 15_000
+const DEFAULT_FOCUS_THROTTLE_MS = 60_000
+
+const GLOBAL_SWR_CONFIG: SWRConfiguration = {
+  keepPreviousData: false,
+  revalidateOnFocus: false,
+  revalidateOnReconnect: true,
+  revalidateIfStale: true,
+  dedupingInterval: DEFAULT_DEDUPING_INTERVAL_MS,
+  focusThrottleInterval: DEFAULT_FOCUS_THROTTLE_MS,
+  errorRetryCount: 2,
+}
 
 interface StoredEnvelope<T> {
   savedAt: number
@@ -33,6 +45,10 @@ interface StoredState<T> {
 
 function canUseStorage(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+}
+
+export function ClientDataCacheProvider({ children }: { children: ReactNode }) {
+  return createElement(SWRConfig, { value: GLOBAL_SWR_CONFIG }, children)
 }
 
 export function readStoredJson<T>(key: string): T | undefined {
@@ -96,10 +112,7 @@ export function usePersistentSWR<T>(
     ready: false,
   })
   const response = useSWR<T, Error>(swrKey, fetcher, {
-    keepPreviousData: false,
-    revalidateOnFocus: false,
-    revalidateOnReconnect: true,
-    dedupingInterval: 15_000,
+    ...GLOBAL_SWR_CONFIG,
     ...config,
   })
   const storedData = storedState.key === storageKey ? storedState.data : undefined

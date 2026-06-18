@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import {
   CartesianGrid,
   Legend,
@@ -14,6 +14,7 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { InfoTooltip } from "@/components/info-tooltip"
+import { usePersistentSWR } from "@/lib/client-persistence"
 import { useI18n, useT } from "@/lib/i18n"
 import { type TimeRangeId } from "@/lib/time-range"
 import { cn } from "@/lib/utils"
@@ -44,6 +45,8 @@ interface MiningCostResponse {
   error?: string
 }
 
+const REFRESH_MS = 10 * 60 * 1000
+
 const formatUsd = (v: number) => {
   if (v >= 1e3) return `$${(v / 1e3).toFixed(2)}K`
   return `$${v.toFixed(0)}`
@@ -64,44 +67,26 @@ function MiningMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
+async function fetchMiningCost(url: string): Promise<MiningCostResponse> {
+  const res = await fetch(url)
+  const json = (await res.json()) as MiningCostResponse
+  if (!res.ok && json.error) throw new Error(json.error)
+  if (!res.ok) throw new Error(`Mining cost API ${res.status}`)
+  return json
+}
+
 export function MiningCostCard({ range, className, variant = "full" }: MiningCostCardProps) {
   const t = useT()
   const { locale } = useI18n()
-  const [payload, setPayload] = useState<MiningCostResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let isActive = true
-    const controller = new AbortController()
-    setLoading(true)
-
-    async function load() {
-      try {
-        const res = await fetch(`/api/crypto/mining-cost?range=${range}`, { signal: controller.signal })
-        const json = (await res.json()) as MiningCostResponse
-        if (!res.ok && json.error) throw new Error(json.error)
-        if (isActive) {
-          setPayload(json)
-          setError(null)
-        }
-      } catch (e) {
-        if (isActive && (e as Error).name !== "AbortError") {
-          setError(e instanceof Error ? e.message : "load failed")
-        }
-      } finally {
-        if (isActive) setLoading(false)
-      }
-    }
-
-    load()
-    const timer = window.setInterval(load, 10 * 60 * 1000)
-    return () => {
-      isActive = false
-      controller.abort()
-      window.clearInterval(timer)
-    }
-  }, [range])
+  const swr = usePersistentSWR<MiningCostResponse>(
+    `crypto:mining-cost:${range}`,
+    `/api/crypto/mining-cost?range=${range}`,
+    fetchMiningCost,
+    { refreshInterval: REFRESH_MS },
+  )
+  const payload = swr.data ?? null
+  const loading = swr.isLoading && !payload
+  const error = payload ? null : swr.error?.message ?? null
 
   const chartData = useMemo(
     () =>
