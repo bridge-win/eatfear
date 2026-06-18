@@ -17,6 +17,7 @@ export type SignalMethodId =
   | "fundamental_surprise"
   | "sentiment"
   | "event_risk"
+  | "onchain_cycle"
 
 export type DataCategoryId =
   | "price"
@@ -180,6 +181,78 @@ const REFERENCE_BACKTESTING: ResearchReference = {
   },
 }
 
+const REFERENCE_CRYPTO_FUNDING: ResearchReference = {
+  title: "BIS Working Paper 1087 — Crypto carry and funding rate dynamics",
+  url: "https://www.bis.org/publ/work1087.htm",
+  note: {
+    zh: "BIS 证实永续资金费率平均年化 ~7-8%，>0.1%/8h 标志拥挤；backwardation 是罕见底部信号。",
+    en: "BIS confirms perp funding averages ~7-8% APY; >0.1%/8h marks crowding; backwardation is a rare bottom signal.",
+  },
+}
+
+const REFERENCE_CRYPTO_FACTORS: ResearchReference = {
+  title: "Chi et al — Basis-Momentum Factor in Crypto Futures (JFM 2023)",
+  url: "https://doi.org/10.1002/fut.22457",
+  note: {
+    zh: "高 basis-momentum 做多做空组合年化 ~222%，是加密期货最强的横截面因子之一。",
+    en: "High-basis-momentum long-short portfolio achieved ~222% annualized — strongest cross-sectional factor in crypto futures.",
+  },
+}
+
+const REFERENCE_ETF_FLOWS: ResearchReference = {
+  title: "K33 Research — Bitcoin ETF flows and price correlation",
+  url: "https://k33.com/research",
+  note: {
+    zh: "比特币 ETF 日流量与 BTC 价格相关性约 0.73；多日累计流量信号强于单日。",
+    en: "BTC ETF daily flows correlate ~0.73 with BTC price; multi-day cumulative signal stronger than single-day.",
+  },
+}
+
+const REFERENCE_CROSS_ASSET: ResearchReference = {
+  title: "Bianchi, Babiak — Bitcoin and macro cross-asset correlations",
+  url: "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3938855",
+  note: {
+    zh: "BTC 与纳指相关性最高峰 0.87，与 DXY 滚动相关 -0.72；ETF 获批后与黄金转为负相关。",
+    en: "BTC-Nasdaq correlation peaked at 0.87; rolling DXY correlation -0.72; post-ETF BTC-gold turned near-record negative.",
+  },
+}
+
+const REFERENCE_ONCHAIN_PEER: ResearchReference = {
+  title: "Grobys, Näsman, Sandretto — Using on-chain data to predict Bitcoin cycles",
+  url: "https://doi.org/10.1016/j.ribaf.2026.103486",
+  note: {
+    zh: "RIBF 2026 对 NUPL、MVRV Z-Score、CVDD 做同行评审验证；链上阈值仍需按分位和周期衰减解读。",
+    en: "RIBF 2026 peer-reviewed evidence on NUPL, MVRV Z-Score, and CVDD; thresholds still need percentile and cycle-decay treatment.",
+  },
+}
+
+const REFERENCE_LTW_FACTORS: ResearchReference = {
+  title: "Liu, Tsyvinski, Wu — Common Risk Factors in Cryptocurrency",
+  url: "https://doi.org/10.1111/jofi.13119",
+  note: {
+    zh: "JoF 2022 三因子模型 CMKT、CSMB、CMOM 解释加密横截面收益。",
+    en: "JoF 2022 three-factor model where CMKT, CSMB, and CMOM capture crypto cross-sectional returns.",
+  },
+}
+
+const REFERENCE_DVOL: ResearchReference = {
+  title: "Deribit — DVOL implied volatility index methodology",
+  url: "https://insights.deribit.com/exchange-updates/dvol-deribit-implied-volatility-index/",
+  note: {
+    zh: "DVOL 是 30 日前瞻年化隐含波动率；高 DVOL 表示波动幅度，不表示方向。",
+    en: "DVOL is 30-day forward annualized implied volatility; high DVOL signals magnitude, not direction.",
+  },
+}
+
+const REFERENCE_SKEW: ResearchReference = {
+  title: "Block Scholes — SVI crypto options volatility surfaces",
+  url: "https://www.blockscholes.com/data",
+  note: {
+    zh: "用 SVI 曲面跟踪 25-delta skew；更适合作为恐慌确认而非提前预测。",
+    en: "Uses SVI surfaces for 25-delta skew; better as reactive fear confirmation than a leading signal.",
+  },
+}
+
 export const SIGNAL_METHOD_CATALOG: readonly SignalMethodDefinition[] = [
   {
     id: "trend",
@@ -207,21 +280,21 @@ export const SIGNAL_METHOD_CATALOG: readonly SignalMethodDefinition[] = [
       en: "Ranks 1/3/6-month returns and recent changes inside the same investable universe.",
     },
     horizon: { zh: "2 周 - 6 月", en: "2 weeks - 6 months" },
-    references: [REFERENCE_VALUE_MOMENTUM],
+    references: [REFERENCE_VALUE_MOMENTUM, REFERENCE_LTW_FACTORS],
   },
   {
     id: "carry",
     title: { zh: "Carry / 期限结构", en: "Carry / Term Structure" },
     purpose: {
-      zh: "捕捉远近期价格、资金费率或利差带来的持仓补偿。",
-      en: "Captures compensation embedded in futures curves, funding rates, and spread carry.",
+      zh: "捕捉远近期价格、资金费率或利差带来的持仓补偿；资金费率 carry 在 2025 拥挤后年化转负，不能当作稳定收益。",
+      en: "Captures compensation embedded in futures curves, funding rates, and spread carry; funding carry turned negative annualized in 2025 as arbitrage crowded.",
     },
     implementation: {
       zh: "使用永续 basis、资金费率、期货曲线、信用利差和利率曲线斜率。",
       en: "Uses perp basis, funding, futures curves, credit spreads, and yield-curve slopes.",
     },
     horizon: { zh: "1 周 - 3 月", en: "1 week - 3 months" },
-    references: [REFERENCE_CARRY],
+    references: [REFERENCE_CARRY, REFERENCE_CRYPTO_FUNDING, REFERENCE_CRYPTO_FACTORS],
   },
   {
     id: "volatility",
@@ -235,21 +308,21 @@ export const SIGNAL_METHOD_CATALOG: readonly SignalMethodDefinition[] = [
       en: "Uses realized volatility, VIX/DVOL, return z-scores, candle wicks, and volume spikes.",
     },
     horizon: { zh: "日内 - 1 月", en: "Intraday - 1 month" },
-    references: [REFERENCE_BACKTESTING],
+    references: [REFERENCE_BACKTESTING, REFERENCE_DVOL],
   },
   {
     id: "positioning",
     title: { zh: "仓位拥挤 / 杠杆", en: "Crowding / Leverage" },
     purpose: {
-      zh: "判断上涨是否由健康资金推动，还是由拥挤杠杆驱动。",
-      en: "Separates healthy participation from crowded leveraged positioning.",
+      zh: "判断上涨是否由健康资金推动，还是由拥挤杠杆驱动；OI 方向不唯一，爆仓热力图多为估算。",
+      en: "Separates healthy participation from crowded leveraged positioning; OI is directionally ambiguous and liquidation heatmaps are estimates.",
     },
     implementation: {
       zh: "组合 OI、资金费率、大户多空比、COT、期权偏度和爆仓代理指标。",
       en: "Combines OI, funding, top-trader ratios, COT, options skew, and liquidation proxies.",
     },
     horizon: { zh: "日内 - 6 周", en: "Intraday - 6 weeks" },
-    references: [REFERENCE_CARRY, REFERENCE_CRYPTO_RISK],
+    references: [REFERENCE_CARRY, REFERENCE_CRYPTO_RISK, REFERENCE_SKEW],
   },
   {
     id: "macro_regime",
@@ -269,15 +342,15 @@ export const SIGNAL_METHOD_CATALOG: readonly SignalMethodDefinition[] = [
     id: "value",
     title: { zh: "价值 / 估值", en: "Value / Valuation" },
     purpose: {
-      zh: "衡量价格相对盈利、现金流、账面价值、成本曲线或历史区间是否便宜。",
-      en: "Measures whether price is cheap versus earnings, cash flow, book value, cost curves, or history.",
+      zh: "衡量价格相对盈利、现金流、账面价值、成本曲线或历史区间是否便宜；BTC 链上峰值阈值逐周期下降，应使用历史分位。",
+      en: "Measures whether price is cheap versus earnings, cash flow, book value, cost curves, or history; BTC on-chain peak thresholds decline each cycle, so use percentiles.",
     },
     implementation: {
       zh: "股票使用估值和盈利修正；加密使用矿工成本、MVRV 类代理和历史分位。",
       en: "Uses valuation and revisions for stocks; miner cost, MVRV-like proxies, and percentiles for crypto.",
     },
     horizon: { zh: "3 月 - 3 年", en: "3 months - 3 years" },
-    references: [REFERENCE_VALUE_MOMENTUM],
+    references: [REFERENCE_VALUE_MOMENTUM, REFERENCE_ONCHAIN_PEER],
   },
   {
     id: "liquidity",
@@ -348,6 +421,20 @@ export const SIGNAL_METHOD_CATALOG: readonly SignalMethodDefinition[] = [
     },
     horizon: { zh: "日内 - 2 周", en: "Intraday - 2 weeks" },
     references: [REFERENCE_FACTOR_MINING],
+  },
+  {
+    id: "onchain_cycle",
+    title: { zh: "链上周期 / 矿工成本", en: "On-Chain Cycle / Miner Cost" },
+    purpose: {
+      zh: "用矿工成本、MVRV、SOPR 和已实现价格判断 BTC 周期阶段；所有顶部阈值逐周期下降，固定触发位只能做 regime 背景。",
+      en: "Uses miner cost, MVRV, SOPR, and realized price to place BTC within its market cycle; all top thresholds decay by cycle, so fixed levels are regime context only.",
+    },
+    implementation: {
+      zh: "价格 / 矿工成本比值；MVRV Z-Score Z<0 底部、Z>7 旧顶部但需分位；SOPR 1.0 是盈亏枢轴。",
+      en: "Price/miner-cost ratio; MVRV Z-Score Z<0 bottoms, legacy Z>7 tops with percentile adjustment; SOPR 1.0 profit/loss pivot.",
+    },
+    horizon: { zh: "1 月 - 24 月", en: "1 month - 24 months" },
+    references: [REFERENCE_ONCHAIN_PEER, REFERENCE_CRYPTO_FUNDING, REFERENCE_CRYPTO_FACTORS],
   },
 ] as const
 
@@ -576,6 +663,83 @@ export const SOURCE_ROADMAP: readonly SourceRoadmapItem[] = [
     useCase: {
       zh: "公告、新闻和监管文本做 tone、事件聚类和影响资产映射。",
       en: "Filings, news, and regulation text for tone, event clustering, and asset mapping.",
+    },
+  },
+  {
+    id: "glassnode",
+    title: "Glassnode on-chain metrics",
+    category: "crypto_native",
+    status: "planned",
+    url: "https://glassnode.com/",
+    useCase: {
+      zh: "MVRV Z-Score、Puell Multiple、SOPR、活跃地址、交易所库存和矿工净仓位。",
+      en: "MVRV Z-Score, Puell Multiple, SOPR, active addresses, exchange reserves, and miner net position.",
+    },
+  },
+  {
+    id: "coinglass",
+    title: "CoinGlass derivatives data",
+    category: "derivatives",
+    status: "planned",
+    url: "https://www.coinglass.com/",
+    useCase: {
+      zh: "多交易所 OI、强平数据、多空比、资金费率历史和期权最大痛苦点。",
+      en: "Cross-exchange OI, liquidations, long/short ratio, funding rate history, and options max pain.",
+    },
+  },
+  {
+    id: "laevitas",
+    title: "Laevitas options analytics",
+    category: "derivatives",
+    status: "planned",
+    url: "https://app.laevitas.ch/",
+    useCase: {
+      zh: "多交易所期权 IV、skew、期限结构和波动率指标；优先评估免费层可用字段。",
+      en: "Multi-venue options IV, skew, term structure, and volatility analytics; evaluate free-tier fields first.",
+    },
+  },
+  {
+    id: "deribit-metrics",
+    title: "Deribit metrics via proxy",
+    category: "derivatives",
+    status: "wired",
+    url: "https://docs.deribit.com/",
+    useCase: {
+      zh: "通过代理接入 DVOL、skew、put/call、最大痛点和期权持仓墙。",
+      en: "Proxy-wired DVOL, skew, put/call, max pain, and options OI walls.",
+    },
+  },
+  {
+    id: "k33-research",
+    title: "K33 Research market intelligence",
+    category: "crypto_native",
+    status: "research",
+    url: "https://k33.com/research",
+    useCase: {
+      zh: "机构资金流、ETF 持仓跟踪、期货 basis 和 BTC 周期定位研究。",
+      en: "Institutional flow, ETF holdings tracking, futures basis, and BTC cycle positioning research.",
+    },
+  },
+  {
+    id: "block-scholes",
+    title: "Block Scholes crypto options analytics",
+    category: "derivatives",
+    status: "research",
+    url: "https://www.blockscholes.com/",
+    useCase: {
+      zh: "加密期权 IV 曲面、偏度、波动率微笑和 RV/IV 比率分析。",
+      en: "Crypto options IV surface, skew, volatility smile, and RV/IV ratio analytics.",
+    },
+  },
+  {
+    id: "coin-metrics",
+    title: "Coin Metrics Network Data",
+    category: "crypto_native",
+    status: "planned",
+    url: "https://coinmetrics.io/",
+    useCase: {
+      zh: "链上经济指标：已实现市值、矿工收入、交易量、供应分布和安全指标。",
+      en: "On-chain economics: realized cap, miner revenue, transaction volume, supply distribution, and security metrics.",
     },
   },
 ] as const
