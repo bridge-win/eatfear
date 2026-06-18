@@ -11,6 +11,7 @@ import {
 } from "@/components/aligned-history-compare"
 import { getCryptoSeriesLabel } from "@/components/crypto-series-label"
 import { jsonFetcher, usePersistentSWR, writeStoredJson } from "@/lib/client-persistence"
+import { useDeferredRender } from "@/lib/client-performance"
 import { DEFAULT_CRYPTO_HISTORY_REFRESH_MS, getEnabledCryptoIndicators } from "@/lib/crypto-indicator-config"
 import { useT } from "@/lib/i18n"
 import { type TimeRangeId } from "@/lib/time-range"
@@ -172,9 +173,10 @@ export function CryptoHistoryCompare({
   const loading = controlledLoading ?? fetched.loading
   const error = controlledError ?? fetched.error
   const expectedSeriesCount = getExpectedCryptoHistorySeriesCount(instId)
+  const canRenderCharts = useDeferredRender(`${instId}:${range}:${payload ? "ready" : "empty"}`)
 
   const data: AlignedHistoryData | null = useMemo(() => {
-    if (!payload) return null
+    if (!canRenderCharts || !payload) return null
     const groupsByPane = new Map<number, AlignedHistorySeries[]>()
     for (const spec of payload.series) {
       const label = getCryptoSeriesLabel(t, spec)
@@ -210,7 +212,7 @@ export function CryptoHistoryCompare({
       timeline: payload.timeline,
       groups,
     }
-  }, [payload, t])
+  }, [canRenderCharts, payload, t])
 
   return (
     <AlignedHistoryCompare
@@ -218,7 +220,7 @@ export function CryptoHistoryCompare({
       title={t("compare.title")}
       infoDescription={t("compare.info")}
       infoSource="OKX · blockchain.info · DefiLlama · alternative.me · Deribit · Yahoo Finance · TradingView Lightweight Charts"
-      loading={loading}
+      loading={loading || !canRenderCharts}
       error={error}
       loadingLabel={t("compare.loading")}
       noDataLabel={t("chart.noData")}

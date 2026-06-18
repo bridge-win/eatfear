@@ -14,6 +14,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command"
+import { scheduleIdleTask } from "@/lib/client-performance"
 import { useT } from "@/lib/i18n"
 
 const PAGE_ITEMS = [
@@ -27,9 +28,16 @@ const PAGE_ITEMS = [
 
 export function CommandPalette() {
   const [open, setOpen] = React.useState(false)
+  const [, startTransition] = React.useTransition()
   const router = useRouter()
   const { setTheme } = useTheme()
   const t = useT()
+
+  React.useEffect(() => {
+    return scheduleIdleTask(() => {
+      for (const item of PAGE_ITEMS) router.prefetch(item.href)
+    }, 1_000)
+  }, [router])
 
   React.useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -44,8 +52,8 @@ export function CommandPalette() {
 
   const runCommand = React.useCallback((callback: () => void) => {
     setOpen(false)
-    callback()
-  }, [])
+    startTransition(callback)
+  }, [startTransition])
 
   return (
     <>

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Menu, TrendingDown } from "lucide-react"
 
 import { CommandPalette } from "@/components/command-palette"
@@ -10,6 +10,7 @@ import { LanguageToggle } from "@/components/language-toggle"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { useT } from "@/lib/i18n"
+import { scheduleIdleTask } from "@/lib/client-performance"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -27,8 +28,19 @@ function isItemActive(pathname: string, href: string) {
 
 export function SiteHeader() {
   const pathname = usePathname()
+  const router = useRouter()
   const t = useT()
   const [mobileOpen, setMobileOpen] = React.useState(false)
+
+  React.useEffect(() => {
+    return scheduleIdleTask(() => {
+      for (const item of navItems) router.prefetch(item.href)
+    }, 1_000)
+  }, [router])
+
+  const prefetchRoute = React.useCallback((href: string) => {
+    router.prefetch(href)
+  }, [router])
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -59,6 +71,9 @@ export function SiteHeader() {
                       key={item.href}
                       href={item.href}
                       prefetch
+                      onPointerEnter={() => prefetchRoute(item.href)}
+                      onPointerDown={() => prefetchRoute(item.href)}
+                      onFocus={() => prefetchRoute(item.href)}
                       onClick={() => setMobileOpen(false)}
                       className={cn(
                         "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
@@ -86,6 +101,9 @@ export function SiteHeader() {
                 key={item.href}
                 href={item.href}
                 prefetch
+                onPointerEnter={() => prefetchRoute(item.href)}
+                onPointerDown={() => prefetchRoute(item.href)}
+                onFocus={() => prefetchRoute(item.href)}
                 className={cn(
                   "rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
                   isActive && "bg-foreground text-background hover:bg-foreground hover:text-background",

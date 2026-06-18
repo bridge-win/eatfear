@@ -24,6 +24,7 @@ import {
   writeStoredJson,
   type DashboardTabValue,
 } from "@/lib/client-persistence"
+import { useDeferredRender } from "@/lib/client-performance"
 import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-shared"
 import { CrashDetector } from "@/lib/crash-detector"
 import { useT } from "@/lib/i18n"
@@ -456,9 +457,10 @@ export function StockDashboard({
       }),
     [opportunityInputs],
   )
+  const canRenderHistory = useDeferredRender(`${tab}:${range}:${payload ? "ready" : "empty"}`)
   const stockHistoryData = useMemo(
-    () => buildStockHistoryData(stockItems),
-    [stockItems],
+    () => (canRenderHistory ? buildStockHistoryData(stockItems) : null),
+    [canRenderHistory, stockItems],
   )
 
   return (
@@ -535,7 +537,7 @@ export function StockDashboard({
             title={t("stock.historyCompare.title")}
             infoDescription={t("stock.historyCompare.info")}
             infoSource="Yahoo Finance · FRED · TradingView Lightweight Charts"
-            loading={isLoading}
+            loading={isLoading || !canRenderHistory}
             error={error}
             loadingLabel={t("stock.loading")}
             noDataLabel={t("chart.noData")}

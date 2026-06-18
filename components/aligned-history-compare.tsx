@@ -21,6 +21,7 @@ import { RefreshCw } from "lucide-react"
 
 import { InfoTooltip } from "@/components/info-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { scheduleIdleTask } from "@/lib/client-performance"
 import { cn } from "@/lib/utils"
 
 export type AlignedHistoryUnit = "usd" | "cny" | "pct" | "ratio" | "raw" | "count"
@@ -128,6 +129,8 @@ const MAX_SERIES_PER_PANE = 2
 const DAY_MS = 24 * 60 * 60 * 1000
 const DESKTOP_TIME_LABEL_COUNT = 5
 const COMPACT_TIME_LABEL_COUNT = 3
+const INITIAL_RENDERED_PANES = 4
+const RENDERED_PANE_CHUNK = 6
 
 function formatRaw(value: number, unit: AlignedHistoryUnit): string {
   if (!Number.isFinite(value)) return "—"
@@ -461,10 +464,40 @@ export function AlignedHistoryCompare({
   const [hoverState, setHoverState] = useState<HoverState | null>(null)
   const [cardWidth, setCardWidth] = useState(0)
   const [visibleLogicalRange, setVisibleLogicalRange] = useState<VisibleLogicalRange | null>(null)
+  const [renderedPaneCount, setRenderedPaneCount] = useState(0)
   const groups = useMemo(() => (data ? getGroups(data, maxSeriesPerPane) : []), [data, maxSeriesPerPane])
   const timeline = useMemo(() => (data ? getTimeline(data) : []), [data])
   const isCompact = cardWidth > 0 && cardWidth < COMPACT_WIDTH
   const seriesCount = useMemo(() => groups.reduce((count, group) => count + group.specs.length, 0), [groups])
+  const renderedGroups = useMemo(
+    () => groups.slice(0, renderedPaneCount),
+    [groups, renderedPaneCount],
+  )
+  const renderedSeriesCount = useMemo(
+    () => renderedGroups.reduce((count, group) => count + group.specs.length, 0),
+    [renderedGroups],
+  )
+
+  useEffect(() => {
+    if (groups.length === 0) {
+      setRenderedPaneCount(0)
+      return () => {}
+    }
+
+    setRenderedPaneCount(Math.min(INITIAL_RENDERED_PANES, groups.length))
+    let cancelNext = () => {}
+    const renderMore = () => {
+      setRenderedPaneCount((previous) => {
+        const next = Math.min(groups.length, previous + RENDERED_PANE_CHUNK)
+        if (next < groups.length) {
+          cancelNext = scheduleIdleTask(renderMore, 900)
+        }
+        return next
+      })
+    }
+    cancelNext = scheduleIdleTask(renderMore, 900)
+    return () => cancelNext()
+  }, [groups])
 
   useEffect(() => {
     hiddenRef.current = hidden
@@ -492,7 +525,7 @@ export function AlignedHistoryCompare({
   }, [data, groups])
 
   useEffect(() => {
-    if (!gridRef.current || !data || seriesCount === 0 || timeline.length === 0) return
+    if (!gridRef.current || !data || renderedSeriesCount === 0 || timeline.length === 0) return
     const grid = gridRef.current
 
     const isDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false
@@ -511,7 +544,7 @@ export function AlignedHistoryCompare({
     )
 
     const panes: PaneChart[] = []
-    groups.forEach((group) => {
+    renderedGroups.forEach((group) => {
       const containerEl = grid.querySelector<HTMLDivElement>(`[data-pane="${group.paneIndex}"]`)
       if (!containerEl) return
       const chart = createChart(containerEl, {
@@ -677,7 +710,7 @@ export function AlignedHistoryCompare({
       chartsRef.current = []
       for (const pane of panes) pane.chart.remove()
     }
-  }, [data, groups, isCompact, seriesCount, timeline])
+  }, [data, isCompact, renderedGroups, renderedSeriesCount, timeline])
 
   useEffect(() => {
     for (const pane of chartsRef.current) {
@@ -701,28 +734,29 @@ export function AlignedHistoryCompare({
   const summaries = useMemo(() => {
     const out = new Map<string, { first: number; last: number; pct: number }>()
     if (!data) return out
-    for (const group of groups) {
+    for (const group of renderedGroups) {
       for (const series of group.specs) {
         const summary = summarize(series.data)
         if (summary) out.set(series.key, summary)
       }
     }
     return out
-  }, [data, groups])
+  }, [data, renderedGroups])
 
   const visibleSeriesCount = useMemo(() => {
-    return groups.reduce(
+    return renderedGroups.reduce(
       (count, group) =>
         count + group.specs.reduce((groupCount, spec) => groupCount + (hidden.has(spec.key) ? 0 : 1), 0),
       0,
     )
-  }, [groups, hidden])
+  }, [renderedGroups, hidden])
   const timeAxisLabels = useMemo(
     () => getTimeAxisLabels(timeline, isCompact, visibleLogicalRange),
     [isCompact, timeline, visibleLogicalRange],
   )
   const displaySeriesCount = Math.max(seriesCount, expectedSeriesCount ?? seriesCount)
-  const pendingSeriesCount = loading ? Math.max(0, displaySeriesCount - seriesCount) : 0
+  const isRenderingMorePanes = !!data && renderedPaneCount < groups.length
+  const pendingSeriesCount = loading || isRenderingMorePanes ? Math.max(0, displaySeriesCount - renderedSeriesCount) : 0
   const pendingPaneCount = Math.ceil(pendingSeriesCount / maxSeriesPerPane)
 
   const hoverPaneTooltips = useMemo<HoverPaneTooltip[]>(() => {
@@ -817,7 +851,7 @@ export function AlignedHistoryCompare({
           <p className="py-12 text-center text-xs text-muted-foreground">{noDataLabel}</p>
         ) : (
           <div ref={gridRef} className="relative flex flex-col gap-px sm:gap-0.5">
-            {groups.map((group) => (
+            {renderedGroups.map((group) => (
               <section
                 key={group.paneIndex}
                 data-history-group={group.key}

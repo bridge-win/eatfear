@@ -23,6 +23,7 @@ import {
   writeStoredJson,
   type DashboardTabValue,
 } from "@/lib/client-persistence"
+import { useDeferredRender } from "@/lib/client-performance"
 import { buildIndicatorInfo, type MacroApiResponse } from "@/lib/dashboard-shared"
 import { DEFAULT_MACRO_INDICATOR_REFRESH_MS, getConfiguredMacroIndicatorMetas } from "@/lib/macro-indicator-config"
 import { useT } from "@/lib/i18n"
@@ -269,7 +270,11 @@ export function MacroDashboard({
       }),
     [opportunityInputs],
   )
-  const macroHistoryData = useMemo(() => buildMacroHistoryData(macroItems), [macroItems])
+  const canRenderHistory = useDeferredRender(`${tab}:${range}:${payload ? "ready" : "empty"}`)
+  const macroHistoryData = useMemo(
+    () => (canRenderHistory ? buildMacroHistoryData(macroItems) : null),
+    [canRenderHistory, macroItems],
+  )
 
   return (
     <DashboardFrame>
@@ -366,7 +371,7 @@ export function MacroDashboard({
             title={t("macro.historyCompare.title")}
             infoDescription={t("macro.historyCompare.info")}
             infoSource="FRED · IMF/World Bank via FRED · Yahoo Finance · TradingView Lightweight Charts"
-            loading={isLoading}
+            loading={isLoading || !canRenderHistory}
             error={error}
             loadingLabel={t("macro.loading")}
             noDataLabel={t("chart.noData")}
