@@ -17,6 +17,7 @@ export type SignalMethodId =
   | "fundamental_surprise"
   | "sentiment"
   | "event_risk"
+  | "onchain_cycle"
 
 export type DataCategoryId =
   | "price"
@@ -177,6 +178,42 @@ const REFERENCE_BACKTESTING: ResearchReference = {
   note: {
     zh: "用于识别回测选择偏差和过拟合后的夏普率幻觉。",
     en: "Used to flag selection bias and inflated Sharpe ratios after multiple trials.",
+  },
+}
+
+const REFERENCE_CRYPTO_FUNDING: ResearchReference = {
+  title: "BIS Working Paper 1087 — Crypto carry and funding rate dynamics",
+  url: "https://www.bis.org/publ/work1087.htm",
+  note: {
+    zh: "BIS 证实永续资金费率平均年化 ~7-8%，>0.1%/8h 标志拥挤；backwardation 是罕见底部信号。",
+    en: "BIS confirms perp funding averages ~7-8% APY; >0.1%/8h marks crowding; backwardation is a rare bottom signal.",
+  },
+}
+
+const REFERENCE_CRYPTO_FACTORS: ResearchReference = {
+  title: "Chi et al — Basis-Momentum Factor in Crypto Futures (JFM 2023)",
+  url: "https://doi.org/10.1002/fut.22457",
+  note: {
+    zh: "高 basis-momentum 做多做空组合年化 ~222%，是加密期货最强的横截面因子之一。",
+    en: "High-basis-momentum long-short portfolio achieved ~222% annualized — strongest cross-sectional factor in crypto futures.",
+  },
+}
+
+const REFERENCE_ETF_FLOWS: ResearchReference = {
+  title: "K33 Research — Bitcoin ETF flows and price correlation",
+  url: "https://k33.com/research",
+  note: {
+    zh: "比特币 ETF 日流量与 BTC 价格相关性约 0.73；多日累计流量信号强于单日。",
+    en: "BTC ETF daily flows correlate ~0.73 with BTC price; multi-day cumulative signal stronger than single-day.",
+  },
+}
+
+const REFERENCE_CROSS_ASSET: ResearchReference = {
+  title: "Bianchi, Babiak — Bitcoin and macro cross-asset correlations",
+  url: "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3938855",
+  note: {
+    zh: "BTC 与纳指相关性最高峰 0.87，与 DXY 滚动相关 -0.72；ETF 获批后与黄金转为负相关。",
+    en: "BTC-Nasdaq correlation peaked at 0.87; rolling DXY correlation -0.72; post-ETF BTC-gold turned near-record negative.",
   },
 }
 
@@ -349,6 +386,20 @@ export const SIGNAL_METHOD_CATALOG: readonly SignalMethodDefinition[] = [
     horizon: { zh: "日内 - 2 周", en: "Intraday - 2 weeks" },
     references: [REFERENCE_FACTOR_MINING],
   },
+  {
+    id: "onchain_cycle",
+    title: { zh: "链上周期 / 矿工成本", en: "On-Chain Cycle / Miner Cost" },
+    purpose: {
+      zh: "用矿工成本、MVRV、SOPR 和已实现价格判断 BTC 处于哪个周期阶段。",
+      en: "Uses miner cost, MVRV, SOPR, and realized price to place BTC within its market cycle.",
+    },
+    implementation: {
+      zh: "价格 / 矿工成本比值；MVRV Z-Score 历史分位；SOPR 穿越 1.0 作为持有者盈亏分界。",
+      en: "Price/miner-cost ratio; MVRV Z-Score historical percentile; SOPR crossing 1.0 as holder profit/loss pivot.",
+    },
+    horizon: { zh: "1 月 - 24 月", en: "1 month - 24 months" },
+    references: [REFERENCE_CRYPTO_FUNDING, REFERENCE_CRYPTO_FACTORS],
+  },
 ] as const
 
 export const DATA_CATEGORY_CATALOG: readonly DataCategoryDefinition[] = [
@@ -499,6 +550,61 @@ export const SOURCE_ROADMAP: readonly SourceRoadmapItem[] = [
     useCase: {
       zh: "公告、新闻和监管文本做 tone、事件聚类和影响资产映射。",
       en: "Filings, news, and regulation text for tone, event clustering, and asset mapping.",
+    },
+  },
+  {
+    id: "glassnode",
+    title: "Glassnode on-chain metrics",
+    category: "crypto_native",
+    status: "planned",
+    url: "https://glassnode.com/",
+    useCase: {
+      zh: "MVRV Z-Score、Puell Multiple、SOPR、活跃地址、交易所库存和矿工净仓位。",
+      en: "MVRV Z-Score, Puell Multiple, SOPR, active addresses, exchange reserves, and miner net position.",
+    },
+  },
+  {
+    id: "coinglass",
+    title: "CoinGlass derivatives data",
+    category: "derivatives",
+    status: "planned",
+    url: "https://www.coinglass.com/",
+    useCase: {
+      zh: "多交易所 OI、强平数据、多空比、资金费率历史和期权最大痛苦点。",
+      en: "Cross-exchange OI, liquidations, long/short ratio, funding rate history, and options max pain.",
+    },
+  },
+  {
+    id: "k33-research",
+    title: "K33 Research market intelligence",
+    category: "crypto_native",
+    status: "research",
+    url: "https://k33.com/research",
+    useCase: {
+      zh: "机构资金流、ETF 持仓跟踪、期货 basis 和 BTC 周期定位研究。",
+      en: "Institutional flow, ETF holdings tracking, futures basis, and BTC cycle positioning research.",
+    },
+  },
+  {
+    id: "block-scholes",
+    title: "Block Scholes crypto options analytics",
+    category: "derivatives",
+    status: "research",
+    url: "https://www.blockscholes.com/",
+    useCase: {
+      zh: "加密期权 IV 曲面、偏度、波动率微笑和 RV/IV 比率分析。",
+      en: "Crypto options IV surface, skew, volatility smile, and RV/IV ratio analytics.",
+    },
+  },
+  {
+    id: "coin-metrics",
+    title: "Coin Metrics Network Data",
+    category: "crypto_native",
+    status: "planned",
+    url: "https://coinmetrics.io/",
+    useCase: {
+      zh: "链上经济指标：已实现市值、矿工收入、交易量、供应分布和安全指标。",
+      en: "On-chain economics: realized cap, miner revenue, transaction volume, supply distribution, and security metrics.",
     },
   },
 ] as const
