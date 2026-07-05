@@ -136,4 +136,5 @@ export interface MarketNewsArticle {
   publishedAt: string
   imageUrl?: string
   tone?: number
+  matchedSymbols?: string[]
 }

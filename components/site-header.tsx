@@ -18,6 +18,8 @@ export const navItems = [
   { href: "/home", key: "nav.home" },
   { href: "/crypto", key: "nav.crypto" },
   { href: "/stock", key: "nav.stock" },
+  { href: "/watchlist", key: "nav.watchlist" },
+  { href: "/journal", key: "nav.journal" },
   { href: "/macro", key: "nav.macro" },
   { href: "/methodology", key: "nav.methodology" },
   { href: "/news", key: "nav.news" },

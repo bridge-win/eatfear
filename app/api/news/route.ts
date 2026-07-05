@@ -11,6 +11,21 @@ interface RssSource {
   language: string
 }
 
+const SYMBOL_ALIASES: Record<string, string[]> = {
+  BTC: ["BTC", "Bitcoin"],
+  ETH: ["ETH", "Ethereum"],
+  SOL: ["SOL", "Solana"],
+  XRP: ["XRP", "Ripple"],
+  BNB: ["BNB", "Binance"],
+  DOGE: ["DOGE", "Dogecoin"],
+  SPY: ["SPY", "S&P 500", "S&P"],
+  QQQ: ["QQQ", "Nasdaq", "Nasdaq 100"],
+  AAPL: ["AAPL", "Apple"],
+  MSFT: ["MSFT", "Microsoft"],
+  NVDA: ["NVDA", "Nvidia"],
+  TSLA: ["TSLA", "Tesla"],
+}
+
 const rssSources: RssSource[] = [
   {
     name: "Yahoo Finance",
@@ -77,6 +92,16 @@ const rssSources: RssSource[] = [
   },
 ]
 
+function tickerSource(symbol: string): RssSource {
+  return {
+    name: `Yahoo Finance ${symbol}`,
+    url: `https://finance.yahoo.com/rss/headline?s=${encodeURIComponent(symbol)}`,
+    domain: "finance.yahoo.com",
+    sourceCountry: "US",
+    language: "English",
+  }
+}
+
 const decodeXml = (value: string) =>
   value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
@@ -138,11 +163,41 @@ async function fetchRssSource(source: RssSource): Promise<MarketNewsArticle[]> {
   })
 }
 
-export async function GET() {
-  const results = await Promise.allSettled(rssSources.map(fetchRssSource))
+function sanitizeSymbols(value: string | null): string[] {
+  if (!value) return []
+  return value
+    .split(",")
+    .map((item) => item.trim().toUpperCase())
+    .filter((item) => /^[A-Z0-9.=-]{1,12}$/.test(item))
+    .slice(0, 12)
+}
+
+function matchSymbols(article: MarketNewsArticle, symbols: string[]): string[] {
+  if (symbols.length === 0) return []
+  const haystack = `${article.title} ${article.url}`.toLowerCase()
+  return symbols.filter((symbol) => {
+    const normalized = symbol.replace(/[-=].*$/, "")
+    const aliases = SYMBOL_ALIASES[normalized] ?? [normalized]
+    return aliases.some((alias) => {
+      const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      return new RegExp(`(^|[^a-z0-9])${escaped.toLowerCase()}([^a-z0-9]|$)`, "i").test(haystack)
+    })
+  })
+}
+
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const symbols = sanitizeSymbols(url.searchParams.get("symbols"))
+  const extraTickerSources = symbols
+    .filter((symbol) => /^[A-Z.]{1,8}$/.test(symbol))
+    .map(tickerSource)
+  const sources = [...extraTickerSources, ...rssSources]
+  const results = await Promise.allSettled(sources.map(fetchRssSource))
   const seenUrls = new Set<string>()
   const articles = results
     .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
+    .map((article) => ({ ...article, matchedSymbols: matchSymbols(article, symbols) }))
+    .filter((article) => symbols.length === 0 || (article.matchedSymbols?.length ?? 0) > 0)
     .filter((article) => {
       if (seenUrls.has(article.url)) return false
       seenUrls.add(article.url)
@@ -154,7 +209,8 @@ export async function GET() {
   return NextResponse.json(
     {
       updatedAt: Date.now(),
-      source: rssSources.map((source) => source.name).join(" + "),
+      symbols,
+      source: sources.map((source) => source.name).join(" + "),
       articles,
     },
     { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },

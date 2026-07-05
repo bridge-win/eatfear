@@ -15,6 +15,7 @@ import { CryptoIndicatorDetail } from "@/components/crypto-indicator-detail"
 import { getCryptoIndicatorDescription } from "@/components/crypto-indicator-info"
 import { CryptoRealtimeCards } from "@/components/crypto-realtime-cards"
 import { CryptoRegimeScoreCard } from "@/components/crypto-regime-score-card"
+import { EuphoriaOpportunityCard } from "@/components/euphoria-opportunity-card"
 import { getCryptoSeriesLabel } from "@/components/crypto-series-label"
 import { CyclePositionCard } from "@/components/cycle-position-card"
 import { OpportunityRadar } from "@/components/opportunity-radar"
@@ -152,8 +153,9 @@ export function CryptoDashboard({
       {canHydrateDashboard && <PanicWindowBanner />}
 
       {canHydrateDashboard && (
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           <BlackSwanOpportunityCard instId={instId} className="h-full min-w-0" />
+          <EuphoriaOpportunityCard instId={instId} className="h-full min-w-0" />
           <CryptoRegimeScoreCard instId={instId} className="h-full min-w-0" />
           <CyclePositionCard className="h-full min-w-0" />
           <CryptoBuyWindowCard className="h-full min-w-0" />
