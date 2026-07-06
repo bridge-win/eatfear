@@ -5,6 +5,7 @@ import {
   type BlackSwanCandle,
   type BlackSwanMetrics,
 } from "@/lib/black-swan-detector"
+import { computeEuphoriaRisk } from "@/lib/euphoria-detector"
 import { fetchFearGreedHistory } from "@/lib/data-sources/alternative"
 import { fetchBlockchainInfoSeries } from "@/lib/data-sources/blockchain-info-charts"
 import { fetchBtcHashrateSeries } from "@/lib/data-sources/mempool-hashrate"
@@ -136,8 +137,19 @@ export async function GET(request: Request) {
   }
 
   const scored = computeBlackSwanOpportunity(metrics)
+  const euphoria = computeEuphoriaRisk(metrics)
 
   const factorPayload = scored.factors.map((f) => ({
+    id: f.id,
+    labelZh: f.labelZh,
+    labelEn: f.labelEn,
+    score: Math.round(f.score * 10) / 10,
+    weight: f.weight,
+    weighted: Math.round(f.weighted * 100) / 100,
+    lines: f.lines,
+  }))
+
+  const euphoriaFactorPayload = euphoria.factors.map((f) => ({
     id: f.id,
     labelZh: f.labelZh,
     labelEn: f.labelEn,
@@ -160,6 +172,16 @@ export async function GET(request: Request) {
     factors: factorPayload,
     activeSignals: scored.activeSignals,
     recentWicks: scored.recentWicks,
+    euphoria: {
+      euphoriaScore: Math.round(euphoria.euphoriaScore * 10) / 10,
+      band: euphoria.signalBand,
+      direction: euphoria.direction,
+      signalZh: euphoria.signalLabelZh,
+      signalEn: euphoria.signalLabelEn,
+      factors: euphoriaFactorPayload,
+      activeSignals: euphoria.activeSignals,
+      recentBlowoffs: euphoria.recentBlowoffs,
+    },
     upstream: {
       candles: candles.length > 0 ? `OKX ${ccy} daily candles · ${candles.length} bars` : "OKX candles unavailable",
       fearGreed: fgr ? "alternative.me Fear & Greed" : "alternative.me unavailable",
@@ -180,6 +202,17 @@ export async function GET(request: Request) {
       hashRibbon: "7%",
       mayerMultiple: "4%",
       puellMultiple: "3%",
+    },
+    euphoriaWeights: {
+      wickBlowoff: "20%",
+      greedExtreme: "18%",
+      leverageFroth: "15%",
+      runupMagnitude: "12%",
+      macroComplacency: "10%",
+      meanReversionHigh: "8%",
+      mayerMultiple: "7%",
+      volumeClimax: "5%",
+      puellMultiple: "5%",
     },
   })
 }
