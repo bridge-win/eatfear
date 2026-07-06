@@ -21,7 +21,6 @@ export const navItems = [
   { href: "/watchlist", key: "nav.watchlist" },
   { href: "/journal", key: "nav.journal" },
   { href: "/macro", key: "nav.macro" },
-  { href: "/watchlist", key: "nav.watchlist" },
   { href: "/methodology", key: "nav.methodology" },
   { href: "/news", key: "nav.news" },
 ] as const

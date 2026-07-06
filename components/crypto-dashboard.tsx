@@ -21,7 +21,6 @@ import { CyclePositionCard } from "@/components/cycle-position-card"
 import { OpportunityRadar } from "@/components/opportunity-radar"
 import { OptionsMaxPainCard } from "@/components/options-max-pain-card"
 import { DashboardFrame } from "@/components/page-frame"
-import { WatchlistStar } from "@/components/watchlist-star"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TimeRangeSelector } from "@/components/time-range-selector"
@@ -146,7 +145,6 @@ export function CryptoDashboard({
           </p>
         </div>
         <div className="flex flex-wrap items-start justify-end gap-1.5">
-          <WatchlistStar symbol={instId.split("-")[0] ?? "BTC"} assetClass="crypto" className="mt-0.5" />
           <SymbolSelector value={instId} options={symbolOptions} onChange={setInstId} />
           <TimeRangeSelector value={range} onChange={setRange} />
         </div>

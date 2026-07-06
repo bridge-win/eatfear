@@ -19,7 +19,6 @@ const DICT: Dict = {
   "nav.macro": { zh: "宏观", en: "Macro" },
   "nav.methodology": { zh: "方法论", en: "Methodology" },
   "nav.news": { zh: "资讯", en: "News" },
-  "nav.watchlist": { zh: "自选", en: "Watchlist" },
   "lang.toggle": { zh: "切换语言", en: "Switch language" },
   "theme.toggle": { zh: "切换主题", en: "Toggle theme" },
   "fontSize.toggle": { zh: "调整字体大小", en: "Adjust font size" },

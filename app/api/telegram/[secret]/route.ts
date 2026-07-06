@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server"
 
 import { createAdminClient } from "@/lib/supabase/admin"
-import { parseStartCommand, sendTelegramMessage, type TelegramUpdate } from "@/lib/telegram"
+import { parseStartCommand, sendTelegramMessage, verifyLinkToken, type TelegramUpdate } from "@/lib/telegram"
 
-export const dynamic = "force-dynamic"
+// Node runtime, not edge: lib/telegram.ts signs deep-link tokens with
+// node:crypto (createHmac/timingSafeEqual), which the edge runtime lacks.
+export const runtime = "nodejs"
 
 /**
  * Telegram webhook. Set it once with:
  *   curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<domain>/api/telegram/<TELEGRAM_WEBHOOK_SECRET>"
  *
- * The secret is a path segment so Telegram (and only Telegram, who knows the
- * URL) can post here. Handles `/start <link_token>` to bind a chat to a user.
+ * The secret is a path segment so only Telegram (who is given the URL) can post
+ * here. Handles `/start <token>` — a signed, expiring token (see lib/telegram.ts)
+ * — binding this chat to the user in `telegram_links(user_id, chat_id)`.
  */
 export async function POST(request: Request, ctx: { params: Promise<{ secret: string }> }) {
   const { secret } = await ctx.params
@@ -43,31 +46,26 @@ export async function POST(request: Request, ctx: { params: Promise<{ secret: st
     return NextResponse.json({ ok: true })
   }
 
-  // Match the one-time deep-link token to a pending link row, then bind the chat.
-  const { data: pending } = await admin
-    .from("telegram_links")
-    .select("user_id")
-    .eq("link_token", start.token)
-    .is("verified_at", null)
-    .maybeSingle()
-
-  if (!pending) {
-    await sendTelegramMessage(start.chatId, "❌ This link is invalid or already used. Generate a new one from your Profile.")
+  const verified = verifyLinkToken(start.token)
+  if (!verified) {
+    await sendTelegramMessage(start.chatId, "❌ This link expired or is invalid. Generate a new one from your Profile.")
     return NextResponse.json({ ok: true })
   }
 
+  // A chat can only be bound to one account; a user can only bind one chat
+  // (both columns are UNIQUE). Upsert on user_id so re-linking replaces the chat.
   const { error } = await admin
     .from("telegram_links")
-    .update({
-      chat_id: start.chatId,
-      username: start.username ?? null,
-      link_token: null,
-      verified_at: new Date().toISOString(),
-    })
-    .eq("user_id", pending.user_id)
+    .upsert({ user_id: verified.userId, chat_id: String(start.chatId), verified_at: new Date().toISOString() }, { onConflict: "user_id" })
 
   if (error) {
-    await sendTelegramMessage(start.chatId, "❌ Could not link this chat. Please try again.")
+    const isChatConflict = error.message?.toLowerCase().includes("chat_id")
+    await sendTelegramMessage(
+      start.chatId,
+      isChatConflict
+        ? "❌ This Telegram chat is already linked to a different eatfear account."
+        : "❌ Could not link this chat. Please try again.",
+    )
     return NextResponse.json({ ok: true })
   }
 
