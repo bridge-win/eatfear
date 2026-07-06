@@ -12,6 +12,11 @@ import type {
   BlackSwanBand,
   BlackSwanWickEvent,
 } from "@/lib/black-swan-detector"
+import type {
+  EuphoriaActiveSignal,
+  EuphoriaBand,
+  EuphoriaDirection,
+} from "@/lib/euphoria-detector"
 
 const REFRESH_MS = 60 * 1000
 
@@ -37,9 +42,44 @@ interface Payload {
   factors: FactorPayload[]
   activeSignals: BlackSwanActiveSignal[]
   recentWicks: BlackSwanWickEvent[]
+  euphoria?: {
+    euphoriaScore: number
+    band: EuphoriaBand
+    direction: EuphoriaDirection
+    signalZh: string
+    signalEn: string
+    factors: FactorPayload[]
+    activeSignals: EuphoriaActiveSignal[]
+  }
   upstream: Record<string, string>
   weights: Record<string, string>
   error?: string
+}
+
+function euphoriaBandTone(band: EuphoriaBand): string {
+  switch (band) {
+    case "blow_off_top":
+      return "text-rose-600 dark:text-rose-400"
+    case "strong":
+      return "text-red-600 dark:text-red-400"
+    case "building":
+      return "text-orange-600 dark:text-orange-400"
+    case "watch":
+      return "text-amber-600 dark:text-amber-400"
+    default:
+      return "text-muted-foreground"
+  }
+}
+
+function directionLabel(direction: EuphoriaDirection, locale: "zh" | "en"): string {
+  if (locale === "zh") {
+    if (direction === "short") return "偏空 / 做空"
+    if (direction === "take_profit") return "减仓 / 止盈"
+    return "中性"
+  }
+  if (direction === "short") return "short bias"
+  if (direction === "take_profit") return "trim / take-profit"
+  return "neutral"
 }
 
 function bandStyles(band: BlackSwanBand): string {
@@ -166,6 +206,40 @@ function HoverContents({
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {payload.euphoria && (
+        <section className="space-y-1.5 rounded-md border border-rose-500/30 bg-rose-500/[0.04] px-2 py-2">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-xs font-semibold text-foreground">
+              {locale === "zh" ? "反向 · 超涨派发风险" : "Reverse · distribution risk"}
+            </p>
+            <p className={cn("text-[11px] font-semibold tabular-nums", euphoriaBandTone(payload.euphoria.band))}>
+              {Math.round(payload.euphoria.euphoriaScore)} / 100 · {directionLabel(payload.euphoria.direction, locale)}
+            </p>
+          </div>
+          <p className={cn("text-[10.5px] leading-snug", euphoriaBandTone(payload.euphoria.band))}>
+            {locale === "zh" ? payload.euphoria.signalZh : payload.euphoria.signalEn}
+          </p>
+          {payload.euphoria.activeSignals.length > 0 && (
+            <ul className="space-y-1">
+              {payload.euphoria.activeSignals.map((sig) => (
+                <li
+                  key={sig.code}
+                  className={cn("flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10.5px] leading-snug", severityClass(sig.severity))}
+                >
+                  {severityIcon(sig.severity)}
+                  <span className="font-medium">{locale === "zh" ? sig.labelZh : sig.labelEn}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            {locale === "zh"
+              ? "超买比超卖更持久,高分是减仓/对冲提示,不是精确顶部。空头逆强势趋势风险极高。"
+              : "Overbought persists longer than oversold — a high score is a trim/hedge cue, not a precise top. Shorting a strong uptrend is high-risk."}
+          </p>
         </section>
       )}
 
