@@ -1,156 +1,115 @@
-# eatfear — Product Positioning & Roadmap
+# eatfear Product Roadmap
 
-## Vision
+eatfear is moving from a panic-conditions dashboard into a structured trading signal workspace:
 
-eatfear ("be greedy when others are fearful") is evolving from a **panic-conditions dashboard**
-into an **all-in-one structured signal workspace for individual traders** across crypto, US
-equities, and macro. The closed loop:
+1. discover oversold and overbought extremes,
+2. explain the evidence chain,
+3. turn readings into explicit trigger events,
+4. track user symbols with news and quantitative signals,
+5. notify users when rules fire,
+6. let users learn through checklist, journal, and paper-trade feedback,
+7. add broker execution only after trust and safety controls are mature.
 
-> Detect extremes (both directions) → explain *why* (evidence chain + historical stats) →
-> teach structured thinking → track *your* watchlist (news + quant signals) → alert you when it
-> matters (email / in-app / Telegram) → help you act safely (paper → live) → journal so you improve.
+The honest product promise is not exact tops or bottoms. "Precise timing" means a rules-based trigger moment, a visible evidence chain, historical forward-return statistics, and an invalidation/risk rule.
 
-### What "precise timing" honestly means
+## Difficulty Review
 
-No system predicts the exact bottom or top. "Precise" here means a **rule-based, unambiguous
-trigger moment** (e.g. the instant Mayer < 0.8 *and* F&G < 20 *and* funding turns negative), paired
-with that rule's **historical hit-rate / forward-return distribution** and **mandatory risk rules**
-(position size, invalidation level). Selling certainty is a scam; selling *verifiable probability +
-discipline* is the moat. The codebase's existing honesty (contradictions arrays, failure-mode
-caveats) is an asset, not a liability.
+| Area | Difficulty | Free/no-paid-API status | Notes |
+| --- | --- | --- | --- |
+| History completeness | Medium | Shipped | OKX daily candle consumers now paginate instead of using fixed 300-row caps. |
+| Oversold long-side scoring | Existing | Shipped | Black Swan score remains the long-side capitulation model. |
+| Overbought short-side scoring | Medium | Shipped | Added euphoria detector and `/api/crypto/euphoria` using OKX, alternative.me, Yahoo VIX, blockchain.info. |
+| Trigger state machine | Medium | Shipped as library | `lib/signal-state.ts` defines neutral -> zone_entered -> triggered -> invalidated/resolved transitions. Persistence is schema-ready. |
+| Historical evidence | Medium | Shipped MVP | `/api/crypto/signal-backtest` computes forward 7/30/90 day outcomes from free OKX daily candles. |
+| Watchlist | Medium | Shipped local-first + schema | `/watchlist` stores symbols locally and `scripts/003_trading_loop_schema.sql` adds durable Supabase tables. |
+| Symbol news tracking | Low | Shipped | `/api/news?symbols=BTC,NVDA` filters RSS and adds Yahoo ticker RSS where available. |
+| Email subscription creation | Low | Shipped | Profile now supports insert, update, delete for crash-alert subscriptions. |
+| In-app alerts | Medium | Schema-ready | `alerts_log` exists; production fan-out worker/UI read status is next. |
+| Telegram | Medium | Integration-ready | Schema reserves `telegram_links`; bot token/webhook setup is external. |
+| Learning checklist + journal | Low | Shipped local-first + schema | `/journal` records decisions, checklist discipline, PnL, and win rate locally. |
+| Paper trading | Medium | Schema-ready, journal MVP shipped | `paper_positions` exists; automatic mark-to-market worker remains next. |
+| Broker execution | High | Not shipped | Requires exchange/broker account, encrypted key management, kill switch, audit logs, legal disclaimers. |
+| Paid/pro data | High | Not required now | Glassnode/CoinGlass paid depth, Kaiko, Laevitas, and broker APIs stay out of the no-paid-API scope. |
 
-## How individual quant traders work today (why this product)
+## Shipped No-Paid-API Scope
 
-The 2026 retail quant stack is a fragmented five-piece kit costing $50–150+/mo:
+### Phase 0: Foundation
 
-1. **Signals** — TradingView (charts + Pine alerts), Coinglass (funding / liquidations / OI),
-   Glassnode (MVRV Z-Score and other on-chain over/undervaluation).
-2. **Bridge** — TradingView webhook → JSON alert (`action`/`symbol`/`qty`/`SL`/`TP`).
-3. **Execution** — bot framework + CCXT (100+ exchanges); equities via Alpaca (commission-free,
-   paper trading) or webhook→broker layers (TradersPost, Autoview).
-4. **Notifications** — **Telegram is the de-facto standard**: every entry/exit, SL/TP, PnL, and
-   bot-health event is pushed to Telegram.
-5. **Learning / discipline** — trade journals (TradeZella, Edgewonk): named strategies, a pre-trade
-   checklist, per-strategy win-rate stats, weekly review.
+- Fixed the `limit=300` class of OKX daily candle truncation for:
+  - `/api/crypto/buy-window`
+  - `/api/crypto/cycle-position`
+  - `/api/crypto/black-swan`
+- Added shared `lib/okx-history.ts`.
+- Added range-aware response metadata where the current APIs can accept `range`.
 
-**Pain = opportunity:** the tools are fragmented, the signals are black boxes (unverifiable Telegram
-signal groups), education and execution are disconnected, and there is a "buy/sell" without a "why".
-eatfear's differentiated niche is **explainable + learnable + cross-asset** extreme capture.
+### Phase 1: Symmetric Signal Engine
 
-## Gap matrix (current vs. new goal)
+- Long side: existing Black Swan Opportunity score.
+- Short/take-profit side:
+  - `lib/euphoria-detector.ts`
+  - `/api/crypto/euphoria`
+  - dashboard card `EuphoriaOpportunityCard`
+- The crypto dashboard now shows both long and short pressure in the first signal row.
 
-| New requirement | Current state |
-|---|---|
-| Oversold detection | ✅ Strong — `black-swan-detector` (10-factor), `buy-window`, `panic-signal` |
-| **Overbought / short side** | ❌ Missing — engine is long-biased, no euphoria/top detection |
-| Precise entry/exit timing | ❌ Only "conditions read", no threshold-cross trigger events |
-| Explain the logic | ✅ Strong (evidence / contradictions / info popovers) — but no *historical* stats (zero backtest) |
-| Learning / skill-building | ◐ Methodology page + 200-entry research corpus; no learning path, checklist, or journal loop |
-| Watchlist | ❌ `crypto-watchlist-panel` is a static metric catalog, not user-selectable symbols |
-| Per-symbol news tracking | ◐ `/api/news` is a global RSS stream, no symbol filtering |
-| Per-symbol quant signals | ◐ BTC-centric global compute, no per-user per-symbol |
-| Notifications (email / in-app / Telegram) | ◐ Resend email path exists; no subscription-create UI, cron runs daily, no in-app center, no Telegram |
-| Order placement | ❌ None |
-| Credibility | ❌ "research-validated" framing but zero computational validation |
+### Phase 2: Watchlist + News + Alert Creation
 
-## Phased roadmap
+- `/watchlist`:
+  - local symbol list,
+  - crypto long/short scores,
+  - symbol-matched RSS headlines,
+  - quick backtest links,
+  - alert readiness markers.
+- `/api/news?symbols=...`:
+  - ticker/alias matching,
+  - Yahoo Finance per-ticker RSS for stock symbols,
+  - crypto/source RSS filtering.
+- Profile:
+  - create subscription,
+  - edit subscription,
+  - delete subscription,
+  - send test alert.
 
-Each phase is independently shippable. Shortest value path: **P0 → P1 → P2**, delivering the north
-star: *"Follow a symbol; when it hits an oversold/overbought trigger, receive one Telegram/email with
-the evidence and historical stats."*
+### Phase 3: Historical Evidence MVP
 
-### P0 — Foundations & honesty
-- Copy alignment: mark `planned`/`research` sources in Radar / analysis-framework clearly as "not yet
-  wired" so the UI doesn't over-promise unwired data categories.
-- Remove dead code (orphaned `lib/client-alert-checker.ts`) and stray `[v0]` scaffolding logs.
-- Commit this `ROADMAP.md`.
-- Note: audit-flagged `limit=300` routes (`buy-window`/`black-swan`/`cycle-position`) return
-  point-in-time snapshots, not range time-series — no pagination fix needed. `paperCount` (136) is a
-  deliberate "reviewed papers" constant, distinct from `detailedPaperCount` (100).
+- `/api/crypto/signal-backtest`:
+  - uses free OKX daily candles,
+  - derives long/short wick + return-z events without lookahead,
+  - returns 7/30/90 day median forward return, hit rate, and median adverse excursion.
 
-### P1 — Symmetric signal engine + trigger state machine *(core of the new goal)*
-- **Overbought / short side:** new `lib/euphoria-detector.ts` mirroring the 10-factor structure of
-  `black-swan-detector.ts` — Mayer > 2.4, Puell > 4, F&G > 80, funding > 0.10%/8h, upper-wick
-  z-score, OI froth, hot basis, VIX < 14 complacency (equities), SPX stretch above 200d. Outputs a
-  0–100 euphoria score + `short`/`take-profit` direction. Fill in the short-side thesis builder in
-  `opportunity-engine.ts` (`directionFromScore` already has the long/short skeleton).
-- **Trigger state machine:** new `lib/signal-state.ts` — each (symbol × signal) carries state
-  `neutral → zone_entered → triggered → invalidated/resolved`; threshold crossings emit events
-  persisted to a `signal_events` table. Migrate hardcoded thresholds toward rolling percentiles
-  (reuse `getStats` percentile/z-score in `opportunity-engine.ts`).
-- Validate by replaying 2020-03, 2021-04/11 tops, 2022-06/11 bottoms, and the 2024 halving cycle.
+### Phase 4: Learning Loop MVP
 
-### P2 — Watchlist + multi-channel notifications *(most direct user value)*
-- **Watchlist:** `watchlist(user_id, symbol, asset_class)` table; star toggles on dashboard cards +
-  a `/watchlist` aggregate page (per symbol: price, active signals, oversold/overbought score, latest
-  news). Parameterize the black-swan/euphoria engines by symbol (currently BTC-centric).
-- **Per-symbol news:** add ticker matching to `/api/news` and per-ticker Yahoo RSS; attach the latest
-  3 headlines per symbol to the watchlist page and alert emails.
-- **Notification pipeline:** add the missing subscription-create UI (`subscription-card.tsx` only
-  edits/deletes today); drive `check-alerts` every ~5 min via Supabase pg_cron / Upstash QStash
-  (Vercel Hobby cron is daily-only); channels = Email (Resend), in-app alert center
-  (`alerts_log` + bell), and a **Telegram bot** (grammY webhook, `/start` deep-link binding
-  `user_id → chat_id`). Every notification carries the trigger evidence, historical stats,
-  invalidation condition, and a risk note — *the notification is the lesson*.
+- `/journal`:
+  - structured pre-trade checklist,
+  - long/short decision log,
+  - entry/exit/size/PnL,
+  - total PnL and win rate.
+- Supabase schema supports durable `trades_journal`.
 
-### P3 — Backtest validation engine *(root of trust; ammunition for notifications)*
-- New `lib/backtest/`: given a signal-event series + price series → forward 7/30/90-day return
-  distribution, hit-rate vs. an unconditional baseline, and max adverse excursion; walk-forward,
-  no lookahead (turn `getValidationChecklist()` from prose into enforced code).
-- Surface on each signal card / notification: "this condition occurred *n* times; 90-day median
-  return *X*%, hit-rate *Y*%, deepest drawdown *Z*%."
-- Wire high-value free sources along the way (Farside ETF flows, MVRV); flip `SOURCE_ROADMAP`
-  statuses `planned → wired` as they land.
+### Data Model
 
-### P4 — Learning loop
-- Restructure the methodology page into a progressive course (market structure → signal families →
-  risk management), linked to the corpus `takeaway`/`failureMode` entries.
-- One-click **pre-trade checklist** generated from a triggered signal (trend aligned? contradictions?
-  event days? size = vol-target? invalidation price?) — first code implementation of the risk layer.
-- **Trade journal MVP** (`trades_journal`): signal → decision → outcome, with per-signal-family
-  *personal* win-rate — closing the learning loop.
-- Each opportunity thesis outputs a vol-target size and invalidation price.
+Run `scripts/003_trading_loop_schema.sql` after the existing Supabase scripts. It adds:
 
-### P5 — Order execution *(strictly staged)*
-- **5a Paper trading first** (no regulatory risk, highest teaching value): `paper_positions`,
-  one-click simulated entry (market + SL/TP) from a signal card, auto-settlement, "signal vs. your
-  timing" performance.
-- **5b Crypto live** (OKX first — already deeply integrated; extensible via CCXT): user API keys
-  (**trade-only, withdrawals disabled**) AES-encrypted in Supabase (key in server env); order
-  confirmation modal shows size/SL/TP/slippage; global kill-switch; audit log.
-- **5c Equities:** deep-link to broker first; Alpaca API live later — securities execution carries
-  regulatory weight and should not lead.
-- Disclaimers throughout: not investment advice; use at your own risk.
+- `watchlist`
+- `signal_events`
+- `alert_rules`
+- `alerts_log`
+- `telegram_links`
+- `trades_journal`
+- `paper_positions`
 
-### P6 — Monetization *(optional, after trust is established)*
-- Free: dashboards + delayed signals + 3 watchlist slots. Paid ($15–25/mo, below the cost of
-  assembling the five-piece kit): unlimited watchlist, real-time multi-channel alerts, backtest
-  stats, Telegram, execution. Comparable: 3Commas $22–75/mo, TradeZella $29/mo.
+## Next Integration Work
 
-## New data model (Supabase, `scripts/003_*.sql` onward)
+1. Persist watchlist and journal through Supabase when the user is logged in, while retaining local fallback.
+2. Add a worker that evaluates watchlist symbols every 5 minutes through Supabase Edge Functions, pg_cron, or QStash.
+3. Write `signal_events` and `alerts_log` from the worker.
+4. Add a bell dropdown backed by `alerts_log`.
+5. Add Telegram bot binding after a bot token exists.
+6. Turn `paper_positions` into true mark-to-market paper trading.
+7. Only then evaluate real broker/exchange execution.
 
-```
-watchlist(user_id, symbol, asset_class, created_at)
-signal_events(id, symbol, signal_id, state, score, evidence_json, triggered_at)
-alert_rules(user_id, symbol|'*', signal_id|'composite', threshold, channels[], enabled)
-alerts_log(user_id, event_id, channel, sent_at, read_at)
-telegram_links(user_id, chat_id, verified_at)
-trades_journal(user_id, event_id?, symbol, direction, entry, exit, size, checklist_json, note, pnl)
-paper_positions(user_id, symbol, direction, entry, sl, tp, size, opened_at, closed_at, pnl)
-exchange_keys(user_id, venue, key_encrypted, perms, created_at)   -- P5b
-```
+## Product Language Guardrails
 
-## Key technical decisions
-- Scheduling: Supabase pg_cron / QStash at ~5-min granularity (bypasses Vercel Hobby daily limit).
-- Telegram: grammY + a Next.js webhook route, deep-link binding.
-- Per-symbol signal compute: the engine functions are already pure; mostly parameterize inputs by
-  symbol + cache to avoid `watchlist × signals` API fan-out hammering free-tier rate limits.
-- Execution safety: server-side encryption, trade-only permissions, confirmation modal, kill-switch,
-  audit log.
-
-## Key files
-- Engines: `lib/{opportunity-engine,black-swan-detector,crypto-regime-score,indicator-score,research-corpus}.ts`
-- Pagination reference: `app/api/crypto/history-compare/route.ts`
-- Notification pieces: `components/subscription-card.tsx`, `app/api/check-alerts/route.ts`,
-  `lib/email-templates.tsx`, `vercel.json`
-- News: `app/api/news/route.ts`; DB: `scripts/001_002_*.sql`
+- Say "rules-based trigger" instead of "predict exact top/bottom."
+- Every notification must include: evidence, historical stats, invalidation, and risk reminder.
+- Paid vendor integrations must be marked as planned or research until keys/contracts exist.
+- Broker execution must remain opt-in, confirmed, audited, and separate from signal generation.

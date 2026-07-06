@@ -2,29 +2,10 @@ import { NextResponse } from "next/server"
 
 import { fetchFearGreedHistory } from "@/lib/data-sources/alternative"
 import { fetchBlockchainInfoSeries } from "@/lib/data-sources/blockchain-info-charts"
-import { getTimeRange } from "@/lib/time-range"
+import { fetchOkxDailyCloses } from "@/lib/okx-history"
+import { getRangeDays, getTimeRange, isTimeRangeId } from "@/lib/time-range"
 
 export const revalidate = 300
-
-const OKX_CANDLES = "https://www.okx.com/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=1D&limit=300"
-
-async function fetchOkxCloses(): Promise<number[]> {
-  try {
-    const res = await fetch(OKX_CANDLES, {
-      headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-      next: { revalidate },
-    })
-    if (!res.ok) return []
-    const json = (await res.json()) as { code: string; data?: string[][] }
-    if (json.code !== "0" || !json.data) return []
-    return json.data
-      .map((row) => Number(row[4]))
-      .filter((v) => Number.isFinite(v))
-      .reverse()
-  } catch {
-    return []
-  }
-}
 
 export type BuyWindowSignalZone = "extreme_buy" | "buy" | "watch" | "neutral" | "sell"
 
@@ -62,13 +43,18 @@ function zoneScore(z: BuyWindowSignalZone): number {
   }
 }
 
-export async function GET() {
-  const range3mo = getTimeRange("3mo")
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const requestedRange = url.searchParams.get("range")
+  const rangeCandidate = requestedRange ?? ""
+  const rangeId = isTimeRangeId(rangeCandidate) ? rangeCandidate : "1y"
+  const range = getTimeRange(rangeId)
+  const daysWanted = Math.max(365, getRangeDays(rangeId))
 
   const [closes, minerRevRaw, fgr] = await Promise.all([
-    fetchOkxCloses(),
-    fetchBlockchainInfoSeries("miners-revenue", "2years", revalidate),
-    fetchFearGreedHistory(range3mo, revalidate),
+    fetchOkxDailyCloses({ instId: "BTC-USDT-SWAP", daysWanted, revalidateSeconds: revalidate }),
+    fetchBlockchainInfoSeries("miners-revenue", getRangeDays(rangeId) > 365 * 2 ? getRangeDays(rangeId) > 365 * 5 ? "all" : "5years" : "2years", revalidate),
+    fetchFearGreedHistory(range, revalidate),
   ])
 
   // ── Mayer Multiple ─────────────────────────────────────────
@@ -120,6 +106,7 @@ export async function GET() {
 
   return NextResponse.json({
     updatedAt: Date.now(),
+    range: rangeId,
     compositeScore,
     windowBand,
     signals: {

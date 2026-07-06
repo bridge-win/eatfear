@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { SubscriptionCard } from "@/components/subscription-card"
 import { AlertHistoryTable } from "@/components/alert-history-table"
-import { ArrowLeft, Bell, Mail, Send } from "lucide-react"
+import { ArrowLeft, Bell, Mail, Plus, Send } from "lucide-react"
 import Link from "next/link"
 import type { Subscription } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
@@ -41,6 +42,10 @@ export default function ProfilePage() {
   const [alertHistory, setAlertHistory] = useState<AlertHistoryItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSendingTest, setIsSendingTest] = useState(false)
+  const [newSymbol, setNewSymbol] = useState("")
+  const [newAssetType, setNewAssetType] = useState<"crypto" | "stock">("crypto")
+  const [newThreshold, setNewThreshold] = useState(5)
+  const [isCreatingSubscription, setIsCreatingSubscription] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -167,6 +172,48 @@ export default function ProfilePage() {
     }
   }
 
+  const handleCreateSubscription = async () => {
+    if (!user) return
+    const symbol = newSymbol.trim().toUpperCase()
+    if (!/^[A-Z0-9.=-]{1,12}$/.test(symbol)) {
+      toast({
+        title: "Invalid Symbol",
+        description: "Use symbols like BTC, ETH, SPY, or NVDA.",
+        variant: "destructive",
+      })
+      return
+    }
+    setIsCreatingSubscription(true)
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("subscriptions")
+      .insert({
+        user_id: user.id,
+        asset_symbol: symbol,
+        asset_type: newAssetType,
+        threshold_percentage: newThreshold,
+        is_active: true,
+      })
+      .select("*")
+      .single()
+
+    if (error) {
+      toast({
+        title: "Subscription Not Created",
+        description: error.message,
+        variant: "destructive",
+      })
+    } else if (data) {
+      setSubscriptions((prev) => [data, ...prev])
+      setNewSymbol("")
+      toast({
+        title: "Subscription Created",
+        description: `${symbol} alerts are now active.`,
+      })
+    }
+    setIsCreatingSubscription(false)
+  }
+
   const handleDeleteSubscription = async (id: string) => {
     const supabase = createClient()
     const { error } = await supabase.from("subscriptions").delete().eq("id", id)
@@ -279,10 +326,50 @@ export default function ProfilePage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold">Your Subscriptions</h2>
-              <Link href="/dashboard">
-                <Button>Add More</Button>
+              <Link href="/watchlist">
+                <Button variant="outline">Open Watchlist</Button>
               </Link>
             </div>
+            <Card className="mb-4">
+              <CardHeader>
+                <CardTitle>Create Alert Subscription</CardTitle>
+                <CardDescription>
+                  Add email crash-alert coverage for a crypto or stock symbol.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-[1fr_9rem_9rem_auto]">
+                <Input
+                  value={newSymbol}
+                  onChange={(event) => setNewSymbol(event.target.value)}
+                  placeholder="BTC, ETH, NVDA"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") handleCreateSubscription()
+                  }}
+                />
+                <select
+                  value={newAssetType}
+                  onChange={(event) => setNewAssetType(event.target.value === "stock" ? "stock" : "crypto")}
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                  aria-label="Asset type"
+                >
+                  <option value="crypto">Crypto</option>
+                  <option value="stock">Stock</option>
+                </select>
+                <Input
+                  type="number"
+                  min="0.1"
+                  max="100"
+                  step="0.1"
+                  value={newThreshold}
+                  onChange={(event) => setNewThreshold(Number.parseFloat(event.target.value))}
+                  aria-label="Threshold percentage"
+                />
+                <Button onClick={handleCreateSubscription} disabled={isCreatingSubscription}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add
+                </Button>
+              </CardContent>
+            </Card>
             {subscriptions.length === 0 ? (
               <Card>
                 <CardHeader>

@@ -2,28 +2,10 @@ import { NextResponse } from "next/server"
 
 import { fetchBlockchainInfoSeries } from "@/lib/data-sources/blockchain-info-charts"
 import { fetchBtcHashrateSeries } from "@/lib/data-sources/mempool-hashrate"
+import { fetchOkxDailyCandles } from "@/lib/okx-history"
+import { getRangeDays, isTimeRangeId } from "@/lib/time-range"
 
 export const revalidate = 300
-
-const OKX_CANDLES = "https://www.okx.com/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=1D&limit=300"
-
-async function fetchOkxCandles(): Promise<Array<{ close: number }>> {
-  try {
-    const res = await fetch(OKX_CANDLES, {
-      headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-      next: { revalidate },
-    })
-    if (!res.ok) return []
-    const json = (await res.json()) as { code: string; data?: string[][] }
-    if (json.code !== "0" || !json.data) return []
-    return json.data
-      .map((row) => ({ close: Number(row[4]) }))
-      .filter((c) => Number.isFinite(c.close))
-      .reverse()
-  } catch {
-    return []
-  }
-}
 
 export type MayerZone = "extreme_buy" | "buy" | "below_200d" | "fair" | "overvalued" | "extreme_sell"
 export type HashRibbonStatus = "recovery" | "capitulation" | "crossover" | "healthy"
@@ -76,11 +58,16 @@ function cycleBandLabel(b: CycleBand): { zh: string; en: string } {
   return m[b]
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const requestedRange = url.searchParams.get("range")
+  const rangeCandidate = requestedRange ?? ""
+  const rangeId = isTimeRangeId(rangeCandidate) ? rangeCandidate : "1y"
+  const daysWanted = Math.max(365, getRangeDays(rangeId))
   const [candles, hashrateSeries, minerRevRaw] = await Promise.all([
-    fetchOkxCandles(),
-    fetchBtcHashrateSeries(600),
-    fetchBlockchainInfoSeries("miners-revenue", "2years", 1800),
+    fetchOkxDailyCandles({ instId: "BTC-USDT-SWAP", daysWanted, revalidateSeconds: revalidate }),
+    fetchBtcHashrateSeries(Math.max(600, daysWanted)),
+    fetchBlockchainInfoSeries("miners-revenue", daysWanted > 365 * 5 ? "all" : daysWanted > 365 * 2 ? "5years" : "2years", 1800),
   ])
 
   // ─── Mayer Multiple ───────────────────────────────────────────────────────
@@ -177,6 +164,7 @@ export async function GET() {
 
   return NextResponse.json({
     updatedAt: Date.now(),
+    range: rangeId,
     cycleScore,
     cycleBand,
     cycleSignalZh: bandLabel.zh,

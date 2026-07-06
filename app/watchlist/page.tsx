@@ -1,7 +1,7 @@
-import { WatchlistView } from "@/components/watchlist-view"
+import { WatchlistWorkspace } from "@/components/watchlist-workspace"
 
 export const dynamic = "force-static"
 
 export default function WatchlistPage() {
-  return <WatchlistView />
+  return <WatchlistWorkspace />
 }

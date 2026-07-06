@@ -14,6 +14,8 @@ const DICT: Dict = {
   "nav.home": { zh: "首页", en: "Home" },
   "nav.crypto": { zh: "加密", en: "Crypto" },
   "nav.stock": { zh: "股票", en: "Stock" },
+  "nav.watchlist": { zh: "自选", en: "Watchlist" },
+  "nav.journal": { zh: "日志", en: "Journal" },
   "nav.macro": { zh: "宏观", en: "Macro" },
   "nav.methodology": { zh: "方法论", en: "Methodology" },
   "nav.news": { zh: "资讯", en: "News" },
