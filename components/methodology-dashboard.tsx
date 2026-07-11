@@ -3,6 +3,7 @@
 import { BookOpen, CheckCircle2, Database, ExternalLink, FlaskConical, ShieldCheck } from "lucide-react"
 
 import { MethodologySummaryStrip } from "@/components/opportunity-radar"
+import { TopMethodsSection } from "@/components/top-methods-section"
 import { Badge } from "@/components/ui/badge"
 import { AppFrame } from "@/components/page-frame"
 import {
@@ -276,6 +277,8 @@ export function MethodologyDashboard() {
               </div>
             </div>
           </section>
+
+          <TopMethodsSection />
 
           <section className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-2">
