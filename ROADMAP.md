@@ -97,6 +97,15 @@ Run `scripts/003_trading_loop_schema.sql` after the existing Supabase scripts. I
 - `trades_journal`
 - `paper_positions`
 
+## Executable Trade Methods
+
+`docs/PLAYBOOKS_SPEC.md` specifies the next professionalization layer: seven
+versioned, machine-checkable playbooks (capitulation reversal long, euphoria
+trim ladder, gated blow-off short, funding-flush mean reversion, Mayer value
+program, VIX panic staged entry, drawdown ladder) with trigger/confirmation/
+invalidation/sizing/exit rules bound to the shipped engines, plus the catalog,
+`/playbooks` page, worker, journal, and per-playbook backtest work items.
+
 ## Next Integration Work
 
 1. Persist watchlist and journal through Supabase when the user is logged in, while retaining local fallback.
