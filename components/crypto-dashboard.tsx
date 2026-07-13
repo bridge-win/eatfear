@@ -18,6 +18,7 @@ import { CryptoRegimeScoreCard } from "@/components/crypto-regime-score-card"
 import { EuphoriaOpportunityCard } from "@/components/euphoria-opportunity-card"
 import { getCryptoSeriesLabel } from "@/components/crypto-series-label"
 import { CyclePositionCard } from "@/components/cycle-position-card"
+import { MarketManipulationMonitor } from "@/components/market-manipulation-monitor"
 import { OpportunityRadar } from "@/components/opportunity-radar"
 import { OptionsMaxPainCard } from "@/components/options-max-pain-card"
 import { DashboardFrame } from "@/components/page-frame"
@@ -163,6 +164,10 @@ export function CryptoDashboard({
       )}
 
       {canHydrateDashboard && optionsCurrency && <OptionsMaxPainCard currency={optionsCurrency} />}
+
+      {canHydrateDashboard && (
+        <MarketManipulationMonitor currency={instId.split("-")[0] ?? "BTC"} />
+      )}
 
       <OpportunityRadar
         assetClass="crypto"

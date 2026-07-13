@@ -219,7 +219,7 @@ export function CryptoHistoryCompare({
       data={data}
       title={t("compare.title")}
       infoDescription={t("compare.info")}
-      infoSource="OKX · blockchain.info · DefiLlama · alternative.me · Deribit · Yahoo Finance · TradingView Lightweight Charts"
+      infoSource="OKX · OKX computed manipulation observables · blockchain.info · DefiLlama · alternative.me · Deribit · Yahoo Finance · TradingView Lightweight Charts"
       loading={loading || !canRenderCharts}
       error={error}
       loadingLabel={t("compare.loading")}

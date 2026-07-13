@@ -14,6 +14,7 @@ import {
   computeMiningCostFromHashrateThPerSec,
   resolveMiningCostParameters,
 } from "@/lib/mining-cost"
+import { computeMarketManipulationMetrics } from "@/lib/market-manipulation-metrics"
 import {
   DEFAULT_CRYPTO_HISTORY_REFRESH_MS,
   getEnabledCryptoIndicators,
@@ -819,6 +820,12 @@ const BTC_SWAP_CANDLE_KEYS = [
   "signalSellScore",
   "signalRiskScore",
   "signalDirection",
+  "manipLeveragePressure",
+  "manipPriceOiDivergence",
+  "manipBasisDislocationZ",
+  "manipCvdPriceDivergence",
+  "manipWickAsymmetryPct",
+  "manipVolumeImpactZ",
 ] as const
 
 const OI_KEYS = [
@@ -829,6 +836,8 @@ const OI_KEYS = [
   "signalSellScore",
   "signalRiskScore",
   "signalDirection",
+  "manipLeveragePressure",
+  "manipPriceOiDivergence",
 ] as const
 const FUNDING_KEYS = [
   "funding",
@@ -836,6 +845,7 @@ const FUNDING_KEYS = [
   "signalSellScore",
   "signalRiskScore",
   "signalDirection",
+  "manipFundingSqueezeZ",
 ] as const
 const LONG_SHORT_KEYS = [
   "ls",
@@ -844,10 +854,36 @@ const LONG_SHORT_KEYS = [
   "signalRiskScore",
   "signalDirection",
 ] as const
-const LIQ_KEYS = ["liqLong", "liqShort"] as const
+const LIQ_KEYS = [
+  "liqLong",
+  "liqShort",
+  "manipLiquidationImbalancePct",
+  "manipLiquidationIntensityZ",
+] as const
 const MINING_COST_KEYS = ["miningElectricityCost", "miningComprehensiveCost"] as const
 const TOP_TRADER_KEYS = ["topTraderAccount", "topTraderPosition"] as const
-const SMART_MONEY_KEYS = ["smartBuy", "smartSell", "smartNet", "smartCum"] as const
+const SMART_MONEY_KEYS = [
+  "smartBuy",
+  "smartSell",
+  "smartNet",
+  "smartCum",
+  "manipTakerImbalancePct",
+  "manipCvdPriceDivergence",
+] as const
+const BASIS_KEYS = ["basis", "manipBasisDislocationZ"] as const
+
+const MANIPULATION_KEYS = [
+  "manipLeveragePressure",
+  "manipPriceOiDivergence",
+  "manipFundingSqueezeZ",
+  "manipBasisDislocationZ",
+  "manipTakerImbalancePct",
+  "manipCvdPriceDivergence",
+  "manipLiquidationImbalancePct",
+  "manipLiquidationIntensityZ",
+  "manipWickAsymmetryPct",
+  "manipVolumeImpactZ",
+] as const
 
 const STRICT_RANGE_COVERAGE_KEYS = new Set<string>([
   "oi",
@@ -856,6 +892,7 @@ const STRICT_RANGE_COVERAGE_KEYS = new Set<string>([
   "ls",
   "contractLs",
   ...TOP_TRADER_KEYS,
+  ...MANIPULATION_KEYS,
 ])
 
 const SELECTED_INSTRUMENT_LABEL_KEYS = new Set<string>([
@@ -975,7 +1012,7 @@ export async function GET(request: Request) {
         )
       : [],
     hasRequestedKey(requestedKeys, BTC_SWAP_CANDLE_KEYS) ? okxDailyCandles(instId, okxDays) : [],
-    requestedKeys.has("basis") ? okxDailyCandles(`${ccy}-USDT`, okxDays) : [],
+    hasRequestedKey(requestedKeys, BASIS_KEYS) ? okxDailyCandles(`${ccy}-USDT`, okxDays) : [],
     requestedKeys.has("ethPrice") ? okxDailyKlines("ETH-USDT", okxDays) : [],
     requestedKeys.has("solPrice") ? okxDailyKlines("SOL-USDT", okxDays) : [],
     requestedKeys.has("xrpPrice") ? okxDailyKlines("XRP-USDT", okxDays) : [],
@@ -1106,6 +1143,20 @@ export async function GET(request: Request) {
     funding,
     lsRatio,
   })
+  const manipulationMetrics = computeMarketManipulationMetrics({
+    price: btcPrice,
+    openInterest: oi,
+    funding,
+    basis,
+    takerBuy: taker.buy,
+    takerSell: taker.sell,
+    takerCumulativeNet: taker.cumulativeNet,
+    longLiquidations: liq.long,
+    shortLiquidations: liq.short,
+    upperWick: btcUpperWick,
+    lowerWick: btcLowerWick,
+    volume: btcVolumeUsd,
+  })
 
   const rawSeriesByKey = new Map<string, RawPoint[]>([
     ["btcPrice", btcPrice],
@@ -1147,6 +1198,16 @@ export async function GET(request: Request) {
     ["smartCum", taker.cumulativeNet],
     ["liqLong", liq.long],
     ["liqShort", liq.short],
+    ["manipLeveragePressure", manipulationMetrics.manipLeveragePressure],
+    ["manipPriceOiDivergence", manipulationMetrics.manipPriceOiDivergence],
+    ["manipFundingSqueezeZ", manipulationMetrics.manipFundingSqueezeZ],
+    ["manipBasisDislocationZ", manipulationMetrics.manipBasisDislocationZ],
+    ["manipTakerImbalancePct", manipulationMetrics.manipTakerImbalancePct],
+    ["manipCvdPriceDivergence", manipulationMetrics.manipCvdPriceDivergence],
+    ["manipLiquidationImbalancePct", manipulationMetrics.manipLiquidationImbalancePct],
+    ["manipLiquidationIntensityZ", manipulationMetrics.manipLiquidationIntensityZ],
+    ["manipWickAsymmetryPct", manipulationMetrics.manipWickAsymmetryPct],
+    ["manipVolumeImpactZ", manipulationMetrics.manipVolumeImpactZ],
     ["fng", fng],
     ["dvol", dvol],
     ["hashRate", hashRateEH],
