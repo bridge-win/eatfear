@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Menu } from "lucide-react"
 
-import { BrandLogoMark } from "@/components/brand-logo"
+import { BrandLogo } from "@/components/brand-logo"
 import { CommandPalette } from "@/components/command-palette"
 import { FontSizeToggle } from "@/components/font-size-toggle"
 import { LanguageToggle } from "@/components/language-toggle"
@@ -145,9 +145,8 @@ export function SiteHeader() {
             </SheetTrigger>
             <SheetContent side="left" className="w-64">
               <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                  <BrandLogoMark className="h-6 w-6" />
-                  eatfear
+                <SheetTitle>
+                  <BrandLogo className="text-base" markClassName="h-6 w-6" />
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-1 px-2">
@@ -182,10 +181,9 @@ export function SiteHeader() {
             data-main-nav-href="/home"
             onPointerDown={(event) => handlePointerDown(event, "/home")}
             onClick={(event) => navigate(event, "/home")}
-            className="flex items-center gap-2"
+            className="flex items-center"
           >
-            <BrandLogoMark className="h-6 w-6" />
-            <span className="text-lg font-bold">eatfear</span>
+            <BrandLogo className="text-lg" markClassName="h-6 w-6" />
           </Link>
         </div>
 

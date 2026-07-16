@@ -13,6 +13,7 @@ import {
   Waypoints,
 } from "lucide-react"
 
+import { BrandLogo } from "@/components/brand-logo"
 import { InfoPopover } from "@/components/info-popover"
 import { AppFrame } from "@/components/page-frame"
 import { Badge } from "@/components/ui/badge"
@@ -33,7 +34,6 @@ type Copy = Record<Locale, string>
 
 const heroCopy: Record<string, Copy> = {
   eyebrow: { zh: "交易机会信号中枢", en: "Trading Opportunity Signal Hub" },
-  title: { zh: "eatfear", en: "eatfear" },
   subtitle: {
     zh: "把 136 篇顶级论文、100 个实战信号方法、实时行情、宏观、链上、衍生品和风险控制合成一套可解释的交易机会框架。",
     en: "A research-backed signal workspace combining 136 papers, 100 practitioner methods, live markets, macro, on-chain, derivatives, and risk controls.",
@@ -163,8 +163,8 @@ export default function MarketingLanding() {
               <Badge variant="outline" className="rounded-sm px-2 py-1 text-[10px]">
                 {text(heroCopy.eyebrow, locale)}
               </Badge>
-              <h1 className="mt-4 text-5xl font-bold leading-none sm:text-6xl lg:text-7xl">
-                {text(heroCopy.title, locale)}
+              <h1 className="mt-4 text-5xl leading-none sm:text-6xl lg:text-7xl">
+                <BrandLogo markClassName="h-[0.82em] w-[0.82em]" />
               </h1>
               <p className="mt-5 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
                 {text(heroCopy.subtitle, locale)}

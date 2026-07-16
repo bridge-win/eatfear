@@ -14,7 +14,7 @@ import { ArrowLeft, Bell, Mail, Plus, Send } from "lucide-react"
 import Link from "next/link"
 import type { Subscription } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
-import { BrandLogoMark } from "@/components/brand-logo"
+import { BrandLogo } from "@/components/brand-logo"
 
 interface Profile {
   id: string
@@ -248,9 +248,8 @@ export default function ProfilePage() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <div className="flex items-center gap-2">
-              <BrandLogoMark className="h-7 w-7" />
-              <span className="text-xl font-bold">eatfear</span>
+            <div>
+              <BrandLogo className="text-xl" markClassName="h-7 w-7" />
             </div>
           </div>
         </div>
