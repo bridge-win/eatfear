@@ -49,13 +49,10 @@ jobs:
       - name: Pull Vercel production environment
         run: pnpm exec vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
 
-      - name: Build Vercel output
-        run: pnpm exec vercel build --prod --token="$VERCEL_TOKEN"
-
       - name: Deploy to Vercel production
         id: deploy
         run: |
-          deployment_url="$(pnpm exec vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          deployment_url="$(pnpm exec vercel deploy --prod --yes --token="$VERCEL_TOKEN")"
           echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
           echo "Production deployment: $deployment_url" >> "$GITHUB_STEP_SUMMARY"
           echo "$deployment_url"
