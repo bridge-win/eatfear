@@ -1,3 +1,33 @@
-<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M12 39 42 77 88 21M67 21h21v21" stroke="#F97316" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ef-tile" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1C1F31"/>
+      <stop offset="0.55" stop-color="#12141F"/>
+      <stop offset="1" stop-color="#0A0B12"/>
+    </linearGradient>
+    <linearGradient id="ef-rim" x1="32" y1="0" x2="32" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="0.4" stop-color="#FFFFFF" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#A855F7" stop-opacity="0.25"/>
+    </linearGradient>
+    <linearGradient id="ef-pulse" x1="11" y1="32" x2="53" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FBBF24"/>
+      <stop offset="0.35" stop-color="#F97316"/>
+      <stop offset="0.68" stop-color="#F43F5E"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+    <radialGradient id="ef-glow" cx="32" cy="31" r="27" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F43F5E" stop-opacity="0.32"/>
+      <stop offset="0.6" stop-color="#F97316" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#F97316" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="ef-blur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="2.6"/>
+    </filter>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#ef-tile)"/>
+  <rect width="64" height="64" rx="15" fill="url(#ef-glow)"/>
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="14.25" stroke="url(#ef-rim)" stroke-width="1.5"/>
+  <path d="M12 32h9.5l5-10.5 7.5 21 5-10.5H52" stroke="url(#ef-pulse)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.55" filter="url(#ef-blur)"/>
+  <path d="M12 32h9.5l5-10.5 7.5 21 5-10.5H52" stroke="url(#ef-pulse)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
