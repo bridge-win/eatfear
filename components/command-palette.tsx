@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
-import { BookOpen, Coins, Home, LineChart, Moon, Newspaper, NotebookPen, Search, Star, Sun } from "lucide-react"
+import { BookOpen, Coins, Crown, Home, LineChart, Moon, Newspaper, NotebookPen, Search, Star, Sun } from "lucide-react"
 
 import {
   CommandDialog,
@@ -19,6 +19,7 @@ import { useT } from "@/lib/i18n"
 const PAGE_ITEMS = [
   { href: "/home", key: "nav.home", icon: Home },
   { href: "/crypto", key: "nav.crypto", icon: Coins },
+  { href: "/crypto/smart-money", key: "nav.smartMoney", icon: Crown },
   { href: "/stock", key: "nav.stock", icon: LineChart },
   { href: "/watchlist", key: "nav.watchlist", icon: Star },
   { href: "/journal", key: "nav.journal", icon: NotebookPen },
