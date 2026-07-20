@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils"
 export const navItems = [
   { href: "/home", key: "nav.home" },
   { href: "/crypto", key: "nav.crypto" },
+  { href: "/crypto/smart-money", key: "nav.smartMoney" },
   { href: "/stock", key: "nav.stock" },
   { href: "/watchlist", key: "nav.watchlist" },
   { href: "/journal", key: "nav.journal" },
@@ -29,6 +30,18 @@ type NavHref = (typeof navItems)[number]["href"]
 
 function isItemActive(pathname: string, href: string) {
   return href === "/home" ? pathname === "/home" : pathname === href || pathname.startsWith(`${href}/`)
+}
+
+// Nested routes (e.g. /crypto/smart-money) match multiple items — the most
+// specific (longest) matching href wins so only one tab highlights.
+function resolveActiveHref(pathname: string): string | null {
+  let best: string | null = null
+  for (const item of navItems) {
+    if (isItemActive(pathname, item.href) && (best === null || item.href.length > best.length)) {
+      best = item.href
+    }
+  }
+  return best
 }
 
 export function isMainNavPath(pathname: string) {
@@ -76,6 +89,7 @@ export function SiteHeader() {
   const [optimisticHref, setOptimisticHref] = React.useState<NavHref | null>(null)
   const pendingPushRef = React.useRef<NavHref | null>(null)
   const activePathname = optimisticHref ?? pathname
+  const activeHref = resolveActiveHref(activePathname)
 
   React.useEffect(() => {
     pendingPushRef.current = null
@@ -151,7 +165,7 @@ export function SiteHeader() {
               </SheetHeader>
               <nav className="flex flex-col gap-1 px-2">
                 {navItems.map((item) => {
-                  const isActive = isItemActive(activePathname, item.href)
+                  const isActive = activeHref === item.href
                   return (
                     <Link
                       key={item.href}
@@ -189,7 +203,7 @@ export function SiteHeader() {
 
         <nav className="hidden flex-wrap items-center gap-2 md:flex">
           {navItems.map((item) => {
-            const isActive = isItemActive(activePathname, item.href)
+            const isActive = activeHref === item.href
             return (
               <Link
                 key={item.href}
