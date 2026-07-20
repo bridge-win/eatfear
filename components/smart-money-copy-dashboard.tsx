@@ -7,6 +7,7 @@ import { ArrowLeft, BookOpenText } from "lucide-react"
 import { CopyTradingLeaderboard } from "@/components/copy-trading-leaderboard"
 import { HyperliquidWalletTracker } from "@/components/hyperliquid-wallet-tracker"
 import { DashboardFrame } from "@/components/page-frame"
+import { SmartMoneyIntelligence } from "@/components/smart-money-intelligence"
 import { SmartMoneyPositioning } from "@/components/smart-money-positioning"
 import { SmartMoneyTracker } from "@/components/smart-money-tracker"
 import { SmartMoneyVerification } from "@/components/smart-money-verification"
@@ -31,6 +32,7 @@ const METHOD_ITEM_KEYS = [
   "smartPage.method.item4",
   "smartPage.method.item5",
   "smartPage.method.item6",
+  "smartPage.method.item7",
 ] as const
 
 export function SmartMoneyCopyDashboard() {
@@ -68,6 +70,8 @@ export function SmartMoneyCopyDashboard() {
           <TimeRangeSelector value={range} onChange={setRange} />
         </div>
       </header>
+
+      <SmartMoneyIntelligence ccy={ccy} range={range} />
 
       <SmartMoneyPositioning ccy={ccy} range={range} />
 
