@@ -5,8 +5,10 @@ import {
   freshnessFrom,
   normalizeBinanceActor,
   normalizeHyperliquidActor,
+  normalizeHyperliquidTrade,
   normalizeOkxActor,
   normalizePolymarketActor,
+  normalizePolymarketTrade,
   ratioToPercentagePoints,
   toFiniteNumber,
 } from "./normalize.ts"
@@ -97,4 +99,55 @@ test("classifies freshness from the actual observation age", () => {
   assert.equal(freshnessFrom(NOW - 20 * 60_000, NOW), "delayed")
   assert.equal(freshnessFrom(NOW - 2 * 60 * 60_000, NOW), "stale")
   assert.equal(freshnessFrom(null, NOW), "unavailable")
+})
+
+test("builds stable event ids and preserves direct verification links", () => {
+  const address = "0x79569c573fd62c0aa3be35f48ec282d185f3eba5"
+  const trade = {
+    proxyWallet: address,
+    side: "BUY",
+    asset: "106791278548747150343884234399469582300633057093599143671464563548029067901636",
+    conditionId: "0x11746412cf15fec7d76c07a46bb6751da804c3c66a7b720aea44cc4a8c587fb5",
+    size: 6.521738,
+    price: 0.4599999264,
+    timestamp: Math.floor((NOW - 5_000) / 1_000),
+    title: "Will the lowest temperature be 27°C?",
+    slug: "lowest-temperature-27c",
+    outcome: "Yes",
+    name: "trashMESH3",
+    transactionHash: "0x7fb93510c31762bc67a24fa8a5b45a816abe43b4e3a0d3cc13aedc6b90602b3b",
+  }
+
+  const first = normalizePolymarketTrade(trade, new Set([address]), NOW)
+  const second = normalizePolymarketTrade(trade, new Set([address]), NOW + 1_000)
+
+  assert.equal(first.id, second.id)
+  assert.equal(first.qualification, "ranked")
+  assert.equal(first.amountUsd, 3)
+  assert.match(first.verificationUrl, /^https:\/\/polymarket\.com\//)
+  assert.equal(first.provenance.freshness, "live")
+})
+
+test("attributes Hyperliquid trade sides using the official buyer-seller ordering", () => {
+  const buyer = "0x0fd468a73084daa6ea77a9261e40fdec3e67e0c7"
+  const seller = "0x428049ba49a2e6747c860eaafa468f8e78212a6c"
+  const trade = {
+    coin: "BTC",
+    side: "A",
+    px: "65473.0",
+    sz: "0.02606",
+    time: NOW - 3_000,
+    hash: "0x203b9fbb10f51dd721b504405be023020cd000a0abf83ca9c4044b0dcff8f7c1",
+    tid: 770160123608623,
+    users: [buyer, seller] as [string, string],
+  }
+
+  const buyerEvent = normalizeHyperliquidTrade(trade, buyer, new Set([buyer]), NOW)
+  const sellerEvent = normalizeHyperliquidTrade(trade, seller, new Set([buyer]), NOW)
+
+  assert.equal(buyerEvent.action, "buy")
+  assert.equal(buyerEvent.qualification, "ranked")
+  assert.equal(sellerEvent.action, "sell")
+  assert.equal(sellerEvent.qualification, "observed_large_trade")
+  assert.equal(buyerEvent.amountUsd, 1_706.23)
 })

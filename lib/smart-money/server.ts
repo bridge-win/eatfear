@@ -1,16 +1,21 @@
 import {
   normalizeBinanceActor,
   normalizeHyperliquidActor,
+  normalizeHyperliquidTrade,
   normalizeOkxActor,
   normalizePolymarketActor,
+  normalizePolymarketTrade,
 } from "./normalize"
 import { scoreActorCohort } from "./scoring"
 import type {
   ActorSourceResult,
   BinanceActorInput,
+  EventSourceResult,
   HyperliquidActorInput,
+  HyperliquidTradeInput,
   OkxActorInput,
   PolymarketActorInput,
+  PolymarketTradeInput,
   SmartMoneySourceHealth,
 } from "./types"
 
@@ -343,11 +348,101 @@ function withPayloadValidation(
   }
 }
 
-export async function fetchActorSources(): Promise<ActorSourceResult[]> {
-  return Promise.all([
-    fetchOkxActors(),
-    fetchBinanceActors(),
-    fetchHyperliquidActors(),
-    fetchPolymarketActors(),
+export async function fetchActorSources(
+  venues: ReadonlySet<SourceDefinition["id"]> = new Set(Object.keys(FIRST_PARTY_SOURCES) as SourceDefinition["id"][]),
+): Promise<ActorSourceResult[]> {
+  const adapters: [SourceDefinition["id"], () => Promise<ActorSourceResult>][] = [
+    ["okx", fetchOkxActors],
+    ["binance", fetchBinanceActors],
+    ["hyperliquid", fetchHyperliquidActors],
+    ["polymarket", fetchPolymarketActors],
+  ]
+  return Promise.all(adapters.filter(([venue]) => venues.has(venue)).map(([, adapter]) => adapter()))
+}
+
+function deduplicateEvents(events: EventSourceResult["events"]): EventSourceResult["events"] {
+  return [...new Map(events.map((event) => [event.id, event])).values()]
+}
+
+function qualifiedHealth(
+  sourceHealth: SmartMoneySourceHealth,
+  qualificationHealth: SmartMoneySourceHealth | undefined,
+  rankedActorCount: number,
+): SmartMoneySourceHealth {
+  if (sourceHealth.status === "unavailable") return sourceHealth
+  if (qualificationHealth?.status === "unavailable") {
+    return {
+      ...sourceHealth,
+      status: "degraded",
+      message: `${sourceHealth.message}; leaderboard qualification unavailable`,
+    }
+  }
+  return {
+    ...sourceHealth,
+    message: `${sourceHealth.message}; matched against ${rankedActorCount} ranked actors`,
+  }
+}
+
+export async function fetchEventSources(ccy: string): Promise<EventSourceResult[]> {
+  const rankingResults = await fetchActorSources(new Set(["hyperliquid", "polymarket"]))
+  const hyperliquidRanking = rankingResults.find((result) => result.sourceId === "hyperliquid")
+  const polymarketRanking = rankingResults.find((result) => result.sourceId === "polymarket")
+  const hyperliquidRanked = new Set(hyperliquidRanking?.actors.flatMap((actor) => actor.address ? [actor.address] : []) ?? [])
+  const polymarketRanked = new Set(polymarketRanking?.actors.flatMap((actor) => actor.address ? [actor.address] : []) ?? [])
+  const polymarketTradeSource: SourceDefinition = {
+    ...FIRST_PARTY_SOURCES.polymarket,
+    successMessage: "Official public trade feed is responding",
+  }
+  const hyperliquidTradeSource: SourceDefinition = {
+    ...FIRST_PARTY_SOURCES.hyperliquid,
+    successMessage: "Official recent-trades feed is responding",
+  }
+
+  const rankedPolymarketAddresses = [...polymarketRanked].slice(0, 8)
+  const [polymarketGlobal, hyperliquidTrades, ...polymarketActorFeeds] = await Promise.all([
+    fetchJsonWithHealth<PolymarketTradeInput[]>({
+      source: polymarketTradeSource,
+      url: "https://data-api.polymarket.com/trades?limit=200&takerOnly=true",
+      timeoutMs: 5_000,
+    }),
+    fetchJsonWithHealth<HyperliquidTradeInput[]>({
+      source: hyperliquidTradeSource,
+      url: "https://api.hyperliquid.xyz/info",
+      init: {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "recentTrades", coin: ccy }),
+      },
+      timeoutMs: 5_000,
+    }),
+    ...rankedPolymarketAddresses.map((address) => fetchJsonWithHealth<PolymarketTradeInput[]>({
+      source: polymarketTradeSource,
+      url: `https://data-api.polymarket.com/trades?user=${encodeURIComponent(address)}&limit=10&takerOnly=true`,
+      timeoutMs: 5_000,
+    })),
   ])
+
+  const polymarketRows = [polymarketGlobal, ...polymarketActorFeeds].flatMap((result) => Array.isArray(result.data) ? result.data : [])
+  const polymarketEvents = deduplicateEvents(polymarketRows
+    .map((row) => normalizePolymarketTrade(row, polymarketRanked))
+    .filter((event) => event.qualification === "ranked" || (event.amountUsd ?? 0) >= 5_000))
+  const hyperliquidEvents = deduplicateEvents((Array.isArray(hyperliquidTrades.data) ? hyperliquidTrades.data : [])
+    .flatMap((row) => (row.users ?? []).map((address) => normalizeHyperliquidTrade(row, address, hyperliquidRanked)))
+    .filter((event) => event.qualification === "ranked" || (event.amountUsd ?? 0) >= 100_000))
+  const polymarketHealth = polymarketGlobal.data !== null
+    ? polymarketGlobal.health
+    : polymarketActorFeeds.find((result) => result.data !== null)?.health ?? polymarketGlobal.health
+
+  return [
+    {
+      sourceId: "hyperliquid",
+      events: hyperliquidEvents,
+      health: qualifiedHealth(hyperliquidTrades.health, hyperliquidRanking?.health, hyperliquidRanked.size),
+    },
+    {
+      sourceId: "polymarket",
+      events: polymarketEvents,
+      health: qualifiedHealth(polymarketHealth, polymarketRanking?.health, polymarketRanked.size),
+    },
+  ]
 }

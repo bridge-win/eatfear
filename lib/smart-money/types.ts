@@ -186,3 +186,30 @@ export interface HyperliquidActorInput {
   displayName?: string
   windowPerformances?: [string, HyperliquidPerformanceInput][]
 }
+
+export interface PolymarketTradeInput {
+  proxyWallet?: string
+  side?: string
+  asset?: string
+  conditionId?: string
+  size?: string | number
+  price?: string | number
+  timestamp?: string | number
+  title?: string
+  slug?: string
+  outcome?: string
+  name?: string
+  pseudonym?: string
+  transactionHash?: string
+}
+
+export interface HyperliquidTradeInput {
+  coin?: string
+  side?: string
+  px?: string | number
+  sz?: string | number
+  time?: string | number
+  hash?: string
+  tid?: string | number
+  users?: [string, string]
+}

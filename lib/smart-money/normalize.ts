@@ -3,10 +3,13 @@ import type {
   DataFreshness,
   DataProvenance,
   HyperliquidActorInput,
+  HyperliquidTradeInput,
   OkxActorInput,
   PolymarketActorInput,
+  PolymarketTradeInput,
   SmartMoneyActor,
   SmartMoneyActorMetrics,
+  SmartMoneyEvent,
   SmartMoneyQuality,
   SmartMoneyVenue,
 } from "./types.ts"
@@ -238,6 +241,137 @@ export function normalizeHyperliquidActor(raw: HyperliquidActorInput, now = Date
       now,
       confidence: 0.97,
       limitations: ["Public opt-in leaderboard", "Address ownership and external hedges are unknown"],
+    }),
+  }
+}
+
+function eventTimestamp(value: unknown, now: number): number | null {
+  const parsed = toFiniteNumber(value)
+  if (parsed === null) return null
+  const milliseconds = parsed < 10_000_000_000 ? parsed * 1_000 : parsed
+  return milliseconds <= now + MINUTE_MS ? milliseconds : null
+}
+
+function money(value: number | null): number | null {
+  return value === null ? null : Math.round(value * 100) / 100
+}
+
+function eventProvenance(input: {
+  sourceId: "polymarket" | "hyperliquid"
+  sourceName: string
+  sourceUrl: string
+  eventAt: number | null
+  now: number
+  confidence: number
+  limitations: string[]
+}): DataProvenance {
+  const freshnessMs = input.eventAt === null ? null : Math.max(0, input.now - input.eventAt)
+  return {
+    sourceId: input.sourceId,
+    sourceName: input.sourceName,
+    sourceType: "first_party",
+    sourceUrl: input.sourceUrl,
+    eventAt: input.eventAt,
+    observedAt: input.now,
+    freshness: freshnessFrom(input.eventAt, input.now),
+    freshnessMs,
+    verification: "settled",
+    confidence: input.confidence,
+    limitations: input.limitations,
+  }
+}
+
+function addressName(address: string): string {
+  return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address
+}
+
+export function normalizePolymarketTrade(
+  raw: PolymarketTradeInput,
+  rankedAddresses: ReadonlySet<string> = new Set<string>(),
+  now = Date.now(),
+): SmartMoneyEvent {
+  const address = raw.proxyWallet?.trim().toLowerCase() || "unknown"
+  const side = raw.side?.toUpperCase() === "SELL" ? "sell" : "buy"
+  const transactionId = raw.transactionHash?.trim() || null
+  const slug = raw.slug?.trim() || ""
+  const eventAt = eventTimestamp(raw.timestamp, now)
+  const size = toFiniteNumber(raw.size)
+  const price = toFiniteNumber(raw.price)
+  const qualification = rankedAddresses.has(address) ? "ranked" : "observed_large_trade"
+  const actorName = safeName(raw.name ?? raw.pseudonym, addressName(address))
+  return {
+    id: `polymarket:${transactionId ?? raw.conditionId ?? raw.asset ?? "unknown"}:${address}:${side}`,
+    actorId: `polymarket:${address}`,
+    actorName,
+    address: address === "unknown" ? null : address,
+    venue: "polymarket",
+    action: side,
+    asset: raw.outcome?.trim() || "MARKET",
+    market: raw.title?.trim() || slug || raw.conditionId?.trim() || "Polymarket market",
+    amountUsd: size !== null && price !== null ? money(size * price) : null,
+    priceUsd: price,
+    pnlUsd: null,
+    transactionId,
+    verificationUrl: slug ? `https://polymarket.com/event/${encodeURIComponent(slug)}` : "https://polymarket.com/activity",
+    qualification,
+    provenance: eventProvenance({
+      sourceId: "polymarket",
+      sourceName: "Polymarket Data API",
+      sourceUrl: "https://docs.polymarket.com/api-reference/core/get-trades-for-a-user-or-markets",
+      eventAt,
+      now,
+      confidence: qualification === "ranked" ? 0.96 : 0.62,
+      limitations: [
+        "The trade is observable but external hedges and intent are unknown",
+        qualification === "ranked" ? "Actor qualified by the monthly leaderboard" : "Large trade is not a smart-actor classification",
+      ],
+    }),
+  }
+}
+
+export function normalizeHyperliquidTrade(
+  raw: HyperliquidTradeInput,
+  participantAddress: string,
+  rankedAddresses: ReadonlySet<string> = new Set<string>(),
+  now = Date.now(),
+): SmartMoneyEvent {
+  const address = participantAddress.trim().toLowerCase() || "unknown"
+  const buyer = raw.users?.[0]?.toLowerCase()
+  const seller = raw.users?.[1]?.toLowerCase()
+  const action = address === seller ? "sell" : "buy"
+  const price = toFiniteNumber(raw.px)
+  const size = toFiniteNumber(raw.sz)
+  const eventAt = eventTimestamp(raw.time, now)
+  const transactionId = raw.hash?.trim() || (raw.tid === undefined ? null : String(raw.tid))
+  const qualification = rankedAddresses.has(address) ? "ranked" : "observed_large_trade"
+  const asset = raw.coin?.trim().toUpperCase() || "UNKNOWN"
+  return {
+    id: `hyperliquid:${raw.time ?? "unknown"}:${asset}:${raw.tid ?? transactionId ?? "unknown"}:${address}:${action}`,
+    actorId: `hyperliquid:${address}`,
+    actorName: addressName(address),
+    address: address === "unknown" ? null : address,
+    venue: "hyperliquid",
+    action,
+    asset,
+    market: `${asset}-PERP`,
+    amountUsd: price !== null && size !== null ? money(price * size) : null,
+    priceUsd: price,
+    pnlUsd: null,
+    transactionId,
+    verificationUrl: raw.hash ? `https://hypurrscan.io/tx/${encodeURIComponent(raw.hash)}` : "https://app.hyperliquid.xyz/trade",
+    qualification,
+    provenance: eventProvenance({
+      sourceId: "hyperliquid",
+      sourceName: "Hyperliquid",
+      sourceUrl: "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/websocket/subscriptions",
+      eventAt,
+      now,
+      confidence: qualification === "ranked" ? 0.97 : 0.64,
+      limitations: [
+        "Buyer and seller are settled counterparties; the fill does not reveal whether a position opened or closed",
+        qualification === "ranked" ? "Actor qualified by the official public leaderboard" : "Large trade is not a smart-actor classification",
+        buyer && seller ? "Official trade schema orders users as buyer then seller" : "Counterparty ordering was incomplete",
+      ],
     }),
   }
 }

@@ -1,5 +1,8 @@
 import type {
   SmartMoneyActor,
+  SmartMoneyConsensus,
+  SmartMoneyConsensusAsset,
+  SmartMoneyEvent,
   SmartMoneyQuality,
   SmartMoneyQualityCategory,
   SmartMoneyQualityComponent,
@@ -142,4 +145,76 @@ function scoreActor(actor: SmartMoneyActor, cohort: SmartMoneyActor[]): SmartMon
 export function scoreActorCohort(actors: SmartMoneyActor[]): SmartMoneyActor[] {
   const scored = actors.map((actor) => ({ ...actor, quality: scoreActor(actor, actors) }))
   return scored.sort((left, right) => right.quality.score - left.quality.score || (left.metrics.rank ?? Infinity) - (right.metrics.rank ?? Infinity))
+}
+
+function isBuyAction(event: SmartMoneyEvent): boolean {
+  return event.action === "buy" || event.action === "long"
+}
+
+function isDirectional(event: SmartMoneyEvent): boolean {
+  return isBuyAction(event) || event.action === "sell" || event.action === "short"
+}
+
+export function calculateMarketConsensus(events: SmartMoneyEvent[]): SmartMoneyConsensus {
+  const allActors = new Set(events.map((event) => event.actorId))
+  const qualifying = events
+    .filter((event) => event.qualification === "ranked" && event.provenance.eventAt !== null && isDirectional(event))
+    .sort((left, right) => (right.provenance.eventAt ?? 0) - (left.provenance.eventAt ?? 0))
+  const latestByActor = new Map<string, SmartMoneyEvent>()
+  for (const event of qualifying) {
+    if (!latestByActor.has(event.actorId)) latestByActor.set(event.actorId, event)
+  }
+  const actorEvents = [...latestByActor.values()]
+  const buyers = actorEvents.filter(isBuyAction)
+  const sellers = actorEvents.filter((event) => !isBuyAction(event))
+  const buyUsd = buyers.reduce((sum, event) => sum + (event.amountUsd ?? 0), 0)
+  const sellUsd = sellers.reduce((sum, event) => sum + (event.amountUsd ?? 0), 0)
+  const venueCount = new Set(actorEvents.map((event) => event.venue)).size
+  const actorCount = actorEvents.length
+  const coverage = allActors.size > 0 ? Math.round((actorCount / allActors.size) * 100) : 0
+  const byAsset = new Map<string, SmartMoneyConsensusAsset>()
+  for (const event of actorEvents) {
+    const current = byAsset.get(event.asset) ?? {
+      asset: event.asset,
+      buyers: 0,
+      sellers: 0,
+      netActors: 0,
+      buyUsd: 0,
+      sellUsd: 0,
+    }
+    if (isBuyAction(event)) {
+      current.buyers += 1
+      current.buyUsd += event.amountUsd ?? 0
+    } else {
+      current.sellers += 1
+      current.sellUsd += event.amountUsd ?? 0
+    }
+    current.netActors = current.buyers - current.sellers
+    byAsset.set(event.asset, current)
+  }
+  const direction = venueCount < 2 || actorCount < 3
+    ? "insufficient"
+    : buyers.length > sellers.length
+      ? "buying"
+      : sellers.length > buyers.length
+        ? "selling"
+        : "mixed"
+
+  return {
+    direction,
+    buyers: buyers.length,
+    sellers: sellers.length,
+    buyUsd: Math.round(buyUsd * 100) / 100,
+    sellUsd: Math.round(sellUsd * 100) / 100,
+    venueCount,
+    actorCount,
+    coverage,
+    assets: [...byAsset.values()]
+      .map((asset) => ({
+        ...asset,
+        buyUsd: Math.round(asset.buyUsd * 100) / 100,
+        sellUsd: Math.round(asset.sellUsd * 100) / 100,
+      }))
+      .sort((left, right) => Math.abs(right.netActors) - Math.abs(left.netActors)),
+  }
 }
