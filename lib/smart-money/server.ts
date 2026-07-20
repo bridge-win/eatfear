@@ -5,8 +5,8 @@ import {
   normalizeOkxActor,
   normalizePolymarketActor,
   normalizePolymarketTrade,
-} from "./normalize"
-import { scoreActorCohort } from "./scoring"
+} from "./normalize.ts"
+import { scoreActorCohort } from "./scoring.ts"
 import type {
   ActorSourceResult,
   BinanceActorInput,
@@ -17,7 +17,7 @@ import type {
   PolymarketActorInput,
   PolymarketTradeInput,
   SmartMoneySourceHealth,
-} from "./types"
+} from "./types.ts"
 
 export interface SourceDefinition {
   id: "okx" | "binance" | "hyperliquid" | "polymarket"
@@ -58,6 +58,36 @@ export const FIRST_PARTY_SOURCES: Record<SourceDefinition["id"], SourceDefinitio
 interface FetchResult<T> {
   data: T | null
   health: SmartMoneySourceHealth
+}
+
+type SourceHealthOutcome = "success" | "schema_mismatch" | "timeout" | "not_configured" | "configured"
+
+export function buildSourceHealth(input: {
+  sourceId: string
+  name: string
+  sourceUrl: string
+  outcome: SourceHealthOutcome
+  latencyMs?: number
+  observedAt: number
+  message?: string
+}): SmartMoneySourceHealth {
+  const defaults: Record<SourceHealthOutcome, { status: SmartMoneySourceHealth["status"]; message: string }> = {
+    success: { status: "operational", message: "Source probe succeeded" },
+    schema_mismatch: { status: "degraded", message: "Source responded with an incompatible payload" },
+    timeout: { status: "unavailable", message: "Source probe timed out" },
+    not_configured: { status: "not_configured", message: "Optional enrichment is not configured" },
+    configured: { status: "degraded", message: "Optional enrichment is configured but not probed by the public health endpoint" },
+  }
+  const selected = defaults[input.outcome]
+  return {
+    sourceId: input.sourceId,
+    name: input.name,
+    status: selected.status,
+    latencyMs: input.latencyMs ?? null,
+    lastSuccessAt: input.outcome === "success" ? input.observedAt : null,
+    message: input.message ?? selected.message,
+    sourceUrl: input.sourceUrl,
+  }
 }
 
 async function fetchJsonObjectArrayPrefixWithHealth<T>(input: {
@@ -445,4 +475,95 @@ export async function fetchEventSources(ccy: string): Promise<EventSourceResult[
       health: qualifiedHealth(polymarketHealth, polymarketRanking?.health, polymarketRanked.size),
     },
   ]
+}
+
+interface OptionalProvider {
+  id: string
+  name: string
+  sourceUrl: string
+  environmentVariable: string
+  capability: string
+}
+
+const OPTIONAL_PROVIDERS: OptionalProvider[] = [
+  { id: "nansen", name: "Nansen", sourceUrl: "https://docs.nansen.ai/", environmentVariable: "NANSEN_API_KEY", capability: "cross-chain Smart Money flows, holdings, DEX trades, and perps" },
+  { id: "arkham", name: "Arkham", sourceUrl: "https://intel.arkm.com/", environmentVariable: "ARKHAM_API_KEY", capability: "entity labels, transfers, portfolios, and counterparties" },
+  { id: "cielo", name: "Cielo", sourceUrl: "https://docs.cielo.finance/", environmentVariable: "CIELO_API_KEY", capability: "wallet feeds, PnL, trading stats, and related wallets" },
+  { id: "helius", name: "Helius", sourceUrl: "https://www.helius.dev/docs", environmentVariable: "HELIUS_API_KEY", capability: "low-latency Solana enhanced transactions and webhooks" },
+  { id: "alchemy", name: "Alchemy", sourceUrl: "https://www.alchemy.com/docs", environmentVariable: "ALCHEMY_API_KEY", capability: "EVM and Solana address activity and historical transfers" },
+  { id: "bubblemaps", name: "Bubblemaps", sourceUrl: "https://docs.bubblemaps.io/", environmentVariable: "BUBBLEMAPS_API_KEY", capability: "token-holder clusters and related-wallet investigation" },
+]
+
+function validateProbe<T>(
+  result: FetchResult<T>,
+  valid: (data: T) => boolean,
+  source: SourceDefinition,
+): SmartMoneySourceHealth {
+  if (result.data === null) return result.health
+  if (valid(result.data)) return result.health
+  return buildSourceHealth({
+    sourceId: source.id,
+    name: source.name,
+    sourceUrl: source.sourceUrl,
+    outcome: "schema_mismatch",
+    latencyMs: result.health.latencyMs ?? undefined,
+    observedAt: Date.now(),
+  })
+}
+
+export async function probeSmartMoneySources(): Promise<SmartMoneySourceHealth[]> {
+  const sources: Record<SourceDefinition["id"], SourceDefinition> = {
+    okx: { ...FIRST_PARTY_SOURCES.okx, successMessage: "Official public-time probe succeeded" },
+    binance: { ...FIRST_PARTY_SOURCES.binance, successStatus: undefined, successMessage: "Official futures-time probe succeeded" },
+    hyperliquid: { ...FIRST_PARTY_SOURCES.hyperliquid, successMessage: "Official all-mids probe succeeded" },
+    polymarket: { ...FIRST_PARTY_SOURCES.polymarket, successMessage: "Official one-row leaderboard probe succeeded" },
+  }
+  const [okx, binance, hyperliquid, polymarket] = await Promise.all([
+    fetchJsonWithHealth<{ code?: string; data?: { ts?: string }[] }>({
+      source: sources.okx,
+      url: "https://www.okx.com/api/v5/public/time",
+      timeoutMs: 4_000,
+    }),
+    fetchJsonWithHealth<{ serverTime?: number }>({
+      source: sources.binance,
+      url: "https://fapi.binance.com/fapi/v1/time",
+      timeoutMs: 4_000,
+    }),
+    fetchJsonWithHealth<Record<string, string>>({
+      source: sources.hyperliquid,
+      url: "https://api.hyperliquid.xyz/info",
+      init: {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "allMids" }),
+      },
+      timeoutMs: 4_000,
+    }),
+    fetchJsonWithHealth<PolymarketActorInput[]>({
+      source: sources.polymarket,
+      url: "https://data-api.polymarket.com/v1/leaderboard?category=OVERALL&timePeriod=MONTH&orderBy=PNL&limit=1&offset=0",
+      timeoutMs: 4_000,
+    }),
+  ])
+  const firstParty = [
+    validateProbe(okx, (data) => data.code === "0" && Boolean(data.data?.[0]?.ts), sources.okx),
+    validateProbe(binance, (data) => typeof data.serverTime === "number", sources.binance),
+    validateProbe(hyperliquid, (data) => typeof data.BTC === "string" && Object.keys(data).length > 0, sources.hyperliquid),
+    validateProbe(polymarket, (data) => Array.isArray(data) && Boolean(data[0]?.proxyWallet), sources.polymarket),
+  ]
+  const observedAt = Date.now()
+  const optional = OPTIONAL_PROVIDERS.map((provider) => {
+    const configured = Boolean(process.env[provider.environmentVariable]?.trim())
+    return buildSourceHealth({
+      sourceId: provider.id,
+      name: provider.name,
+      sourceUrl: provider.sourceUrl,
+      outcome: configured ? "configured" : "not_configured",
+      observedAt,
+      message: configured
+        ? `Configured for ${provider.capability}; live adapter verification is pending`
+        : `Add a licensed connection to unlock ${provider.capability}`,
+    })
+  })
+  return [...firstParty, ...optional]
 }
