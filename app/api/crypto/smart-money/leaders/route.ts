@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server"
+import { normalizeBinanceActor, normalizeOkxActor, percentagePoints, ratioToPercentagePoints } from "@/lib/smart-money/normalize"
 
 export const revalidate = 60
 
 /**
  * Copy-trading leaderboard, multi-venue.
  *
- * Every source here reports exchange-settled performance (PnL, ROI, win
- * ratio, AUM, copier counts) — settled from real fills, so unlike social
- * leaderboards the numbers cannot be self-reported.
+ * Every source here reports venue-calculated performance (PnL, ROI, win
+ * ratio, AUM, copier counts). The venue data is more reliable than a user
+ * biography, but remains subject to each venue's window and methodology.
  *
  * - OKX: official public copy-trading API. Stable, supports per-trader
  *   drill-down (stats / pnl curve / current positions).
@@ -85,25 +86,28 @@ const fetchOkx = async (sort: string, page: number): Promise<{ traders: Normaliz
     const entry = payload.data[0]
     const traders = (entry.ranks ?? [])
       .filter((rank) => typeof rank.uniqueCode === "string" && rank.uniqueCode.length > 0)
-      .map<NormalizedTrader>((rank) => ({
-        uniqueCode: rank.uniqueCode as string,
-        source: "okx",
-        nickName: rank.nickName ?? "—",
-        avatar: rank.portLink ?? null,
-        pnl: num(rank.pnl),
-        pnlRatio: num(rank.pnlRatio),
-        winRatio: num(rank.winRatio),
-        aum: num(rank.aum),
-        leadDays: num(rank.leadDays),
-        copyTraderNum: num(rank.copyTraderNum),
-        maxCopyTraderNum: num(rank.maxCopyTraderNum),
-        instruments: Array.isArray(rank.traderInsts) ? rank.traderInsts.slice(0, 6) : [],
-        pnlSparkline: (rank.pnlRatios ?? [])
-          .map((point) => ({ time: num(point.beginTs), value: num(point.pnlRatio) }))
-          .filter((point): point is { time: number; value: number } => point.time !== null && point.value !== null)
-          .sort((a, b) => a.time - b.time),
-        hasDetail: true,
-      }))
+      .map<NormalizedTrader>((rank) => {
+        const actor = normalizeOkxActor(rank)
+        return {
+          uniqueCode: rank.uniqueCode as string,
+          source: "okx",
+          nickName: actor.name,
+          avatar: actor.avatarUrl,
+          pnl: actor.metrics.pnlUsd,
+          pnlRatio: actor.metrics.roiPct,
+          winRatio: actor.metrics.winRatePct,
+          aum: actor.metrics.accountValueUsd,
+          leadDays: actor.metrics.activeDays,
+          copyTraderNum: actor.metrics.followers,
+          maxCopyTraderNum: actor.metrics.maxFollowers,
+          instruments: Array.isArray(rank.traderInsts) ? rank.traderInsts.slice(0, 6) : [],
+          pnlSparkline: (rank.pnlRatios ?? [])
+            .map((point) => ({ time: num(point.beginTs), value: ratioToPercentagePoints(point.pnlRatio) }))
+            .filter((point): point is { time: number; value: number } => point.time !== null && point.value !== null)
+            .sort((a, b) => a.time - b.time),
+          hasDetail: true,
+        }
+      })
     return { traders, totalPage: num(entry.totalPage) ?? 1 }
   } catch {
     return { traders: [], totalPage: 0 }
@@ -126,10 +130,15 @@ interface BinanceLeadItem {
   avatarUrl?: string
   roi?: string | number
   pnl?: string | number
+  aum?: string | number
   aumAmount?: string | number
+  mdd?: string | number
+  winRate?: string | number
   currentCopyCount?: string | number
   maxCopyCount?: string | number
   favoriteCount?: string | number
+  startTime?: string | number
+  chartItems?: { value?: string | number; dataType?: string; dateTime?: string | number }[]
 }
 
 interface BinanceLeadPayload {
@@ -166,22 +175,28 @@ const fetchBinance = async (sort: string): Promise<{ traders: NormalizedTrader[]
     if (!Array.isArray(list) || list.length === 0) return { traders: [], totalPage: 0 }
     const traders = list
       .filter((item) => item.leadPortfolioId !== undefined && item.leadPortfolioId !== null)
-      .map<NormalizedTrader>((item) => ({
-        uniqueCode: String(item.leadPortfolioId),
-        source: "binance",
-        nickName: item.nickname ?? "—",
-        avatar: item.avatarUrl ?? null,
-        pnl: num(item.pnl),
-        pnlRatio: num(item.roi),
-        winRatio: null,
-        aum: num(item.aumAmount),
-        leadDays: null,
-        copyTraderNum: num(item.currentCopyCount),
-        maxCopyTraderNum: num(item.maxCopyCount),
-        instruments: [],
-        pnlSparkline: [],
-        hasDetail: false,
-      }))
+      .map<NormalizedTrader>((item) => {
+        const actor = normalizeBinanceActor(item)
+        return {
+          uniqueCode: String(item.leadPortfolioId),
+          source: "binance",
+          nickName: actor.name,
+          avatar: actor.avatarUrl,
+          pnl: actor.metrics.pnlUsd,
+          pnlRatio: actor.metrics.roiPct,
+          winRatio: actor.metrics.winRatePct,
+          aum: actor.metrics.accountValueUsd,
+          leadDays: actor.metrics.activeDays,
+          copyTraderNum: actor.metrics.followers,
+          maxCopyTraderNum: actor.metrics.maxFollowers,
+          instruments: [],
+          pnlSparkline: (item.chartItems ?? [])
+            .map((point) => ({ time: num(point.dateTime), value: percentagePoints(point.value) }))
+            .filter((point): point is { time: number; value: number } => point.time !== null && point.value !== null)
+            .sort((a, b) => a.time - b.time),
+          hasDetail: false,
+        }
+      })
     return { traders, totalPage: 1 }
   } catch {
     return { traders: [], totalPage: 0 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { ratioToPercentagePoints } from "@/lib/smart-money/normalize"
 
 export const revalidate = 300
 
@@ -103,7 +104,7 @@ export async function GET(request: Request) {
   const stats = statsRow
     ? {
         ccy: statsRow.ccy ?? "USDT",
-        winRatio: num(statsRow.winRatio),
+        winRatio: ratioToPercentagePoints(statsRow.winRatio),
         profitDays: num(statsRow.profitDays),
         lossDays: num(statsRow.lossDays),
         copierPnl: num(statsRow.curCopyTraderPnl),
@@ -113,7 +114,7 @@ export async function GET(request: Request) {
     : null
 
   const pnlSeries = pnlRows
-    .map((row) => ({ time: num(row.beginTs), pnl: num(row.pnl), pnlRatio: num(row.pnlRatio) }))
+    .map((row) => ({ time: num(row.beginTs), pnl: num(row.pnl), pnlRatio: ratioToPercentagePoints(row.pnlRatio) }))
     .filter((row): row is { time: number; pnl: number | null; pnlRatio: number | null } => row.time !== null)
     .sort((a, b) => a.time - b.time)
 
@@ -127,7 +128,7 @@ export async function GET(request: Request) {
       markPx: num(row.markPx),
       margin: num(row.margin),
       upl: num(row.upl),
-      uplRatio: num(row.uplRatio),
+      uplRatio: ratioToPercentagePoints(row.uplRatio),
       openTime: num(row.openTime),
       ccy: row.ccy ?? "USDT",
     }))

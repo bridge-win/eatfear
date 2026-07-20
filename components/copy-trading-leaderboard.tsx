@@ -76,7 +76,7 @@ const formatUsd = (value: number | null): string => {
 }
 
 const formatPct = (value: number | null, digits = 1): string =>
-  value === null ? "—" : `${(value * 100).toFixed(digits)}%`
+  value === null ? "—" : `${value.toFixed(digits)}%`
 
 const pnlTone = (value: number | null) =>
   value === null
@@ -133,7 +133,7 @@ function LeaderDetail({ uniqueCode, range }: { uniqueCode: string; range: TimeRa
   const stats = detail.stats
   const curve = detail.pnlSeries
     .filter((row) => row.pnlRatio !== null)
-    .map((row) => ({ time: row.time, value: (row.pnlRatio as number) * 100 }))
+    .map((row) => ({ time: row.time, value: row.pnlRatio as number }))
 
   return (
     <div className="space-y-3 border-t bg-muted/20 px-3 py-3">
@@ -293,7 +293,7 @@ export function CopyTradingLeaderboard({ range, className }: { range: TimeRangeI
             <InfoTooltip
               title={t("smartPage.leaders.title")}
               description={t("smartPage.leaders.info")}
-              source="OKX Copy Trading public API"
+              source={source === "okx" ? "OKX Copy Trading public API" : "Binance Copy Trading web API"}
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">

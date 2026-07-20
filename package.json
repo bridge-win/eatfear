@@ -8,6 +8,7 @@
     "dev": "next dev --turbopack -p 3111",
     "dev:webpack": "next dev -p 3111",
     "lint": "eslint .",
+    "test": "node --test lib/market-manipulation-metrics.test.ts lib/smart-money/*.test.ts",
     "start": "next start",
     "deploy": "vercel deploy --prod -y",
     "deploy:preview": "vercel deploy -y",
