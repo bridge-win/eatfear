@@ -635,6 +635,107 @@ const DICT: Dict = {
     zh: "Binance 持仓比数据仅保留最近 30 天，当前时间档已钳制为最近 30 天。",
     en: "Binance positioning data retains only the last 30 days; this range is clamped to the latest 30 days.",
   },
+  "smartPage.intel.title": { zh: "聪明钱情报 · 多因子综合 ({ccy})", en: "Smart Money Intelligence — Multi-factor ({ccy})" },
+  "smartPage.intel.info": {
+    zh: "单一指标容易被噪音或人为操纵带偏，本模块把五组相互独立的信号加权合成一个方向读数：持仓分歧（顶级仓位多头% − 全市场多头%，权重 30%）、主动流向（区间内主动买卖失衡，25%）、杠杆拥挤（持仓量变化 × 资金费成本，20%，拥挤是反向信号）、融资情绪（杠杆借贷比历史分位，15%，极端为反向）、期权对冲（Put/Call 持仓比，10%）。\n用法：综合分是方向倾向而不是择时信号；重点看各因子是否同向共振，以及分歧曲线与价格的背离。",
+    en: "Any single gauge can be skewed by noise or manipulation, so this module fuses five independent signal families into one weighted read: positioning spread (top-trader position long% − all-account long%, 30%), aggressive flow (taker buy/sell imbalance over the window, 25%), leverage crowding (open-interest change × funding cost, 20%, contrarian), margin-loan sentiment (borrow-ratio percentile, 15%, contrarian at extremes), and options hedging (put/call OI ratio, 10%).\nHow to use: the composite is a directional lean, not a timing signal; watch for factors resonating in the same direction, and for divergence between the spread curve and price.",
+  },
+  "smartPage.intel.composite": { zh: "综合方向分 (-100 ~ +100)", en: "Composite score (-100 to +100)" },
+  "smartPage.intel.compositeHint": {
+    zh: "五因子加权合成，当前数据覆盖率 {coverage}%；缺失的因子会自动剔除并重新归一化权重。",
+    en: "Weighted blend of five factors; current data coverage {coverage}%. Missing factors are dropped and weights renormalized.",
+  },
+  "smartPage.intel.meter.bear": { zh: "偏空", en: "Bearish" },
+  "smartPage.intel.meter.neutral": { zh: "中性", en: "Neutral" },
+  "smartPage.intel.meter.bull": { zh: "偏多", en: "Bullish" },
+  "smartPage.intel.verdict.strongBull": { zh: "强烈偏多", en: "Strongly bullish" },
+  "smartPage.intel.verdict.bull": { zh: "偏多", en: "Bullish" },
+  "smartPage.intel.verdict.neutral": { zh: "中性", en: "Neutral" },
+  "smartPage.intel.verdict.bear": { zh: "偏空", en: "Bearish" },
+  "smartPage.intel.verdict.strongBear": { zh: "强烈偏空", en: "Strongly bearish" },
+  "smartPage.intel.verdict.unknown": { zh: "数据不足", en: "Insufficient data" },
+  "smartPage.intel.na": { zh: "该币种暂无此数据", en: "Not available for this asset" },
+  "smartPage.intel.factor.spread.label": { zh: "持仓分歧", en: "Positioning spread" },
+  "smartPage.intel.factor.spread.bull": {
+    zh: "顶级仓位比散户更偏多，聪明钱在承接散户的空头方向。",
+    en: "Top-trader positions lean longer than the crowd — smart money is taking the other side of retail shorts.",
+  },
+  "smartPage.intel.factor.spread.bear": {
+    zh: "顶级仓位比散户更偏空，散户多头缺乏大资金背书。",
+    en: "Top-trader positions lean shorter than the crowd — retail longs lack big-money backing.",
+  },
+  "smartPage.intel.factor.spread.neutral": {
+    zh: "顶级与散户方向基本一致，分歧信号缺席。",
+    en: "Top traders and the crowd are aligned — no divergence signal.",
+  },
+  "smartPage.intel.factor.flow.label": { zh: "主动流向", en: "Aggressive flow" },
+  "smartPage.intel.factor.flow.bull": {
+    zh: "区间内主动买盘占优，方向有真实吃单支撑。",
+    en: "Aggressive buying dominates the window — the lean is backed by real lifting.",
+  },
+  "smartPage.intel.factor.flow.bear": {
+    zh: "区间内主动卖盘占优，反弹缺乏吃单承接。",
+    en: "Aggressive selling dominates the window — rallies lack real bid-side takers.",
+  },
+  "smartPage.intel.factor.flow.neutral": {
+    zh: "主动买卖大致平衡，流向不构成方向证据。",
+    en: "Taker flow is roughly balanced — no directional evidence from flow.",
+  },
+  "smartPage.intel.factor.crowding.label": { zh: "杠杆拥挤", en: "Leverage crowding" },
+  "smartPage.intel.factor.crowding.bull": {
+    zh: "资金费为负、空头持续付费，挤压燃料在空头一侧（反向偏多）。",
+    en: "Funding is negative — shorts keep paying, squeeze fuel sits on the short side (contrarian bullish).",
+  },
+  "smartPage.intel.factor.crowding.bear": {
+    zh: "资金费偏高且持仓量攀升，多头拥挤、持仓成本不可持续（反向偏空）。",
+    en: "Funding is elevated while open interest climbs — longs are crowded and paying an unsustainable cost (contrarian bearish).",
+  },
+  "smartPage.intel.factor.crowding.neutral": {
+    zh: "资金费与持仓量处于正常区间，杠杆结构健康。",
+    en: "Funding and open interest sit in normal ranges — leverage structure is healthy.",
+  },
+  "smartPage.intel.factor.loan.label": { zh: "融资情绪", en: "Margin sentiment" },
+  "smartPage.intel.factor.loan.bull": {
+    zh: "杠杆借贷比处于历史低分位，杠杆情绪冰点通常靠近底部区域（反向偏多）。",
+    en: "Borrow ratio sits at a low historical percentile — frozen leverage appetite tends to mark bottom zones (contrarian bullish).",
+  },
+  "smartPage.intel.factor.loan.bear": {
+    zh: "杠杆借贷比处于历史高分位，散户加杠杆过热（反向偏空）。",
+    en: "Borrow ratio sits at a high historical percentile — retail leverage is overheated (contrarian bearish).",
+  },
+  "smartPage.intel.factor.loan.neutral": {
+    zh: "杠杆借贷比处于中位区间，情绪不极端。",
+    en: "Borrow ratio is mid-range — sentiment is not extreme.",
+  },
+  "smartPage.intel.factor.options.label": { zh: "期权对冲", en: "Options hedging" },
+  "smartPage.intel.factor.options.bull": {
+    zh: "Call 持仓明显占优，期权市场为上行定价。",
+    en: "Calls clearly dominate open interest — the options market is pricing upside.",
+  },
+  "smartPage.intel.factor.options.bear": {
+    zh: "Put 持仓占优，下行保护需求升高。",
+    en: "Puts dominate open interest — demand for downside protection is elevated.",
+  },
+  "smartPage.intel.factor.options.neutral": {
+    zh: "Put/Call 持仓比处于均衡区间。",
+    en: "Put/call open interest is balanced.",
+  },
+  "smartPage.intel.spreadChart": {
+    zh: "分歧差值历史 vs 价格（分歧走扩而价格未跟 = 潜在反转）",
+    en: "Divergence history vs price (spread widening without price follow-through = potential reversal)",
+  },
+  "smartPage.intel.ratioChart": {
+    zh: "杠杆借贷比 & Put/Call 持仓比",
+    en: "Margin borrow ratio & put/call OI ratio",
+  },
+  "smartPage.intel.series.spread": { zh: "分歧差值 (pp)", en: "Spread (pp)" },
+  "smartPage.intel.series.price": { zh: "价格", en: "Price" },
+  "smartPage.intel.series.loan": { zh: "借贷比", en: "Borrow ratio" },
+  "smartPage.intel.series.putCall": { zh: "Put/Call 持仓比", en: "Put/Call OI" },
+  "smartPage.intel.clampNote": {
+    zh: "OKX 合约级统计保留期有限，当前时间档已钳制为最近 180 天。",
+    en: "OKX contract-level stats have bounded retention; this range is clamped to the latest 180 days.",
+  },
   "smartPage.leaders.title": { zh: "跟单排行榜（OKX 带单员）", en: "Copy-Trading Leaderboard (OKX lead traders)" },
   "smartPage.leaders.info": {
     zh: "OKX 官方跟单公开榜单：收益、收益率、胜率、AUM 与跟单人数均来自真实成交结算，不可自报。点击任意交易员展开近 30 日统计、90 日日度收益率曲线与当前带单持仓。\n用法：优先看收益率曲线是否平滑、带单天数是否够长、AUM 与跟单人数是否匹配容量，而不是只看收益额排名。",
@@ -788,6 +889,10 @@ const DICT: Dict = {
   "smartPage.method.item6": {
     zh: "永远小仓试跟、独立止损：跟单不是托管，历史收益不代表未来；先用最小仓位验证 2–4 周，再决定是否加大。",
     en: "Always start small with your own stop: copying is not custody and past returns do not persist; validate with minimum size for 2–4 weeks before scaling.",
+  },
+  "smartPage.method.item7": {
+    zh: "多因子共振优于单一信号：持仓分歧、主动流向、杠杆拥挤、融资情绪、期权对冲同向时置信度最高；只有一个因子极端时，先当噪音处理。",
+    en: "Multi-factor resonance beats any single signal: confidence peaks when positioning spread, aggressive flow, leverage crowding, margin sentiment and options hedging all point the same way; a lone extreme factor is noise until confirmed.",
   },
 
   // Options OI / max pain (Deribit)

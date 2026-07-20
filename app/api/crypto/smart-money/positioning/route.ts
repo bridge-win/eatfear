@@ -15,12 +15,20 @@ export const revalidate = 60
  * Upstream retention: Binance keeps only the last 30 days and serves at most
  * 500 rows per request, so longer ranges are clamped (reported via `note`)
  * and multi-page windows are stitched to keep full in-range coverage.
+ *
+ * Binance's futures/data endpoints answer HTTP 451 from datacenter/US IPs —
+ * exactly where this app runs on Vercel — so in production those series come
+ * back empty. OKX Rubik exposes contract-level 1:1 equivalents that are
+ * reachable from the same hosts, so every series falls back to OKX when the
+ * Binance page is empty. That keeps top-trader / all-market long ratios,
+ * divergence and taker buy/sell populated regardless of where we execute.
  */
 
 const BINANCE_FAPI = "https://fapi.binance.com"
 const OKX = "https://www.okx.com"
 const BINANCE_RETENTION_DAYS = 30
 const BINANCE_PAGE_LIMIT = 500
+const OKX_PAGE_LIMIT = 100
 
 const SUPPORTED_CCY = /^[A-Z0-9]{2,10}$/
 
@@ -179,6 +187,72 @@ const fetchOkxAccountRatio = async (
   return Array.from(byTime.values()).sort((a, b) => a.time - b.time)
 }
 
+interface OkxContractResponse {
+  code?: string
+  data?: string[][]
+}
+
+/**
+ * OKX Rubik contract-level stats page by `begin`/`end` (max 100 rows/request),
+ * newest-first. Windows are stitched forward to cover the full requested range.
+ */
+const fetchOkxContractWindows = async (
+  path: string,
+  instId: string,
+  period: PeriodKey,
+  startMs: number,
+  endMs: number,
+): Promise<string[][]> => {
+  const windowMs = OKX_PAGE_LIMIT * PERIODS[period].ms
+  const rows: string[][] = []
+  let cursor = startMs
+  let guard = 0
+  while (cursor < endMs && guard < 16) {
+    guard += 1
+    const windowEnd = Math.min(cursor + windowMs - 1, endMs)
+    const payload = await fetchJsonSafe<OkxContractResponse>(
+      `${OKX}${path}?instId=${instId}&period=${PERIODS[period].okx}` +
+        `&begin=${cursor}&end=${windowEnd}&limit=${OKX_PAGE_LIMIT}`,
+    )
+    if (payload?.code === "0" && Array.isArray(payload.data)) rows.push(...payload.data)
+    cursor = windowEnd + 1
+  }
+  return rows
+}
+
+const okxRatioPoints = (rows: string[][]): RatioPoint[] => {
+  const byTime = new Map<number, RatioPoint>()
+  for (const row of rows) {
+    const time = Number(row[0])
+    const ratio = Number(row[1])
+    if (!Number.isFinite(time) || !Number.isFinite(ratio) || ratio < 0) continue
+    byTime.set(time, { time, ratio, longPct: (ratio / (1 + ratio)) * 100 })
+  }
+  return Array.from(byTime.values()).sort((a, b) => a.time - b.time)
+}
+
+// OKX taker-volume-contract rows are [ts, sellVol, buyVol]; ratio = buy / sell.
+const okxTakerPoints = (rows: string[][]): TakerPoint[] => {
+  const byTime = new Map<number, TakerPoint>()
+  for (const row of rows) {
+    const time = Number(row[0])
+    const sellVol = Number(row[1])
+    const buyVol = Number(row[2])
+    if (!Number.isFinite(time) || !Number.isFinite(buyVol) || !Number.isFinite(sellVol)) continue
+    byTime.set(time, { time, ratio: sellVol > 0 ? buyVol / sellVol : 0, buyVol, sellVol })
+  }
+  return Array.from(byTime.values()).sort((a, b) => a.time - b.time)
+}
+
+type SeriesSource = "binance" | "okx" | "none"
+
+const preferBinance = <T>(binance: T[], okx: T[]): { points: T[]; source: SeriesSource } =>
+  binance.length > 0
+    ? { points: binance, source: "binance" }
+    : okx.length > 0
+      ? { points: okx, source: "okx" }
+      : { points: [], source: "none" }
+
 const latestOf = <T>(points: T[]): T | null => (points.length > 0 ? points[points.length - 1] : null)
 
 export async function GET(request: Request) {
@@ -193,18 +267,57 @@ export async function GET(request: Request) {
   const endMs = Date.now()
   const startMs = endMs - days * 24 * 60 * 60 * 1000
 
-  const [topPositionRows, topAccountRows, globalAccountRows, takerRows, okxAccount] = await Promise.all([
+  const instId = `${ccy}-USDT-SWAP`
+
+  const [
+    topPositionRows,
+    topAccountRows,
+    globalAccountRows,
+    takerRows,
+    okxAccount,
+    okxTopPositionRows,
+    okxTopAccountRows,
+    okxGlobalRows,
+    okxTakerRows,
+  ] = await Promise.all([
     fetchBinanceWindows<BinanceRatioRow>("/futures/data/topLongShortPositionRatio", symbol, period, startMs, endMs),
     fetchBinanceWindows<BinanceRatioRow>("/futures/data/topLongShortAccountRatio", symbol, period, startMs, endMs),
     fetchBinanceWindows<BinanceRatioRow>("/futures/data/globalLongShortAccountRatio", symbol, period, startMs, endMs),
     fetchBinanceWindows<BinanceTakerRow>("/futures/data/takerlongshortRatio", symbol, period, startMs, endMs),
     fetchOkxAccountRatio(ccy, period, startMs, endMs),
+    fetchOkxContractWindows(
+      "/api/v5/rubik/stat/contracts/long-short-position-ratio-contract-top-trader",
+      instId,
+      period,
+      startMs,
+      endMs,
+    ),
+    fetchOkxContractWindows(
+      "/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader",
+      instId,
+      period,
+      startMs,
+      endMs,
+    ),
+    fetchOkxContractWindows(
+      "/api/v5/rubik/stat/contracts/long-short-account-ratio-contract",
+      instId,
+      period,
+      startMs,
+      endMs,
+    ),
+    fetchOkxContractWindows("/api/v5/rubik/stat/taker-volume-contract", instId, period, startMs, endMs),
   ])
 
-  const topPosition = toRatioPoints(topPositionRows)
-  const topAccount = toRatioPoints(topAccountRows)
-  const globalAccount = toRatioPoints(globalAccountRows)
-  const takerRatio = toTakerPoints(takerRows)
+  const topPositionPick = preferBinance(toRatioPoints(topPositionRows), okxRatioPoints(okxTopPositionRows))
+  const topAccountPick = preferBinance(toRatioPoints(topAccountRows), okxRatioPoints(okxTopAccountRows))
+  const globalAccountPick = preferBinance(toRatioPoints(globalAccountRows), okxRatioPoints(okxGlobalRows))
+  const takerPick = preferBinance(toTakerPoints(takerRows), okxTakerPoints(okxTakerRows))
+
+  const topPosition = topPositionPick.points
+  const topAccount = topAccountPick.points
+  const globalAccount = globalAccountPick.points
+  const takerRatio = takerPick.points
 
   const latestTop = latestOf(topPosition)
   const latestGlobal = latestOf(globalAccount)
@@ -215,17 +328,24 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     sources: [
-      "Binance futures/data top-trader & global long/short ratios",
-      "Binance futures/data taker buy/sell volume",
-      "OKX Rubik contracts long/short account ratio",
+      "Binance futures/data top-trader & global long/short ratios (primary)",
+      "Binance futures/data taker buy/sell volume (primary)",
+      "OKX Rubik contract top-trader / all-account long-short & taker volume (fallback)",
     ],
     ccy,
     symbol,
+    instId,
     range: range.id,
     period,
     requestedDays,
     clampedDays: days,
     note: requestedDays > BINANCE_RETENTION_DAYS ? "binance-30d-retention" : null,
+    sourceUsed: {
+      topPosition: topPositionPick.source,
+      topAccount: topAccountPick.source,
+      globalAccount: globalAccountPick.source,
+      takerRatio: takerPick.source,
+    },
     series: {
       topPosition,
       topAccount,
