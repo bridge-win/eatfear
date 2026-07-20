@@ -9,6 +9,7 @@ import { HyperliquidWalletTracker } from "@/components/hyperliquid-wallet-tracke
 import { DashboardFrame } from "@/components/page-frame"
 import { SmartMoneyPositioning } from "@/components/smart-money-positioning"
 import { SmartMoneyTracker } from "@/components/smart-money-tracker"
+import { SmartMoneyVerification } from "@/components/smart-money-verification"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TimeRangeSelector } from "@/components/time-range-selector"
@@ -72,7 +73,9 @@ export function SmartMoneyCopyDashboard() {
 
       <SmartMoneyTracker ccy={ccy} range={range} variant="full" />
 
-      <CopyTradingLeaderboard />
+      <SmartMoneyVerification ccy={ccy} />
+
+      <CopyTradingLeaderboard range={range} />
 
       <HyperliquidWalletTracker />
 

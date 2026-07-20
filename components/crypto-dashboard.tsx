@@ -1,8 +1,6 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import Link from "next/link"
-import { Crown } from "lucide-react"
 
 import { BlackSwanOpportunityCard } from "@/components/black-swan-opportunity-card"
 import { CryptoBuyWindowCard } from "@/components/crypto-buy-window-card"
@@ -148,14 +146,6 @@ export function CryptoDashboard({
           </p>
         </div>
         <div className="flex flex-wrap items-start justify-end gap-1.5">
-          <Link
-            href="/crypto/smart-money"
-            prefetch={false}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Crown className="h-3.5 w-3.5" />
-            {t("crypto.smartMoneyLink")}
-          </Link>
           <SymbolSelector value={instId} options={symbolOptions} onChange={setInstId} />
           <TimeRangeSelector value={range} onChange={setRange} />
         </div>

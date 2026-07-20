@@ -1,6 +1,6 @@
 # Smart Money & Copy Trading — 二级页面规格 (Spec)
 
-> 路径:`/crypto/smart-money` · 状态:v1 已实现 · 归属:Crypto 模块二级页面
+> 路径:`/crypto/smart-money` · 状态:v2 已实现 · 归属:Crypto 模块;一级导航栏(Crypto 右侧)
 
 ## 1. 目标
 
@@ -46,10 +46,19 @@
 ### 3.2 Flow — 主动资金流(复用已有 SmartMoneyTracker)
 - OKX taker-volume SPOT+SWAP 合并,买/卖/净流 + 累计净流,支持全部时间档。
 
-### 3.3 Copy Trading 排行榜(OKX 带单员)
+### 3.3 Copy Trading 排行榜(多渠道)
+- **多数据源**:OKX(官方公开跟单 API,稳定,支持下钻)+ Binance(带单 portfolio 公开列表,best-effort 未公开端点,归一化为同一结构,失败自动降级为空列表)。源切换器 UI,每个源独立空态,单源不可用不影响另一源。
 - 排序:综合 / 收益额 / 收益率 / 胜率 / AUM。
-- 行:昵称、90 日收益率 sparkline、PnL、胜率、AUM、带单天数、跟单人数(含满员状态)。
-- 点击展开:近 30 日统计(胜率、盈利/亏损天数、跟单者收益)、90 日日度收益率曲线、**当前带单持仓表**(方向、杠杆、开仓均价、标记价、浮盈比例)。
+- 行:昵称、收益率 sparkline、PnL、胜率、AUM、带单天数、跟单人数(含满员状态);数据源以 `hasDetail` 标记是否可展开。
+- 点击展开(仅支持下钻的源):**随选中时间档自适应**的统计与收益率曲线——`range → OKX lastDays` 映射(1d/5d→7 天,1mo→30 天,其余→90 天),KPI 与曲线标题按解析出的天数动态显示;**当前带单持仓表**(方向、杠杆、开仓均价、标记价、浮盈比例)。
+
+### 3.6 资金真实性验证(反诱导 / 反造假)
+用独立、难以伪造的数据交叉验证上方聪明钱信号是否为真实承担风险的资金,而非诱导散户接盘的假仓位:
+- **资金费率**(OKX funding-rate-history):持仓的真实成本;极端费率 = 拥挤/挤压/诱多陷阱风险。
+- **持仓量**(OKX Rubik open-interest-volume):上升=新资金进场支撑方向,下降=获利平仓/空心行情。
+- **跨所一致性**:OKX vs Binance 散户多头占比差值;两个独立交易所口径一致远比单一交易所难伪造。
+- **链上锚点**:下方 Hyperliquid 持仓链上结算、完全无法造假,作为终极验真基准。
+- 输出:三项 KPI + 四条真实性检查清单(通过/注意/警告/参考,含具体解释),资金费率与持仓量历史迷你图。
 
 ### 3.4 链上聪明钱包观察列表(Hyperliquid)
 - 用户自行添加 0x 地址(本地持久化,localStorage),不预置第三方地址(避免张冠李戴/过期)。
@@ -68,8 +77,9 @@ Browser (usePersistentSWR + localStorage 缓存)
    ▼
 Next.js Route Handlers (Vercel, revalidate 缓存 60–300s)
    ├─ positioning     → Binance futures/data ×4 (分页) + OKX rubik long-short (分页)
-   ├─ leaders         → OKX copytrading public-lead-traders
-   ├─ leader-detail   → OKX public-stats + public-pnl + public-current-subpositions (并行)
+   ├─ leaders         → OKX public-lead-traders | Binance copy-trade query-list (源可插拔)
+   ├─ leader-detail   → OKX public-stats + public-pnl + public-current-subpositions (并行, range→lastDays)
+   ├─ verification    → OKX funding-rate-history + OI-volume + OKX/Binance 多空比 (并行)
    └─ wallet          → Hyperliquid /info ×2 (clearinghouseState + portfolio, 并行)
 ```
 
@@ -87,8 +97,9 @@ Next.js Route Handlers (Vercel, revalidate 缓存 60–300s)
 | 路由 | 参数 | 返回 |
 | --- | --- | --- |
 | `GET /api/crypto/smart-money/positioning` | `ccy`, `range` | `{ series: { topPosition, topAccount, globalAccount, takerRatio, okxAccount }, divergence, clampedDays, note }` |
-| `GET /api/crypto/smart-money/leaders` | `sort`(overview/pnl/aum/win_ratio/pnl_ratio), `page` | `{ traders: [...], totalPage }` |
-| `GET /api/crypto/smart-money/leader-detail` | `uniqueCode` | `{ stats, pnlSeries, positions }` |
+| `GET /api/crypto/smart-money/leaders` | `source`(okx/binance), `sort`, `page` | `{ source, traders: [...{source,hasDetail}], totalPage }` |
+| `GET /api/crypto/smart-money/leader-detail` | `uniqueCode`, `range` | `{ windowDays, stats, pnlSeries, positions }` |
+| `GET /api/crypto/smart-money/verification` | `ccy` | `{ funding, openInterest, crossVenue, checks: [{id,status}] }` |
 | `GET /api/crypto/smart-money/wallet` | `address` | `{ equity, withdrawable, pnl: {day,week,month,allTime}, positions }` |
 
 ## 5. 页面与导航

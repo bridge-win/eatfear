@@ -12,6 +12,20 @@ const OKX = "https://www.okx.com"
 
 const UNIQUE_CODE = /^[A-Z0-9]{1,32}$/
 
+// OKX public-stats / public-pnl accept a lastDays bucket, not an arbitrary
+// window — map the dashboard range to the nearest supported bucket.
+const resolveLastDays = (range: string | null): { lastDays: string; days: number } => {
+  switch (range) {
+    case "1d":
+    case "5d":
+      return { lastDays: "1", days: 7 }
+    case "1mo":
+      return { lastDays: "2", days: 30 }
+    default:
+      return { lastDays: "3", days: 90 }
+  }
+}
+
 interface OkxEnvelope<T> {
   code?: string
   data?: T[]
@@ -75,12 +89,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "invalid uniqueCode" }, { status: 400 })
   }
   const code = encodeURIComponent(uniqueCodeRaw)
+  const { lastDays, days } = resolveLastDays(url.searchParams.get("range"))
 
   const [statsRows, pnlRows, positionRows] = await Promise.all([
-    // lastDays=2 → trailing 30 days
-    okxFetchSafe<OkxStatsRow>(`/api/v5/copytrading/public-stats?instType=SWAP&uniqueCode=${code}&lastDays=2`),
-    // lastDays=3 → trailing 90 days of daily pnl ratios
-    okxFetchSafe<OkxPnlRow>(`/api/v5/copytrading/public-pnl?instType=SWAP&uniqueCode=${code}&lastDays=3`),
+    okxFetchSafe<OkxStatsRow>(`/api/v5/copytrading/public-stats?instType=SWAP&uniqueCode=${code}&lastDays=${lastDays}`),
+    okxFetchSafe<OkxPnlRow>(`/api/v5/copytrading/public-pnl?instType=SWAP&uniqueCode=${code}&lastDays=${lastDays}`),
     okxFetchSafe<OkxSubPositionRow>(
       `/api/v5/copytrading/public-current-subpositions?instType=SWAP&uniqueCode=${code}&limit=10`,
     ),
@@ -122,6 +135,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     source: "OKX Copy Trading public stats / pnl / subpositions",
     uniqueCode: uniqueCodeRaw,
+    windowDays: days,
     stats,
     pnlSeries,
     positions,

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { InfoTooltip } from "@/components/info-tooltip"
 import { jsonFetcher, usePersistentSWR, usePersistentState } from "@/lib/client-persistence"
 import { useI18n, useT } from "@/lib/i18n"
+import { type TimeRangeId } from "@/lib/time-range"
 import { cn } from "@/lib/utils"
 
 const SORTS = ["overview", "pnl", "pnl_ratio", "win_ratio", "aum"] as const
@@ -15,10 +16,15 @@ type SortId = (typeof SORTS)[number]
 
 const isSortId = (value: string): value is SortId => (SORTS as readonly string[]).includes(value)
 
+const SOURCES = ["okx", "binance"] as const
+type SourceId = (typeof SOURCES)[number]
+
+const isSourceId = (value: string): value is SourceId => (SOURCES as readonly string[]).includes(value)
+
 interface LeaderTrader {
   uniqueCode: string
+  source: SourceId
   nickName: string
-  ccy: string
   pnl: number | null
   pnlRatio: number | null
   winRatio: number | null
@@ -28,6 +34,7 @@ interface LeaderTrader {
   maxCopyTraderNum: number | null
   instruments: string[]
   pnlSparkline: { time: number; value: number }[]
+  hasDetail: boolean
 }
 
 interface LeadersResponse {
@@ -37,6 +44,7 @@ interface LeadersResponse {
 }
 
 interface LeaderDetailResponse {
+  windowDays: number
   stats: {
     winRatio: number | null
     profitDays: number | null
@@ -102,12 +110,12 @@ function PnlSparkline({ points }: { points: { time: number; value: number }[] })
   )
 }
 
-function LeaderDetail({ uniqueCode }: { uniqueCode: string }) {
+function LeaderDetail({ uniqueCode, range }: { uniqueCode: string; range: TimeRangeId }) {
   const t = useT()
   const { locale } = useI18n()
   const swr = usePersistentSWR<LeaderDetailResponse>(
-    `crypto:smart-leader-detail:${uniqueCode}`,
-    `/api/crypto/smart-money/leader-detail?uniqueCode=${encodeURIComponent(uniqueCode)}`,
+    `crypto:smart-leader-detail:${uniqueCode}:${range}`,
+    `/api/crypto/smart-money/leader-detail?uniqueCode=${encodeURIComponent(uniqueCode)}&range=${range}`,
     jsonFetcher,
     { refreshInterval: REFRESH_MS },
   )
@@ -121,6 +129,7 @@ function LeaderDetail({ uniqueCode }: { uniqueCode: string }) {
   }
 
   const dateLocale = locale === "zh" ? "zh-CN" : "en-US"
+  const windowDays = detail.windowDays
   const stats = detail.stats
   const curve = detail.pnlSeries
     .filter((row) => row.pnlRatio !== null)
@@ -131,7 +140,7 @@ function LeaderDetail({ uniqueCode }: { uniqueCode: string }) {
       {stats && (
         <div>
           <p className="mb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-            {t("smartPage.leaders.detail.stats30d")}
+            {t("smartPage.leaders.detail.stats", { days: windowDays })}
           </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             {[
@@ -157,7 +166,7 @@ function LeaderDetail({ uniqueCode }: { uniqueCode: string }) {
       {curve.length > 1 && (
         <div>
           <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-            {t("smartPage.leaders.detail.pnlCurve")}
+            {t("smartPage.leaders.detail.pnlCurve", { days: windowDays })}
           </p>
           <div className="h-28 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -260,13 +269,14 @@ function LeaderDetail({ uniqueCode }: { uniqueCode: string }) {
   )
 }
 
-export function CopyTradingLeaderboard({ className }: { className?: string }) {
+export function CopyTradingLeaderboard({ range, className }: { range: TimeRangeId; className?: string }) {
   const t = useT()
+  const [source, setSource] = usePersistentState<SourceId>("crypto:smart-leader-source", "okx", isSourceId)
   const [sort, setSort] = usePersistentState<SortId>("crypto:smart-leader-sort", "pnl", isSortId)
   const [expanded, setExpanded] = useState<string | null>(null)
   const swr = usePersistentSWR<LeadersResponse>(
-    `crypto:smart-leaders:${sort}`,
-    `/api/crypto/smart-money/leaders?sort=${sort}`,
+    `crypto:smart-leaders:${source}:${sort}`,
+    `/api/crypto/smart-money/leaders?source=${source}&sort=${sort}`,
     jsonFetcher,
     { refreshInterval: REFRESH_MS },
   )
@@ -286,20 +296,40 @@ export function CopyTradingLeaderboard({ className }: { className?: string }) {
               source="OKX Copy Trading public API"
             />
           </div>
-          <div className="flex flex-wrap gap-1">
-            {SORTS.map((sortId) => (
-              <button
-                key={sortId}
-                type="button"
-                onClick={() => setSort(sortId)}
-                className={cn(
-                  "rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                  sort === sortId && "bg-foreground text-background hover:bg-foreground hover:text-background",
-                )}
-              >
-                {t(`smartPage.sort.${sortId}`)}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 rounded-full border bg-background/60 p-0.5">
+              {SOURCES.map((sourceId) => (
+                <button
+                  key={sourceId}
+                  type="button"
+                  onClick={() => {
+                    setSource(sourceId)
+                    setExpanded(null)
+                  }}
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:text-foreground",
+                    source === sourceId && "bg-foreground text-background",
+                  )}
+                >
+                  {t(`smartPage.leaders.source.${sourceId}`)}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {SORTS.map((sortId) => (
+                <button
+                  key={sortId}
+                  type="button"
+                  onClick={() => setSort(sortId)}
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                    sort === sortId && "bg-foreground text-background hover:bg-foreground hover:text-background",
+                  )}
+                >
+                  {t(`smartPage.sort.${sortId}`)}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -333,10 +363,13 @@ export function CopyTradingLeaderboard({ className }: { className?: string }) {
                     trader.maxCopyTraderNum > 0 &&
                     trader.copyTraderNum >= trader.maxCopyTraderNum
                   return (
-                    <Fragment key={trader.uniqueCode}>
+                    <Fragment key={`${trader.source}:${trader.uniqueCode}`}>
                       <tr
-                        onClick={() => setExpanded(isOpen ? null : trader.uniqueCode)}
-                        className="cursor-pointer border-b border-dashed transition-colors last:border-0 hover:bg-muted/40"
+                        onClick={() => trader.hasDetail && setExpanded(isOpen ? null : trader.uniqueCode)}
+                        className={cn(
+                          "border-b border-dashed transition-colors last:border-0",
+                          trader.hasDetail && "cursor-pointer hover:bg-muted/40",
+                        )}
                       >
                         <td className="py-2 pr-2">
                           <p className="font-medium">{trader.nickName}</p>
@@ -367,13 +400,19 @@ export function CopyTradingLeaderboard({ className }: { className?: string }) {
                           )}
                         </td>
                         <td className="py-2 text-right text-muted-foreground">
-                          {isOpen ? <ChevronUp className="ml-auto h-3.5 w-3.5" /> : <ChevronDown className="ml-auto h-3.5 w-3.5" />}
+                          {trader.hasDetail ? (
+                            isOpen ? (
+                              <ChevronUp className="ml-auto h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronDown className="ml-auto h-3.5 w-3.5" />
+                            )
+                          ) : null}
                         </td>
                       </tr>
-                      {isOpen && (
+                      {isOpen && trader.hasDetail && (
                         <tr>
                           <td colSpan={9} className="p-0">
-                            <LeaderDetail uniqueCode={trader.uniqueCode} />
+                            <LeaderDetail uniqueCode={trader.uniqueCode} range={range} />
                           </td>
                         </tr>
                       )}
