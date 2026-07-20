@@ -16,7 +16,8 @@ export const revalidate = 300
  * - Cross-venue consistency: OKX vs Binance retail long% — two independent
  *   venues agreeing is far harder to fake than one.
  * - On-chain anchor: Hyperliquid positions (tracked below) are settled
- *   on-chain and cannot be faked at all — the ground-truth check.
+ *   on-chain and provide an independent public-state cross-check. Address
+ *   ownership, intent, and external hedges remain outside this evidence.
  *
  * Every upstream fails closed, so partial data still yields a useful verdict.
  */

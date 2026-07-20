@@ -2,16 +2,11 @@
 
 import { useMemo } from "react"
 import Link from "next/link"
-import { ArrowLeft, BookOpenText } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 
-import { CopyTradingLeaderboard } from "@/components/copy-trading-leaderboard"
-import { HyperliquidWalletTracker } from "@/components/hyperliquid-wallet-tracker"
 import { DashboardFrame } from "@/components/page-frame"
-import { SmartMoneyPositioning } from "@/components/smart-money-positioning"
-import { SmartMoneyTracker } from "@/components/smart-money-tracker"
-import { SmartMoneyVerification } from "@/components/smart-money-verification"
+import { SmartMoneyCommandCenter } from "@/components/smart-money-command-center"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TimeRangeSelector } from "@/components/time-range-selector"
 import { usePersistentState } from "@/lib/client-persistence"
 import { useT } from "@/lib/i18n"
@@ -23,15 +18,6 @@ const CCY_OPTIONS = ["BTC", "ETH", "SOL", "XRP", "BNB", "DOGE"] as const
 
 const isCcy = (value: string): value is (typeof CCY_OPTIONS)[number] =>
   (CCY_OPTIONS as readonly string[]).includes(value)
-
-const METHOD_ITEM_KEYS = [
-  "smartPage.method.item1",
-  "smartPage.method.item2",
-  "smartPage.method.item3",
-  "smartPage.method.item4",
-  "smartPage.method.item5",
-  "smartPage.method.item6",
-] as const
 
 export function SmartMoneyCopyDashboard() {
   const t = useT()
@@ -69,31 +55,7 @@ export function SmartMoneyCopyDashboard() {
         </div>
       </header>
 
-      <SmartMoneyPositioning ccy={ccy} range={range} />
-
-      <SmartMoneyTracker ccy={ccy} range={range} variant="full" />
-
-      <SmartMoneyVerification ccy={ccy} />
-
-      <CopyTradingLeaderboard range={range} />
-
-      <HyperliquidWalletTracker />
-
-      <Card className="py-2.5">
-        <CardHeader className="px-3 pb-1">
-          <div className="flex items-center gap-1.5">
-            <BookOpenText className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-sm">{t("smartPage.method.title")}</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="px-3 pt-1">
-          <ol className="list-decimal space-y-1.5 pl-4 text-xs leading-relaxed text-muted-foreground">
-            {METHOD_ITEM_KEYS.map((key) => (
-              <li key={key}>{t(key)}</li>
-            ))}
-          </ol>
-        </CardContent>
-      </Card>
+      <SmartMoneyCommandCenter ccy={ccy} range={range} />
     </DashboardFrame>
   )
 }
