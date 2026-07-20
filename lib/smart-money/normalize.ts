@@ -342,7 +342,9 @@ export function normalizeHyperliquidTrade(
   const price = toFiniteNumber(raw.px)
   const size = toFiniteNumber(raw.sz)
   const eventAt = eventTimestamp(raw.time, now)
-  const transactionId = raw.hash?.trim() || (raw.tid === undefined ? null : String(raw.tid))
+  const rawHash = raw.hash?.trim() || ""
+  const validHash = /^0x[0-9a-fA-F]{64}$/.test(rawHash) && !/^0x0{64}$/.test(rawHash)
+  const transactionId = validHash ? rawHash : raw.tid === undefined ? null : String(raw.tid)
   const qualification = rankedAddresses.has(address) ? "ranked" : "observed_large_trade"
   const asset = raw.coin?.trim().toUpperCase() || "UNKNOWN"
   return {
@@ -358,7 +360,7 @@ export function normalizeHyperliquidTrade(
     priceUsd: price,
     pnlUsd: null,
     transactionId,
-    verificationUrl: raw.hash ? `https://hypurrscan.io/tx/${encodeURIComponent(raw.hash)}` : "https://app.hyperliquid.xyz/trade",
+    verificationUrl: validHash ? `https://hypurrscan.io/tx/${encodeURIComponent(rawHash)}` : "https://app.hyperliquid.xyz/trade",
     qualification,
     provenance: eventProvenance({
       sourceId: "hyperliquid",

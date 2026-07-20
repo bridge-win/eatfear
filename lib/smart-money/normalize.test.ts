@@ -150,4 +150,8 @@ test("attributes Hyperliquid trade sides using the official buyer-seller orderin
   assert.equal(sellerEvent.action, "sell")
   assert.equal(sellerEvent.qualification, "observed_large_trade")
   assert.equal(buyerEvent.amountUsd, 1_706.23)
+
+  const zeroHashEvent = normalizeHyperliquidTrade({ ...trade, hash: `0x${"0".repeat(64)}` }, buyer, new Set([buyer]), NOW)
+  assert.equal(zeroHashEvent.transactionId, String(trade.tid))
+  assert.equal(zeroHashEvent.verificationUrl, "https://app.hyperliquid.xyz/trade")
 })
