@@ -3,6 +3,8 @@ import { NextResponse } from "next/server"
 import { buildDiscoverResponse } from "@/lib/discover/server"
 
 export const revalidate = 900
+export const runtime = "nodejs"
+export const maxDuration = 10
 
 const CACHE_HEADER = "public, s-maxage=900, stale-while-revalidate=300"
 
