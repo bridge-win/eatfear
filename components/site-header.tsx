@@ -19,6 +19,7 @@ export const navItems = [
   { href: "/crypto", key: "nav.crypto" },
   { href: "/crypto/smart-money", key: "nav.smartMoney" },
   { href: "/stock", key: "nav.stock" },
+  { href: "/discover", key: "nav.discover" },
   { href: "/watchlist", key: "nav.watchlist" },
   { href: "/journal", key: "nav.journal" },
   { href: "/macro", key: "nav.macro" },
