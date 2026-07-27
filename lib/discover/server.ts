@@ -1,5 +1,3 @@
-import { get as httpsGet } from "node:https"
-
 import { fetchYahooSeries } from "@/lib/data-sources/yahoo"
 import {
   DISCOVER_MIN_ANNUALIZED_YIELD_PCT,
@@ -148,52 +146,25 @@ function parseOptionSymbol(value: string | undefined): ParsedOptionSymbol | null
 
 async function fetchCboeOptionChain(symbol: string): Promise<CboeOptionChainResponse | null> {
   const url = `${CBOE_BASE_URL}/${encodeURIComponent(symbol)}.json`
-  return fetchNodeHttpsJson<CboeOptionChainResponse>(url)
+  return fetchUncachedJson<CboeOptionChainResponse>(url)
 }
 
-async function fetchNodeHttpsJson<T>(url: string): Promise<T | null> {
-  return new Promise((resolve) => {
-    let settled = false
-    const finish = (value: T | null) => {
-      if (settled) return
-      settled = true
-      resolve(value)
-    }
-
-    const request = httpsGet(
-      url,
-      {
-        headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-        timeout: CHART_TIMEOUT_MS,
-      },
-      (response) => {
-        if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
-          response.resume()
-          finish(null)
-          return
-        }
-
-        let body = ""
-        response.setEncoding("utf8")
-        response.on("data", (chunk: string) => {
-          body += chunk
-        })
-        response.on("end", () => {
-          try {
-            finish(JSON.parse(body) as T)
-          } catch {
-            finish(null)
-          }
-        })
-      },
-    )
-
-    request.on("timeout", () => {
-      request.destroy()
-      finish(null)
+async function fetchUncachedJson<T>(url: string): Promise<T | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), CHART_TIMEOUT_MS)
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
+      signal: controller.signal,
     })
-    request.on("error", () => finish(null))
-  })
+    if (!response.ok) return null
+    return (await response.json()) as T
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 function selectCboeOptionQuote({
