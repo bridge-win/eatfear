@@ -7,21 +7,21 @@ Add a first-release `Discover` module that helps ordinary investors find relativ
 - Cash-secured put and covered-call candidates with an estimated annualized premium yield of at least 10%.
 - Stable-yield methods such as Treasury bills, Treasury money-market funds, insured deposits, overnight cash/repo sweeps, ultrashort bond funds, and collateralized cash/lending programs.
 - Concrete stable-yield assets/funds such as Treasury bill ETFs, floating-rate Treasury ETFs, and ultrashort bond ETFs with live price/risk data and issuer sources.
-- 15-minute refresh through a server-side cached API so the page updates at least daily and normally much faster without manual edits.
+- Production-safe static fallback snapshot so `/discover` is available while the live scanner API is deferred behind Vercel provisioning.
 
 This is an information and screening surface, not personalized financial advice.
 
 ## Data Contract
 
-`GET /api/discover` returns:
+The first production-safe `/discover` page renders:
 
 - `candidates`: screened option-income opportunities with price, strike, days to expiration, premium, annualized yield, realized volatility, max drawdown, risk score, reasons, cautions, and source metadata.
 - `stableYieldIdeas`: lower-risk income methods with estimated yield, liquidity, principal risk, access notes, tax notes, and source links.
 - `stableYieldAssets`: concrete ETF/fund candidates with live price, day change, Treasury-proxy yield guide, one-year realized volatility, max drawdown, risk score, reasons, cautions, and issuer links.
 - `sources`: data sources and limitations.
-- `updatedAt` and `nextUpdateAt`: cache timestamps for refresh visibility.
+- `updatedAt` and `nextUpdateAt`: snapshot timestamps for visibility.
 
-The first release uses no paid credentials. Yahoo chart data supplies current price snapshots and one-year history. Cboe delayed option-chain JSON supplies bid/ask, volume, and open interest when a liquid target contract is available. Black-Scholes estimates from realized volatility are kept as fallback only when delayed option data is missing or too illiquid.
+The intended live release uses no paid credentials. Yahoo chart data supplies current price snapshots and one-year history. Cboe delayed option-chain JSON supplies bid/ask, volume, and open interest when a liquid target contract is available. Black-Scholes estimates from realized volatility are kept as fallback only when delayed option data is missing or too illiquid. The current production-safe version embeds a typed fallback snapshot and source links so the route can publish without adding a new Vercel function.
 
 ## Screening Rules
 

@@ -14,14 +14,13 @@ import {
   Filter,
   Landmark,
   LineChart,
-  RefreshCw,
   ShieldCheck,
   SlidersHorizontal,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { jsonFetcher, usePersistentSWR } from "@/lib/client-persistence"
+import { STATIC_DISCOVER_RESPONSE } from "@/lib/discover/static-data"
 import type {
   DiscoverCandidate,
   DiscoverResponse,
@@ -34,27 +33,11 @@ import { cn } from "@/lib/utils"
 
 type StrategyFilter = "all" | DiscoverStrategy
 
-const DISCOVER_REFRESH_MS = 15 * 60 * 1000
-const DISCOVER_MAX_CACHE_AGE_MS = 2 * 60 * 60 * 1000
-
 const strategyFilters: Array<{ value: StrategyFilter; label: string }> = [
   { value: "all", label: "All" },
   { value: "cash_secured_put", label: "Cash-secured puts" },
   { value: "covered_call", label: "Covered calls" },
 ]
-
-const emptyDiscoverResponse: DiscoverResponse = {
-  updatedAt: 0,
-  nextUpdateAt: 0,
-  minAnnualizedYieldPct: 10,
-  riskPolicy: "Loading risk policy...",
-  treasuryBillProxyRatePct: null,
-  candidates: [],
-  stableYieldAssets: [],
-  stableYieldIdeas: [],
-  sources: [],
-  limitations: [],
-}
 
 function formatTime(timestamp: number | null | undefined): string {
   if (!timestamp) return "Unavailable"
@@ -290,19 +273,13 @@ function EmptyState({ error }: { error?: string }) {
 export function DiscoverYieldCenter() {
   const [strategy, setStrategy] = React.useState<StrategyFilter>("all")
   const [minYield, setMinYield] = React.useState(10)
-  const discover = usePersistentSWR<DiscoverResponse>(
-    "discover:yield-center:v1",
-    "/api/discover",
-    jsonFetcher,
-    { fallbackData: emptyDiscoverResponse, refreshInterval: DISCOVER_REFRESH_MS },
-    { maxAgeMs: DISCOVER_MAX_CACHE_AGE_MS },
-  )
+  const discover: DiscoverResponse = STATIC_DISCOVER_RESPONSE
 
   const candidates = React.useMemo(() => {
-    return (discover.data?.candidates ?? []).filter((candidate) => {
+    return discover.candidates.filter((candidate) => {
       return (strategy === "all" || candidate.strategy === strategy) && candidate.annualizedYieldPct >= minYield
     })
-  }, [discover.data?.candidates, minYield, strategy])
+  }, [discover.candidates, minYield, strategy])
 
   const topYield = candidates.length > 0
     ? Math.max(...candidates.map((candidate) => candidate.annualizedYieldPct))
@@ -317,7 +294,7 @@ export function DiscoverYieldCenter() {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300">
-                  15-minute income map
+                  Production income map
                 </Badge>
                 <Badge variant="outline">Not personalized advice</Badge>
               </div>
@@ -332,13 +309,13 @@ export function DiscoverYieldCenter() {
             <div className="grid content-start gap-2 sm:grid-cols-2">
               <Metric label="Top screened yield" value={formatPct(topYield)} tone="text-emerald-600 dark:text-emerald-300" />
               <Metric label="Low/moderate rows" value={`${lowModerateCount}`} />
-              <Metric label="Treasury proxy" value={formatPct(discover.data?.treasuryBillProxyRatePct, 2)} />
-              <Metric label="Next refresh" value={formatTime(discover.data?.nextUpdateAt)} />
+              <Metric label="Treasury proxy" value={formatPct(discover.treasuryBillProxyRatePct, 2)} />
+              <Metric label="Snapshot" value={formatTime(discover.updatedAt)} />
             </div>
           </div>
 
           <div className="border-t bg-muted/20 px-4 py-2 text-[11px] text-muted-foreground lg:px-5">
-            Updated {formatTime(discover.data?.updatedAt)} · {discover.data?.riskPolicy ?? "Loading risk policy..."}
+            Updated {formatTime(discover.updatedAt)} · {discover.riskPolicy}
           </div>
         </section>
 
@@ -376,39 +353,30 @@ export function DiscoverYieldCenter() {
           </label>
         </section>
 
-        {discover.error && !discover.data ? (
-          <EmptyState error={discover.error.message} />
-        ) : (
-          <section className="space-y-3">
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h2 className="text-xl font-bold">Option-income candidates</h2>
-                <p className="text-sm text-muted-foreground">
-                  Delayed option-chain bid when available, current price snapshots, and explicit assignment risk.
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                {discover.isRefreshing ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CalendarClock className="h-3.5 w-3.5" />}
-                15-minute server cache
-              </div>
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 className="text-xl font-bold">Option-income candidates</h2>
+              <p className="text-sm text-muted-foreground">
+                Delayed option-chain snapshot, current production fallback, and explicit assignment risk.
+              </p>
             </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <CalendarClock className="h-3.5 w-3.5" />
+              Static fallback
+            </div>
+          </div>
 
-            {discover.isLoading ? (
-              <div className="grid gap-3">
-                <div className="h-64 animate-pulse rounded-lg border bg-muted/30" />
-                <div className="h-64 animate-pulse rounded-lg border bg-muted/30" />
-              </div>
-            ) : candidates.length > 0 ? (
-              <div className="grid gap-3">
-                {candidates.map((candidate) => (
-                  <CandidateCard key={`${candidate.symbol}:${candidate.strategy}`} candidate={candidate} />
-                ))}
-              </div>
-            ) : (
-              <EmptyState error="No candidate currently clears this filter. Lower the minimum yield or switch strategy." />
-            )}
-          </section>
-        )}
+          {candidates.length > 0 ? (
+            <div className="grid gap-3">
+              {candidates.map((candidate) => (
+                <CandidateCard key={`${candidate.symbol}:${candidate.strategy}`} candidate={candidate} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState error="No candidate currently clears this filter. Lower the minimum yield or switch strategy." />
+          )}
+        </section>
 
         <section className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-2">
@@ -425,7 +393,7 @@ export function DiscoverYieldCenter() {
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
-            {(discover.data?.stableYieldAssets ?? []).map((asset) => (
+            {discover.stableYieldAssets.map((asset) => (
               <StableAssetCard key={asset.symbol} asset={asset} />
             ))}
           </div>
@@ -446,7 +414,7 @@ export function DiscoverYieldCenter() {
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
-            {(discover.data?.stableYieldIdeas ?? []).map((idea) => (
+            {discover.stableYieldIdeas.map((idea) => (
               <StableYieldCard key={idea.id} idea={idea} />
             ))}
           </div>
@@ -459,7 +427,7 @@ export function DiscoverYieldCenter() {
               Source status
             </div>
             <div className="mt-3 space-y-2">
-              {(discover.data?.sources ?? []).map((source) => (
+              {discover.sources.map((source) => (
                 <a
                   key={source.id}
                   href={source.url}
@@ -490,7 +458,7 @@ export function DiscoverYieldCenter() {
               <Metric label="Risk gate" value="55/100 minimum" />
             </div>
             <ul className="mt-3 space-y-1.5 text-[12px] leading-relaxed text-muted-foreground">
-              {(discover.data?.limitations ?? []).map((limitation) => (
+              {discover.limitations.map((limitation) => (
                 <li key={limitation} className="rounded-md bg-muted/30 px-2 py-1.5">{limitation}</li>
               ))}
             </ul>
