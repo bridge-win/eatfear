@@ -8,7 +8,7 @@ import { InfoTooltip } from "@/components/info-tooltip"
 import { jsonFetcher, usePersistentSWR } from "@/lib/client-persistence"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import type { OptionsOiPayload } from "@/app/api/crypto/options-oi/route"
+import type { OptionsOiPayload } from "@/lib/api-routes/crypto/options-oi/route"
 
 const REFRESH_MS = 5 * 60 * 1000
 

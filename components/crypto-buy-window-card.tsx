@@ -7,7 +7,7 @@ import { InfoTooltip } from "@/components/info-tooltip"
 import { usePersistentSWR } from "@/lib/client-persistence"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import type { BuyWindowSignalZone } from "@/app/api/crypto/buy-window/route"
+import type { BuyWindowSignalZone } from "@/lib/api-routes/crypto/buy-window/route"
 
 const REFRESH_MS = 5 * 60 * 1000
 

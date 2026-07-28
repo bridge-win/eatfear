@@ -7,7 +7,7 @@ import { InfoTooltip } from "@/components/info-tooltip"
 import { usePersistentSWR } from "@/lib/client-persistence"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import type { SignalZone } from "@/app/api/stock/panic-signal/route"
+import type { SignalZone } from "@/lib/api-routes/stock/panic-signal/route"
 
 const REFRESH_MS = 5 * 60 * 1000
 

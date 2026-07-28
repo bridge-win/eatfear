@@ -7,7 +7,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { usePersistentSWR } from "@/lib/client-persistence"
 import { useI18n } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import type { CycleBand, HashRibbonStatus, MayerZone, PuellZone } from "@/app/api/crypto/cycle-position/route"
+import type { CycleBand, HashRibbonStatus, MayerZone, PuellZone } from "@/lib/api-routes/crypto/cycle-position/route"
 
 const REFRESH_MS = 300 * 1000
 

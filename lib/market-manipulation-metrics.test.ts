@@ -146,7 +146,7 @@ test("registers each manipulation curve once in the history indicator config", (
 
 test("requires full selected-range coverage for every manipulation curve", () => {
   const source = readFileSync(
-    new URL("../app/api/crypto/history-compare/route.ts", import.meta.url),
+    new URL("./api-routes/crypto/history-compare/route.ts", import.meta.url),
     "utf8",
   )
   const strictCoverageSet = source.match(
