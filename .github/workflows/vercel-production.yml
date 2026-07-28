@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: vercel-production-${{ github.ref }}
+  group: vercel-production-node22-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -22,6 +22,7 @@ jobs:
   deploy:
     name: Build and deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check required secrets
         run: |
