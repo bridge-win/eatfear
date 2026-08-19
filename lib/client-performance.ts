@@ -23,6 +23,17 @@ export function useDeferredRender(renderKey: string, timeout = 180): boolean {
   return ready
 }
 
+export function useDebouncedValue<T>(value: T, delayMs = 500): T {
+  const [debounced, setDebounced] = useState(value)
+
+  useEffect(() => {
+    const handle = globalThis.setTimeout(() => setDebounced(value), delayMs)
+    return () => globalThis.clearTimeout(handle)
+  }, [delayMs, value])
+
+  return debounced
+}
+
 export function useDelayedIdleRender(renderKey: string, delay = 1_000, idleTimeout = 500): boolean {
   const [ready, setReady] = useState(false)
 

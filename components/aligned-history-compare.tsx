@@ -1022,7 +1022,7 @@ export function AlignedHistoryCompare({
                 key={tooltip.key}
                 data-history-hover-tooltip
                 data-history-hover-pane={tooltip.key}
-                className="pointer-events-none absolute z-20 rounded-md border bg-popover/95 px-1.5 py-1 text-[9px] text-popover-foreground shadow-md backdrop-blur sm:text-[10px]"
+                className="pointer-events-none absolute z-20 px-1.5 py-1 text-[9px] text-foreground [text-shadow:0_0_4px_var(--background),0_1px_2px_var(--background)] sm:text-[10px]"
                 style={{ left: tooltip.left, top: tooltip.top, width: tooltip.width }}
               >
                 <div className="space-y-px">

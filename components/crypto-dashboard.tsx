@@ -37,7 +37,7 @@ import {
   usePersistentSWR,
   type DashboardTabValue,
 } from "@/lib/client-persistence"
-import { useDelayedIdleRender } from "@/lib/client-performance"
+import { useDebouncedValue, useDelayedIdleRender } from "@/lib/client-performance"
 import { useT } from "@/lib/i18n"
 import { buildTradingOpportunities, type OpportunityInputSeries } from "@/lib/opportunity-engine"
 import {
@@ -81,6 +81,13 @@ function isInstrumentId(value: string): value is string {
 
 function isDatetimeLocalValue(value: string): value is string {
   return value === "" || /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)
+}
+
+/* Must be module-level: usePersistentState re-runs its restore effect whenever
+   the validator identity changes, and an inline validator makes the restore
+   and write effects fight each other, flip-flopping state on every render. */
+function isBooleanFlag(value: string): value is "true" | "false" {
+  return value === "true" || value === "false"
 }
 
 function toDatetimeLocalValue(timestamp: number): string {
@@ -148,7 +155,7 @@ export function CryptoDashboard({
   const [customActiveValue, setCustomActiveValue] = usePersistentState<"true" | "false">(
     "crypto:custom-window-active",
     "false",
-    (value): value is "true" | "false" => value === "true" || value === "false",
+    isBooleanFlag,
   )
   const customActive = customActiveValue === "true"
   const [customStart, setCustomStart] = usePersistentState<string>(
@@ -163,8 +170,12 @@ export function CryptoDashboard({
   )
   const [tab, setTab] = usePersistentState<DashboardTabValue>("crypto:tab", "history", isDashboardTabValue)
   const [selectedSeriesKey, setSelectedSeriesKey] = useState<string | null>(null)
-  const customStartMs = customActive ? toTimestamp(customStart) : null
-  const customEndMs = customActive ? toTimestamp(customEnd) : null
+  /* Debounce so editing a datetime-local field (which fires onChange per
+     segment) doesn't refetch history on every keystroke. */
+  const debouncedCustomStart = useDebouncedValue(customStart, 600)
+  const debouncedCustomEnd = useDebouncedValue(customEnd, 600)
+  const customStartMs = customActive ? toTimestamp(debouncedCustomStart) : null
+  const customEndMs = customActive ? toTimestamp(debouncedCustomEnd) : null
   const validCustomWindow =
     customActive &&
     customStartMs !== null &&
@@ -178,11 +189,11 @@ export function CryptoDashboard({
     }),
     [customEndMs, customStartMs, interval, validCustomWindow],
   )
-  const canHydrateDashboard = useDelayedIdleRender(
-    `crypto:${instId}:${range}:${interval}:${historySelection.startMs ?? "preset"}:${historySelection.endMs ?? "now"}:hydrate`,
-    2_000,
-    1_000,
-  )
+  /* Hydration staggers heavy sections on first load and instrument/range
+     switches only. Interval or custom-window edits must not de-hydrate the
+     dashboard: unmounting sections above the pickers makes the page jump and
+     steals focus from the datetime inputs. */
+  const canHydrateDashboard = useDelayedIdleRender(`crypto:${instId}:${range}:hydrate`, 2_000, 1_000)
   const instrumentsPayload = usePersistentSWR<CryptoInstrumentsPayload>(
     "crypto:instruments",
     "/api/crypto/instruments",

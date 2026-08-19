@@ -15,6 +15,9 @@ export interface QuantCandle {
 
 export interface QuantFeatureSet {
   returns: RawPoint[]
+  ret24hNorm: RawPoint[]
+  ret72hNorm: RawPoint[]
+  ret7dNorm: RawPoint[]
   vwap: RawPoint[]
   vwapDistancePct: RawPoint[]
   vwapZScore: RawPoint[]
@@ -29,6 +32,8 @@ export interface QuantFeatureSet {
   adx14: RawPoint[]
   plusDi: RawPoint[]
   minusDi: RawPoint[]
+  donchianUpper20: RawPoint[]
+  donchianLower20: RawPoint[]
   realizedVol: RawPoint[]
   rvPercentile30d: RawPoint[]
   rvPercentile90d: RawPoint[]
@@ -249,6 +254,25 @@ function rollingVwap(candles: QuantCandle[], windowSize: number): Pick<QuantFeat
   }
 }
 
+/* Previous-N-bar extremes (current bar excluded) so a close beyond the band
+   registers as a breakout on the bar where it happens. */
+function rollingDonchian(candles: QuantCandle[], period: number): { upper: RawPoint[]; lower: RawPoint[] } {
+  const upper: RawPoint[] = []
+  const lower: RawPoint[] = []
+  for (let index = 0; index < candles.length; index += 1) {
+    const sample = index === 0 ? candles.slice(0, 1) : candles.slice(Math.max(0, index - period), index)
+    let high = -Infinity
+    let low = Infinity
+    for (const candle of sample) {
+      high = Math.max(high, candle.high)
+      low = Math.min(low, candle.low)
+    }
+    upper.push({ timestamp: candles[index].timestamp, value: high })
+    lower.push({ timestamp: candles[index].timestamp, value: low })
+  }
+  return { upper, lower }
+}
+
 function realizedVolatility(candles: QuantCandle[], windowSize: number, barsPerYear: number): RawPoint[] {
   const returns = candles.map((candle, index) => {
     const previous = candles[index - 1]
@@ -274,6 +298,20 @@ export function computeQuantFeatures(candles: QuantCandle[], barsPerDay: number)
   const ema200 = rollingEma(sorted, 200)
   const rv = realizedVolatility(sorted, Math.max(2, Math.round(30 * barsPerDay)), Math.max(365, Math.round(365 * barsPerDay)))
   const adxFeatures = rollingAdx(sorted, 14)
+  const donchian = rollingDonchian(sorted, 20)
+
+  /* Horizon return divided by realized vol scaled to the same horizon — the
+     trend-engine input where at least two of the 24h/72h/7d horizons must
+     agree before a direction is tradable. */
+  const volNormalizedReturn = (horizonDays: number): RawPoint[] => {
+    const lookback = Math.max(1, Math.round(horizonDays * barsPerDay))
+    return sorted.map((candle, index) => {
+      const previous = sorted[index - lookback]
+      const horizonVolPct = (rv[index]?.value ?? 0) * Math.sqrt(horizonDays / 365)
+      if (!previous || previous.close <= 0 || horizonVolPct <= 0) return { timestamp: candle.timestamp, value: 0 }
+      return { timestamp: candle.timestamp, value: ((candle.close / previous.close - 1) * 100) / horizonVolPct }
+    })
+  }
 
   const trendRegime = sorted.map((candle, index) => {
     const e20 = ema20[index]?.value ?? candle.close
@@ -290,6 +328,9 @@ export function computeQuantFeatures(candles: QuantCandle[], barsPerDay: number)
 
   return {
     returns,
+    ret24hNorm: volNormalizedReturn(1),
+    ret72hNorm: volNormalizedReturn(3),
+    ret7dNorm: volNormalizedReturn(7),
     ...vwapFeatures,
     rsi14: rollingRsi(sorted, 14),
     atr14,
@@ -303,6 +344,8 @@ export function computeQuantFeatures(candles: QuantCandle[], barsPerDay: number)
     ema20Slope: rollingSlopePct(ema20, Math.max(1, Math.round(5 * barsPerDay))),
     ema50Slope: rollingSlopePct(ema50, Math.max(1, Math.round(10 * barsPerDay))),
     ...adxFeatures,
+    donchianUpper20: donchian.upper,
+    donchianLower20: donchian.lower,
     realizedVol: rv,
     rvPercentile30d: rollingPercentile(rv, Math.max(2, Math.round(30 * barsPerDay))),
     rvPercentile90d: rvPct90,
@@ -349,6 +392,7 @@ export function computeDerivativeFeatures(points: {
   oiZScore: RawPoint[]
   liquidationZScore: RawPoint[]
   liquidationImbalance: RawPoint[]
+  liqOverOi: RawPoint[]
 } {
   const oi = [...points.oi].sort((a, b) => a.timestamp - b.timestamp)
   const oiChange = (lookbackMs: number) =>
@@ -377,6 +421,12 @@ export function computeDerivativeFeatures(points: {
     oiPct90d: rollingPercentile(oi, 90),
     oiZScore: rollingZScore(oi, 30),
     liquidationZScore: rollingZScore(liquidation, 30),
+    /* Forced-flow trigger: liquidation notional relative to open interest.
+       A spike toward its upper tail marks a leverage flush, not just a busy day. */
+    liqOverOi: liquidation.map((point) => {
+      const oiValue = valueAt(oi, point.timestamp, 2 * DAY_MS)
+      return { timestamp: point.timestamp, value: oiValue && oiValue > 0 ? (point.value / oiValue) * 100 : 0 }
+    }),
     liquidationImbalance: Array.from(liquidationByTime.entries())
       .sort(([a], [b]) => a - b)
       .map(([timestamp, row]) => ({
@@ -384,6 +434,28 @@ export function computeDerivativeFeatures(points: {
         value: row.long + row.short === 0 ? 0 : ((row.long - row.short) / (row.long + row.short)) * 100,
       })),
   }
+}
+
+/* Crowding gauge: open interest relative to rolling 24h traded volume. High
+   values mean positions are large versus what the tape can absorb, so exits
+   move price. */
+export function computeOiVolumeRatio(oi: RawPoint[], candles: QuantCandle[], barsPerDay: number): RawPoint[] {
+  const sorted = [...candles].sort((a, b) => a.timestamp - b.timestamp)
+  const window = Math.max(1, Math.round(barsPerDay))
+  const rolling24hVolume: RawPoint[] = sorted.map((candle, index) => {
+    const sample = sorted.slice(Math.max(0, index - window + 1), index + 1)
+    const volume = sample.reduce(
+      (sum, row) => sum + (row.quoteVolume > 0 ? row.quoteVolume : row.volume * row.close),
+      0,
+    )
+    return { timestamp: candle.timestamp, value: volume }
+  })
+  return [...oi]
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map((point) => {
+      const volume = valueAt(rolling24hVolume, point.timestamp, 2 * DAY_MS)
+      return { timestamp: point.timestamp, value: volume && volume > 0 ? point.value / volume : 0 }
+    })
 }
 
 export function computeCompositeSignals(input: {
@@ -421,8 +493,12 @@ export function computeCompositeSignals(input: {
   const cascadeInProgress: RawPoint[] = []
   const exhaustionScore: RawPoint[] = []
 
-  for (let index = 0; index < input.candles.length; index += 1) {
-    const candle = input.candles[index]
+  /* The quant feature arrays are ascending; the fetcher hands candles in
+     descending order. Sort so index i pairs the candle with its own features. */
+  const candles = [...input.candles].sort((a, b) => a.timestamp - b.timestamp)
+
+  for (let index = 0; index < candles.length; index += 1) {
+    const candle = candles[index]
     const timestamp = candle.timestamp
     const fundingTail = tailScore(valueAt(input.fundingPct90d, timestamp, staleMs))
     const oiPct = valueAt(input.oiPct90d, timestamp, staleMs) ?? 0
