@@ -1,6 +1,5 @@
 "use client"
 
-import { Input } from "@/components/ui/input"
 import {
   cryptoHistoryIntervalOptions,
   isTimeRangeId,
@@ -71,7 +70,7 @@ interface TimeRangeSelectProps {
 export function TimeRangeSelect({ label, customLabel, value, onChange, options = defaultOptions, className }: TimeRangeSelectProps) {
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
-      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
+      <span className="shrink-0 text-[11px] text-muted-foreground">{label}</span>
       <select
         aria-label={label}
         value={value}
@@ -79,7 +78,7 @@ export function TimeRangeSelect({ label, customLabel, value, onChange, options =
           const next = event.target.value
           if (next === "custom" || isTimeRangeId(next)) onChange(next)
         }}
-        className="h-8 min-w-[6.5rem] rounded-md border border-input bg-background px-2.5 text-xs font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="h-8 min-w-[4.75rem] rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
       >
         {options.map((id) => {
           const option = timeRangeOptions.find((entry) => entry.id === id)
@@ -102,7 +101,7 @@ interface CryptoIntervalSelectProps {
 export function CryptoIntervalSelect({ label, value, onChange, className }: CryptoIntervalSelectProps) {
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
-      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
+      <span className="shrink-0 text-[11px] text-muted-foreground">{label}</span>
       <select
         aria-label={label}
         value={value}
@@ -111,61 +110,12 @@ export function CryptoIntervalSelect({ label, value, onChange, className }: Cryp
           const option = cryptoHistoryIntervalOptions.find((entry) => entry.id === next)
           if (option) onChange(option.id)
         }}
-        className="h-8 min-w-[4.75rem] rounded-md border border-input bg-background px-2.5 text-xs font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="h-8 min-w-[4rem] rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
       >
         {cryptoHistoryIntervalOptions.map((option) => (
           <option key={option.id} value={option.id}>{option.label}</option>
         ))}
       </select>
-    </div>
-  )
-}
-
-interface DateTimeFieldProps {
-  label: string
-  value: string
-  onChange: (next: string) => void
-  className?: string
-}
-
-export function DateTimeField({ label, value, onChange, className }: DateTimeFieldProps) {
-  return (
-    <div className={cn("flex items-center gap-1.5", className)}>
-      <span className="shrink-0 text-xs text-muted-foreground">{label}</span>
-      <Input
-        aria-label={label}
-        type="datetime-local"
-        value={value}
-        onInput={(event) => onChange(event.currentTarget.value)}
-        className="h-8 w-48 text-xs tabular-nums"
-      />
-    </div>
-  )
-}
-
-interface CustomTimeWindowPickerProps {
-  startLabel: string
-  endLabel: string
-  startValue: string
-  endValue: string
-  onStartChange: (next: string) => void
-  onEndChange: (next: string) => void
-  className?: string
-}
-
-export function CustomTimeWindowPicker({
-  startLabel,
-  endLabel,
-  startValue,
-  endValue,
-  onStartChange,
-  onEndChange,
-  className,
-}: CustomTimeWindowPickerProps) {
-  return (
-    <div className={cn("flex flex-wrap items-center justify-end gap-1.5", className)}>
-      <DateTimeField label={startLabel} value={startValue} onChange={onStartChange} />
-      <DateTimeField label={endLabel} value={endValue} onChange={onEndChange} />
     </div>
   )
 }

@@ -40,6 +40,7 @@ const DICT: Dict = {
   "timeRange.rangeLabel": { zh: "周期", en: "Range" },
   "timeRange.intervalLabel": { zh: "粒度", en: "Interval" },
   "timeRange.customOption": { zh: "自定义", en: "Custom" },
+  "timeRange.windowLabel": { zh: "日期区间", en: "Date range" },
   "timeRange.startLabel": { zh: "开始", en: "Start" },
   "timeRange.endLabel": { zh: "结束", en: "End" },
   "crypto.title": { zh: "加密看板", en: "Crypto Dashboard" },

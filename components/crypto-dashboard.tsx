@@ -14,6 +14,7 @@ import {
 } from "@/components/crypto-history-compare"
 import { CryptoIndicatorDetail } from "@/components/crypto-indicator-detail"
 import { getCryptoIndicatorDescription } from "@/components/crypto-indicator-info"
+import { DateTimeRangePicker } from "@/components/date-time-range-picker"
 import { CryptoRealtimeCards } from "@/components/crypto-realtime-cards"
 import { CryptoRegimeScoreCard } from "@/components/crypto-regime-score-card"
 import { EuphoriaOpportunityCard } from "@/components/euphoria-opportunity-card"
@@ -27,7 +28,6 @@ import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   CryptoIntervalSelect,
-  CustomTimeWindowPicker,
   TimeRangeSelect,
   type TimeRangeSelectValue,
 } from "@/components/time-range-selector"
@@ -271,14 +271,10 @@ export function CryptoDashboard({
     setDraftEnd(nextEnd)
   }
 
-  const handleCustomStartChange = (next: string) => {
+  const handleCustomWindowChange = (nextStart: string, nextEnd: string) => {
     customWindowEditPending.current = true
-    setDraftStart(next)
-  }
-
-  const handleCustomEndChange = (next: string) => {
-    customWindowEditPending.current = true
-    setDraftEnd(next)
+    setDraftStart(nextStart)
+    setDraftEnd(nextEnd)
   }
   const optionsCurrency = useMemo(() => {
     const base = instId.split("-")[0]
@@ -339,8 +335,13 @@ export function CryptoDashboard({
             {t("crypto.subtitle", { source: "OKX" })}
           </p>
         </div>
-        <div className="flex max-w-full flex-wrap items-center justify-end gap-2 xl:flex-nowrap">
-          <SymbolSelector value={instId} options={symbolOptions} onChange={setInstId} />
+        <div className="flex w-full max-w-full flex-wrap items-center justify-end gap-1.5 lg:w-auto xl:flex-nowrap">
+          <SymbolSelector
+            value={instId}
+            options={symbolOptions}
+            onChange={setInstId}
+            className="w-[9.5rem] min-w-0"
+          />
           <TimeRangeSelect
             label={t("timeRange.rangeLabel")}
             customLabel={t("timeRange.customOption")}
@@ -348,14 +349,14 @@ export function CryptoDashboard({
             onChange={handleRangeChange}
           />
           <CryptoIntervalSelect label={t("timeRange.intervalLabel")} value={interval} onChange={setInterval} />
-          <CustomTimeWindowPicker
+          <DateTimeRangePicker
+            label={t("timeRange.windowLabel")}
             startLabel={t("timeRange.startLabel")}
             endLabel={t("timeRange.endLabel")}
             startValue={draftStart}
             endValue={draftEnd}
-            onStartChange={handleCustomStartChange}
-            onEndChange={handleCustomEndChange}
-            className="xl:flex-nowrap"
+            onChange={handleCustomWindowChange}
+            className="basis-full sm:basis-auto"
           />
         </div>
       </header>
