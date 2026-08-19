@@ -18,13 +18,25 @@ import { computeMarketManipulationMetrics } from "@/lib/market-manipulation-metr
 import {
   DEFAULT_CRYPTO_HISTORY_REFRESH_MS,
   getEnabledCryptoIndicators,
+  type CryptoIndicatorGroup,
   type CryptoIndicatorUnit,
 } from "@/lib/crypto-indicator-config"
 import {
+  buildOrderBookDepthSnapshot,
+  computeCompositeSignals,
+  computeDerivativeFeatures,
+  computeQuantFeatures,
+} from "@/lib/crypto-quant-features"
+import { createAdminClient } from "@/lib/supabase/admin"
+import {
+  DEFAULT_CRYPTO_HISTORY_INTERVAL,
   DEFAULT_TIME_RANGE,
   getBlockchainTimespan,
-  getRangeDays,
+  getCryptoHistoryInterval,
+  getDefaultCryptoIntervalForRange,
+  getRangeStartMs,
   getTimeRange,
+  isCryptoHistoryInterval,
   type TimeRangeOption,
 } from "@/lib/time-range"
 
@@ -243,31 +255,44 @@ interface SeriesSpec {
   labelVars?: Record<string, string | number>
   order: number
   paneIndex: number
+  group: CryptoIndicatorGroup
+  tier: "core" | "secondary"
   color: string
   source: string
   unit: CryptoIndicatorUnit
   refreshMs: number
   relevanceScore?: number
+  nativeInterval: string
+  coverage: "complete" | "partial"
+  freshness: "live" | "collected" | "historical"
   data: { time: number; value: number | null }[]
 }
 
 const DAY_MS = 86_400_000
+const MAX_HISTORY_POINTS = 5_000
 
-/* Build a daily UTC timeline covering the lookback window. */
-function buildTimeline(days: number, anchorMs: number): number[] {
+interface HistorySelection {
+  rangeId: string
+  startMs: number
+  endMs: number
+  days: number
+  interval: ReturnType<typeof getCryptoHistoryInterval>
+  custom: boolean
+}
+
+/* Build a UTC timeline covering the requested window at the selected candle interval. */
+function buildTimeline(startMs: number, anchorMs: number, stepMs: number): number[] {
   const out: number[] = []
-  const start = Math.floor((anchorMs - days * DAY_MS) / DAY_MS) * DAY_MS
-  const end = Math.floor(anchorMs / DAY_MS) * DAY_MS
-  for (let t = start; t <= end; t += DAY_MS) out.push(t)
+  const start = Math.floor(startMs / stepMs) * stepMs
+  const end = Math.floor(anchorMs / stepMs) * stepMs
+  for (let t = start; t <= end; t += stepMs) out.push(t)
   return out
 }
 
-function buildTimelineFromStart(startMs: number, anchorMs: number): number[] {
-  const out: number[] = []
-  const start = Math.floor(startMs / DAY_MS) * DAY_MS
-  const end = Math.floor(anchorMs / DAY_MS) * DAY_MS
-  for (let t = start; t <= end; t += DAY_MS) out.push(t)
-  return out
+function compactTimeline(timeline: number[]): number[] {
+  if (timeline.length <= MAX_HISTORY_POINTS) return timeline
+  const stride = Math.ceil(timeline.length / MAX_HISTORY_POINTS)
+  return timeline.filter((_, index) => index % stride === 0 || index === timeline.length - 1)
 }
 
 /**
@@ -275,7 +300,7 @@ function buildTimelineFromStart(startMs: number, anchorMs: number): number[] {
  * (max 7-day staleness). Carry-forward is only used to normalize real source
  * updates onto a daily grid; series with gaps after this pass are excluded.
  */
-function alignDaily(points: RawPoint[], timeline: number[]): (number | null)[] {
+function alignSeries(points: RawPoint[], timeline: number[], maxStaleMs: number): (number | null)[] {
   if (points.length === 0) return timeline.map(() => null)
   const sorted = [...points].sort((a, b) => a.timestamp - b.timestamp)
   const out: (number | null)[] = []
@@ -283,12 +308,12 @@ function alignDaily(points: RawPoint[], timeline: number[]): (number | null)[] {
   let lastValue: number | null = null
   let lastTime = -Infinity
   for (const t of timeline) {
-    while (cursor < sorted.length && sorted[cursor].timestamp <= t + DAY_MS / 2) {
+    while (cursor < sorted.length && sorted[cursor].timestamp <= t + maxStaleMs / 2) {
       lastValue = sorted[cursor].value
       lastTime = sorted[cursor].timestamp
       cursor++
     }
-    out.push(lastValue !== null && t - lastTime <= 7 * DAY_MS ? lastValue : null)
+    out.push(lastValue !== null && t - lastTime <= maxStaleMs ? lastValue : null)
   }
   return out
 }
@@ -304,7 +329,32 @@ function hasUsableCoverage(values: (number | null)[]): boolean {
 function chooseCompleteCandidate(candidates: RawPoint[][], timeline: number[]): RawPoint[] {
   const nonEmpty = candidates.filter((candidate) => candidate.length > 0)
   if (nonEmpty.length === 0) return []
-  return nonEmpty.find((candidate) => hasCompleteCoverage(alignDaily(dropOutOfRange(candidate), timeline))) ?? nonEmpty[0]
+  return nonEmpty.find((candidate) => hasCompleteCoverage(alignSeries(dropOutOfRange(candidate), timeline, 7 * DAY_MS))) ?? nonEmpty[0]
+}
+
+function resolveHistorySelection(url: URL): HistorySelection {
+  const rangeId = url.searchParams.get("range") ?? DEFAULT_TIME_RANGE
+  const presetRange = getTimeRange(rangeId)
+  const now = Date.now()
+  const requestedEnd = Number(url.searchParams.get("end"))
+  const requestedStart = Number(url.searchParams.get("start"))
+  const hasCustomWindow = Number.isFinite(requestedStart) && Number.isFinite(requestedEnd) && requestedEnd > requestedStart
+  const endMs = hasCustomWindow ? Math.min(requestedEnd, now) : now
+  const startMs = hasCustomWindow ? requestedStart : getRangeStartMs(presetRange.id, endMs)
+  const days = Math.max(1, Math.ceil((endMs - startMs) / DAY_MS))
+  const intervalParam = url.searchParams.get("interval")
+  const defaultInterval = getDefaultCryptoIntervalForRange(presetRange.id)
+  const interval = getCryptoHistoryInterval(
+    intervalParam && isCryptoHistoryInterval(intervalParam) ? intervalParam : defaultInterval ?? DEFAULT_CRYPTO_HISTORY_INTERVAL,
+  )
+  return {
+    rangeId: hasCustomWindow ? "custom" : presetRange.id,
+    startMs,
+    endMs,
+    days,
+    interval,
+    custom: hasCustomWindow,
+  }
 }
 
 /* ---------------------- per-source fetchers ---------------------- */
@@ -339,19 +389,37 @@ const OKX_CANDLE_PAGE_LIMIT = 100
 const OKX_FUNDING_PAGE_LIMIT = 100
 const OKX_MAX_PAGES = 60
 const OKX_RETRY_DELAYS_MS = [500, 1_250, 2_500] as const
-const OKX_RUBIK_REQUEST_SPACING_MS = 420
+const OKX_RUBIK_REQUEST_SPACING_MS = 150
 /* OKX publishes hard retention windows for these Rubik derivatives stats;
    skip requests that cannot cover the selected range's left edge. */
 const OKX_INSTRUMENT_HISTORY_EARLIEST_MS = Date.UTC(2024, 0, 1)
 const OKX_TOP_TRADER_HISTORY_EARLIEST_MS = Date.UTC(2024, 2, 22)
 const OKX_MARKET_LONG_SHORT_MAX_DAYS = 180
 
-type OkxDerivativeHistoryPeriod = "1D" | "1W"
+type OkxDerivativeHistoryPeriod = "5m" | "15m" | "30m" | "1H" | "4H" | "1D" | "1W"
 
-function okxDerivativeHistoryPeriod(daysWanted: number): {
+function okxDerivativeHistoryPeriod(daysWanted: number, requestedPeriod?: OkxDerivativeHistoryPeriod | null): {
   period: OkxDerivativeHistoryPeriod
   stepDays: number
 } {
+  if (requestedPeriod) {
+    switch (requestedPeriod) {
+      case "5m":
+        return { period: "5m", stepDays: 5 / 1440 }
+      case "15m":
+        return { period: "15m", stepDays: 15 / 1440 }
+      case "30m":
+        return { period: "30m", stepDays: 30 / 1440 }
+      case "1H":
+        return { period: "1H", stepDays: 1 / 24 }
+      case "4H":
+        return { period: "4H", stepDays: 4 / 24 }
+      case "1D":
+        return { period: "1D", stepDays: 1 }
+      case "1W":
+        return { period: "1W", stepDays: 7 }
+    }
+  }
   return daysWanted > 450 ? { period: "1W", stepDays: 7 } : { period: "1D", stepDays: 1 }
 }
 
@@ -446,15 +514,17 @@ async function okxRubikPaginated(
 async function okxCandleRows(
   instId: string,
   daysWanted: number,
+  bar: string,
+  pointLimit: number,
 ): Promise<string[][]> {
-  const desired = Math.max(60, Math.ceil(daysWanted) + 7)
+  const desired = Math.max(60, Math.min(OKX_MAX_PAGES * OKX_CANDLE_PAGE_LIMIT, pointLimit + Math.ceil(daysWanted / 7) + 7))
   const collected = new Map<number, string[]>()
   let after: string | null = null
 
   for (let page = 0; page < OKX_MAX_PAGES; page++) {
     const params = new URLSearchParams({
       instId,
-      bar: "1D",
+      bar,
       limit: String(OKX_CANDLE_PAGE_LIMIT),
     })
     if (after) params.set("after", after)
@@ -482,8 +552,8 @@ async function okxCandleRows(
   return Array.from(collected.values()).sort((a, b) => Number(b[0]) - Number(a[0]))
 }
 
-async function okxDailyCandles(instId: string, daysWanted: number): Promise<OkxCandlePoint[]> {
-  const rows = await okxCandleRows(instId, daysWanted)
+async function okxCandles(instId: string, daysWanted: number, bar: string, pointLimit: number): Promise<OkxCandlePoint[]> {
+  const rows = await okxCandleRows(instId, daysWanted, bar, pointLimit)
   return rows
     .map((row) => {
       const timestamp = Number(row[0])
@@ -511,13 +581,13 @@ async function okxDailyCandles(instId: string, daysWanted: number): Promise<OkxC
 }
 
 async function okxDailyKlines(instId: string, daysWanted: number): Promise<RawPoint[]> {
-  return okxDailyCandles(instId, daysWanted).then((candles) =>
+  return okxCandles(instId, daysWanted, "1D", Math.ceil(daysWanted) + 7).then((candles) =>
     candles.map((candle) => ({ timestamp: candle.timestamp, value: candle.close })),
   )
 }
 
-async function okxOiHistory(instId: string, daysWanted: number): Promise<RawPoint[]> {
-  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted)
+async function okxOiHistory(instId: string, daysWanted: number, requestedPeriod?: OkxDerivativeHistoryPeriod | null): Promise<RawPoint[]> {
+  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted, requestedPeriod)
   const rows = await okxRubikPaginated(
     (begin, end, limit) =>
       `/api/v5/rubik/stat/contracts/open-interest-history?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
@@ -529,19 +599,21 @@ async function okxOiHistory(instId: string, daysWanted: number): Promise<RawPoin
     .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value))
 }
 
-async function okxLongShort(ccy: string, daysWanted: number): Promise<RawPoint[]> {
+async function okxLongShort(ccy: string, daysWanted: number, requestedPeriod?: OkxDerivativeHistoryPeriod | null): Promise<RawPoint[]> {
+  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted, requestedPeriod)
   const rows = await okxRubikPaginated(
     (begin, end, limit) =>
-      `/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=${ccy}&period=1D&begin=${begin}&end=${end}&limit=${limit}`,
+      `/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=${ccy}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
     daysWanted,
+    stepDays,
   )
   return rows
     .map((row) => ({ timestamp: toDayKey(Number(row[0])), value: Number(row[1]) }))
     .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value))
 }
 
-async function okxContractLongShort(instId: string, daysWanted: number): Promise<RawPoint[]> {
-  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted)
+async function okxContractLongShort(instId: string, daysWanted: number, requestedPeriod?: OkxDerivativeHistoryPeriod | null): Promise<RawPoint[]> {
+  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted, requestedPeriod)
   const rows = await okxRubikPaginated(
     (begin, end, limit) =>
       `/api/v5/rubik/stat/contracts/long-short-account-ratio-contract?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
@@ -553,11 +625,11 @@ async function okxContractLongShort(instId: string, daysWanted: number): Promise
     .filter((p) => Number.isFinite(p.timestamp) && Number.isFinite(p.value))
 }
 
-async function okxTopTraderPosition(instId: string, daysWanted: number): Promise<{
+async function okxTopTraderPosition(instId: string, daysWanted: number, requestedPeriod?: OkxDerivativeHistoryPeriod | null): Promise<{
   account: RawPoint[]
   position: RawPoint[]
 }> {
-  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted)
+  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted, requestedPeriod)
   const [accountRows, positionRows] = await Promise.all([
     okxRubikPaginated(
       (begin, end, limit) =>
@@ -582,22 +654,25 @@ async function okxTopTraderPosition(instId: string, daysWanted: number): Promise
   }
 }
 
-async function okxTakerNet(ccy: string, daysWanted: number): Promise<{
+async function okxTakerNet(ccy: string, daysWanted: number, requestedPeriod?: OkxDerivativeHistoryPeriod | null): Promise<{
   buy: RawPoint[]
   sell: RawPoint[]
   net: RawPoint[]
   cumulativeNet: RawPoint[]
 }> {
+  const { period, stepDays } = okxDerivativeHistoryPeriod(daysWanted, requestedPeriod)
   const [contractRows, spotRows] = await Promise.all([
     okxRubikPaginated(
       (begin, end, limit) =>
-        `/api/v5/rubik/stat/taker-volume?ccy=${ccy}&instType=CONTRACTS&period=1D&begin=${begin}&end=${end}&limit=${limit}`,
+        `/api/v5/rubik/stat/taker-volume?ccy=${ccy}&instType=CONTRACTS&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
       daysWanted,
+      stepDays,
     ),
     okxRubikPaginated(
       (begin, end, limit) =>
-        `/api/v5/rubik/stat/taker-volume?ccy=${ccy}&instType=SPOT&period=1D&begin=${begin}&end=${end}&limit=${limit}`,
+        `/api/v5/rubik/stat/taker-volume?ccy=${ccy}&instType=SPOT&period=${period}&begin=${begin}&end=${end}&limit=${limit}`,
       daysWanted,
+      stepDays,
     ),
   ])
   const merged = new Map<number, { sell: number; buy: number }>()
@@ -799,8 +874,80 @@ async function blockchainSeries(chart: string, timespan: string): Promise<RawPoi
   return rows.map((p) => ({ timestamp: p.timestamp, value: p.value }))
 }
 
+interface StoredMarketSnapshot {
+  timestamp: string
+  spread_pct: number | null
+  bid_depth_01_usd: number | null
+  ask_depth_01_usd: number | null
+  bid_depth_05_usd: number | null
+  ask_depth_05_usd: number | null
+  bid_depth_1_usd: number | null
+  ask_depth_1_usd: number | null
+  orderbook_imbalance_pct: number | null
+}
+
+function pointsFromStoredSnapshots(
+  rows: StoredMarketSnapshot[],
+  field: keyof Omit<StoredMarketSnapshot, "timestamp">,
+): RawPoint[] {
+  return rows
+    .map((row) => {
+      const value = row[field]
+      return {
+        timestamp: new Date(row.timestamp).getTime(),
+        value: typeof value === "number" ? value : Number.NaN,
+      }
+    })
+    .filter((point) => Number.isFinite(point.timestamp) && Number.isFinite(point.value))
+}
+
+async function fetchStoredMarketSnapshots({
+  instId,
+  startMs,
+  endMs,
+}: {
+  instId: string
+  startMs: number
+  endMs: number
+}): Promise<StoredMarketSnapshot[]> {
+  const supabase = createAdminClient()
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from("crypto_market_snapshots")
+    .select(
+      "timestamp,spread_pct,bid_depth_01_usd,ask_depth_01_usd,bid_depth_05_usd,ask_depth_05_usd,bid_depth_1_usd,ask_depth_1_usd,orderbook_imbalance_pct",
+    )
+    .eq("inst_id", instId)
+    .gte("timestamp", new Date(startMs).toISOString())
+    .lte("timestamp", new Date(endMs).toISOString())
+    .order("timestamp", { ascending: true })
+    .limit(MAX_HISTORY_POINTS)
+
+  if (error || !data) return []
+  return data as StoredMarketSnapshot[]
+}
+
 const BTC_PRICE_KEYS = [
   "btcPrice",
+  "vwap",
+  "vwapDistancePct",
+  "vwapZScore",
+  "rsi14",
+  "atr14",
+  "atrPct",
+  "ema20",
+  "ema50",
+  "ema200",
+  "ema20Slope",
+  "ema50Slope",
+  "adx14",
+  "plusDi",
+  "minusDi",
+  "realizedVol",
+  "rvPercentile30d",
+  "rvPercentile90d",
+  "trendRegime",
+  "volRegime",
   "btcMomentum7d",
   "btcMomentum30d",
   "btcMomentum90d",
@@ -831,6 +978,11 @@ const BTC_SWAP_CANDLE_KEYS = [
 const OI_KEYS = [
   "oi",
   "oiChangePct",
+  "oiChange1h",
+  "oiChange4h",
+  "oiPct30d",
+  "oiPct90d",
+  "oiZScore",
   "oiReturnZ",
   "signalBuyScore",
   "signalSellScore",
@@ -841,6 +993,9 @@ const OI_KEYS = [
 ] as const
 const FUNDING_KEYS = [
   "funding",
+  "fundingPct30d",
+  "fundingPct90d",
+  "fundingZScore",
   "signalBuyScore",
   "signalSellScore",
   "signalRiskScore",
@@ -857,12 +1012,18 @@ const LONG_SHORT_KEYS = [
 const LIQ_KEYS = [
   "liqLong",
   "liqShort",
+  "liquidationZScore",
+  "liquidationImbalance",
   "manipLiquidationImbalancePct",
   "manipLiquidationIntensityZ",
 ] as const
 const MINING_COST_KEYS = ["miningElectricityCost", "miningComprehensiveCost"] as const
 const TOP_TRADER_KEYS = ["topTraderAccount", "topTraderPosition"] as const
 const SMART_MONEY_KEYS = [
+  "buyVolume",
+  "sellVolume",
+  "volumeDelta",
+  "cvd",
   "smartBuy",
   "smartSell",
   "smartNet",
@@ -871,6 +1032,24 @@ const SMART_MONEY_KEYS = [
   "manipCvdPriceDivergence",
 ] as const
 const BASIS_KEYS = ["basis", "manipBasisDislocationZ"] as const
+const ORDERBOOK_KEYS = [
+  "spread",
+  "bidDepth01",
+  "askDepth01",
+  "bidDepth05",
+  "askDepth05",
+  "bidDepth1",
+  "askDepth1",
+  "orderbookImbalance",
+] as const
+const COMPOSITE_SIGNAL_KEYS = [
+  "crowdingScore",
+  "extensionScore",
+  "trendScore",
+  "cascadeScore",
+  "cascadeInProgress",
+  "exhaustionScore",
+] as const
 
 const MANIPULATION_KEYS = [
   "manipLeveragePressure",
@@ -893,6 +1072,7 @@ const STRICT_RANGE_COVERAGE_KEYS = new Set<string>([
   "contractLs",
   ...TOP_TRADER_KEYS,
   ...MANIPULATION_KEYS,
+  ...ORDERBOOK_KEYS,
 ])
 
 const SELECTED_INSTRUMENT_LABEL_KEYS = new Set<string>([
@@ -904,6 +1084,7 @@ const SELECTED_INSTRUMENT_LABEL_KEYS = new Set<string>([
   "contractLs",
   ...TOP_TRADER_KEYS,
   ...SMART_MONEY_KEYS,
+  ...COMPOSITE_SIGNAL_KEYS,
 ])
 
 const CROSS_SECTION_PRICE_KEY_BY_CCY: Readonly<Record<string, string>> = {
@@ -926,29 +1107,61 @@ function getNonNegativeInteger(value: string | null): number {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0
 }
 
-function hasRequestedKey(requestedKeys: Set<string>, keys: readonly string[]): boolean {
-  return keys.some((key) => requestedKeys.has(key))
+function hasRequestedKey(requestedWithSignals: Set<string>, keys: readonly string[]): boolean {
+  return keys.some((key) => requestedWithSignals.has(key))
+}
+
+function getAlignmentMaxStaleMs(key: string, group: CryptoIndicatorGroup, intervalMs: number): number {
+  if (group === "orderbook") return Math.max(intervalMs * 2, 10 * 60_000)
+  if (key === "funding" || key.startsWith("funding")) return Math.max(intervalMs * 2, 12 * 60 * 60_000)
+  return Math.max(intervalMs * 2, 7 * DAY_MS)
+}
+
+function getFreshness(group: CryptoIndicatorGroup): "live" | "collected" | "historical" {
+  return group === "orderbook" ? "collected" : "historical"
 }
 
 /* ----------------------------- handler ----------------------------- */
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const rangeId = url.searchParams.get("range") ?? DEFAULT_TIME_RANGE
-  const range = getTimeRange(rangeId)
+  const selection = resolveHistorySelection(url)
+  const range = getTimeRange(selection.custom ? DEFAULT_TIME_RANGE : selection.rangeId)
   const miningCostParameters = resolveMiningCostParameters(url.searchParams)
-  const days = getRangeDays(range.id)
+  const days = selection.days
   const ccy = (url.searchParams.get("ccy") ?? "BTC").toUpperCase()
   const isBtc = ccy === "BTC"
   const instId = `${ccy}-USDT-SWAP`
-  const blockchainSpan = getBlockchainTimespan(range.id)
+  const blockchainSpan = selection.custom
+    ? days <= 30
+      ? "30days"
+      : days <= 90
+        ? "90days"
+        : days <= 365
+          ? "1year"
+          : days <= 365 * 5
+            ? "5years"
+            : days <= 365 * 10
+              ? "10years"
+              : "all"
+    : getBlockchainTimespan(range.id)
   /* Total days requested from OKX endpoints. The per-call helpers paginate
      internally (begin/end for Rubik stats, after for candles/funding) up to
      OKX_MAX_PAGES, so this is no longer bounded by any single-request cap. */
-  const okxDays = Math.max(60, Math.ceil(days) + 7)
+  const intradayBufferDays = selection.interval.id === "1m" || selection.interval.id === "5m" ? 1 : 2
+  const okxDays =
+    selection.interval.id === "1d" || selection.interval.id === "1w"
+      ? Math.max(60, Math.ceil(days) + 7)
+      : Math.max(1, Math.ceil(days) + intradayBufferDays)
+  const okxPointLimit = Math.min(OKX_MAX_PAGES * OKX_CANDLE_PAGE_LIMIT, Math.ceil((selection.endMs - selection.startMs) / selection.interval.stepMs) + 250)
+  const rubikPeriod = selection.interval.okxBar === "1W" ? "1W" : selection.interval.okxBar === "1D" ? "1D" : selection.interval.okxBar
+  const supportedRubikPeriod: OkxDerivativeHistoryPeriod | null =
+    rubikPeriod === "5m" || rubikPeriod === "15m" || rubikPeriod === "30m" || rubikPeriod === "1H" || rubikPeriod === "4H" || rubikPeriod === "1D" || rubikPeriod === "1W"
+      ? rubikPeriod
+      : null
 
-  const now = Date.now()
-  let timeline = buildTimeline(days, now)
+  const now = selection.endMs
+  let timeline = compactTimeline(buildTimeline(selection.startMs, selection.endMs, selection.interval.stepMs))
   const timelineStart = timeline[0] ?? now
   const okxInstrumentHistoryCoversRange = timelineStart >= OKX_INSTRUMENT_HISTORY_EARLIEST_MS
   const okxTopTraderHistoryCoversRange = timelineStart >= OKX_TOP_TRADER_HISTORY_EARLIEST_MS
@@ -960,6 +1173,12 @@ export async function GET(request: Request) {
   const requestedIndicators =
     indicatorLimit === null ? offsetIndicators : offsetIndicators.slice(0, indicatorLimit)
   const requestedKeys = new Set(requestedIndicators.map((indicator) => indicator.key))
+  const requestedWithSignals = new Set<string>(requestedKeys)
+  if (hasRequestedKey(requestedWithSignals, COMPOSITE_SIGNAL_KEYS)) {
+    for (const key of [...BTC_PRICE_KEYS, ...OI_KEYS, ...FUNDING_KEYS, ...LIQ_KEYS, ...SMART_MONEY_KEYS, ...ORDERBOOK_KEYS]) {
+      requestedWithSignals.add(key)
+    }
+  }
 
   /* Staged clients request the top ordered slice first; skip lower-priority
      upstream calls until the background full-history request asks for them. */
@@ -1005,85 +1224,91 @@ export async function GET(request: Request) {
     natgas,
     nikkei,
     hangseng,
+    storedSnapshots,
   ] = await Promise.all([
-    isBtc && hasRequestedKey(requestedKeys, BTC_PRICE_KEYS)
+    isBtc && hasRequestedKey(requestedWithSignals, BTC_PRICE_KEYS)
       ? fetchBtcUsdDailyFromBlockchain(blockchainSpan, revalidate).then((r) =>
           (r?.points ?? []).map((p) => ({ timestamp: p.timestamp, value: p.close })),
         )
       : [],
-    hasRequestedKey(requestedKeys, BTC_SWAP_CANDLE_KEYS) ? okxDailyCandles(instId, okxDays) : [],
-    hasRequestedKey(requestedKeys, BASIS_KEYS) ? okxDailyCandles(`${ccy}-USDT`, okxDays) : [],
-    requestedKeys.has("ethPrice") ? okxDailyKlines("ETH-USDT", okxDays) : [],
-    requestedKeys.has("solPrice") ? okxDailyKlines("SOL-USDT", okxDays) : [],
-    requestedKeys.has("xrpPrice") ? okxDailyKlines("XRP-USDT", okxDays) : [],
-    requestedKeys.has("bnbPrice") ? okxDailyKlines("BNB-USDT", okxDays) : [],
-    requestedKeys.has("dogePrice") ? okxDailyKlines("DOGE-USDT", okxDays) : [],
-    hasRequestedKey(requestedKeys, OI_KEYS) && okxInstrumentHistoryCoversRange
-      ? okxOiHistory(instId, okxDays)
+    hasRequestedKey(requestedWithSignals, BTC_SWAP_CANDLE_KEYS) ? okxCandles(instId, okxDays, selection.interval.okxBar, okxPointLimit) : [],
+    hasRequestedKey(requestedWithSignals, BASIS_KEYS) ? okxCandles(`${ccy}-USDT`, okxDays, selection.interval.okxBar, okxPointLimit) : [],
+    requestedWithSignals.has("ethPrice") ? okxDailyKlines("ETH-USDT", okxDays) : [],
+    requestedWithSignals.has("solPrice") ? okxDailyKlines("SOL-USDT", okxDays) : [],
+    requestedWithSignals.has("xrpPrice") ? okxDailyKlines("XRP-USDT", okxDays) : [],
+    requestedWithSignals.has("bnbPrice") ? okxDailyKlines("BNB-USDT", okxDays) : [],
+    requestedWithSignals.has("dogePrice") ? okxDailyKlines("DOGE-USDT", okxDays) : [],
+    hasRequestedKey(requestedWithSignals, OI_KEYS) && okxInstrumentHistoryCoversRange
+      ? okxOiHistory(instId, okxDays, supportedRubikPeriod)
       : [],
-    hasRequestedKey(requestedKeys, FUNDING_KEYS) ? okxFundingHistory(instId, okxDays) : [],
-    hasRequestedKey(requestedKeys, LONG_SHORT_KEYS) && okxMarketLongShortCoversRange
-      ? okxLongShort(ccy, okxDays)
+    hasRequestedKey(requestedWithSignals, FUNDING_KEYS) ? okxFundingHistory(instId, okxDays) : [],
+    hasRequestedKey(requestedWithSignals, LONG_SHORT_KEYS) && okxMarketLongShortCoversRange
+      ? okxLongShort(ccy, okxDays, supportedRubikPeriod)
       : [],
-    requestedKeys.has("contractLs") && okxInstrumentHistoryCoversRange
-      ? okxContractLongShort(instId, okxDays)
+    requestedWithSignals.has("contractLs") && okxInstrumentHistoryCoversRange
+      ? okxContractLongShort(instId, okxDays, supportedRubikPeriod)
       : [],
-    hasRequestedKey(requestedKeys, TOP_TRADER_KEYS) && okxTopTraderHistoryCoversRange
-      ? okxTopTraderPosition(instId, okxDays)
+    hasRequestedKey(requestedWithSignals, TOP_TRADER_KEYS) && okxTopTraderHistoryCoversRange
+      ? okxTopTraderPosition(instId, okxDays, supportedRubikPeriod)
       : { account: [], position: [] },
-    hasRequestedKey(requestedKeys, SMART_MONEY_KEYS)
-      ? okxTakerNet(ccy, okxDays)
+    hasRequestedKey(requestedWithSignals, SMART_MONEY_KEYS)
+      ? okxTakerNet(ccy, okxDays, supportedRubikPeriod)
       : { buy: [], sell: [], net: [], cumulativeNet: [] },
-    hasRequestedKey(requestedKeys, LIQ_KEYS)
+    hasRequestedKey(requestedWithSignals, LIQ_KEYS)
       ? okxLiquidationDaily(instId, okxDays)
       : { long: [], short: [] },
-    requestedKeys.has("fng")
+    requestedWithSignals.has("fng")
       ? fetchFearGreedHistory(range, revalidate).then((r) =>
           (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
         )
       : [],
-    requestedKeys.has("stablecoinMcap")
+    requestedWithSignals.has("stablecoinMcap")
       ? fetchStablecoinMarketCap(range, revalidate).then((r) =>
           (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
         )
       : [],
-    requestedKeys.has("defiTvl")
+    requestedWithSignals.has("defiTvl")
       ? fetchDefiTvl(range, revalidate).then((r) =>
           (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
         )
       : [],
-    hasRequestedKey(requestedKeys, MINING_COST_KEYS) ? fetchMempoolHashrateHistory(revalidate) : [],
-    requestedKeys.has("hashRate") || hasRequestedKey(requestedKeys, MINING_COST_KEYS)
+    hasRequestedKey(requestedWithSignals, MINING_COST_KEYS) ? fetchMempoolHashrateHistory(revalidate) : [],
+    requestedWithSignals.has("hashRate") || hasRequestedKey(requestedWithSignals, MINING_COST_KEYS)
       ? blockchainSeries("hash-rate", blockchainSpan)
       : [],
-    requestedKeys.has("difficulty") ? blockchainSeries("difficulty", blockchainSpan) : [],
-    requestedKeys.has("nTxs") ? blockchainSeries("n-transactions", blockchainSpan) : [],
-    requestedKeys.has("activeAddrs") ? blockchainSeries("n-unique-addresses", blockchainSpan) : [],
-    requestedKeys.has("mempool") ? blockchainSeries("mempool-size", blockchainSpan) : [],
-    requestedKeys.has("txFeesUsd") ? blockchainSeries("transaction-fees-usd", blockchainSpan) : [],
-    requestedKeys.has("avgBlockSize") ? blockchainSeries("avg-block-size", blockchainSpan) : [],
-    requestedKeys.has("dvol") ? deribitDvolDaily(days) : [],
-    requestedKeys.has("dxy") ? yahooPoints("DX-Y.NYB", range) : [],
-    requestedKeys.has("us10y") ? yahooPoints("^TNX", range) : [], // US 10Y yield
-    requestedKeys.has("us2y") ? yahooPoints("^IRX", range) : [], // Short rate proxy (13W)
-    requestedKeys.has("vix") ? yahooPoints("^VIX", range) : [],
-    requestedKeys.has("sp500") ? yahooPoints("^GSPC", range) : [],
-    requestedKeys.has("nasdaq") ? yahooPoints("^IXIC", range) : [],
-    requestedKeys.has("russell") ? yahooPoints("^RUT", range) : [],
-    requestedKeys.has("gold") ? yahooPoints("GC=F", range) : [],
-    requestedKeys.has("silver") ? yahooPoints("SI=F", range) : [],
-    requestedKeys.has("copper") ? yahooPoints("HG=F", range) : [],
-    requestedKeys.has("oil") ? yahooPoints("CL=F", range) : [],
-    requestedKeys.has("natgas") ? yahooPoints("NG=F", range) : [],
-    requestedKeys.has("nikkei") ? yahooPoints("^N225", range) : [],
-    requestedKeys.has("hangseng") ? yahooPoints("^HSI", range) : [],
+    requestedWithSignals.has("difficulty") ? blockchainSeries("difficulty", blockchainSpan) : [],
+    requestedWithSignals.has("nTxs") ? blockchainSeries("n-transactions", blockchainSpan) : [],
+    requestedWithSignals.has("activeAddrs") ? blockchainSeries("n-unique-addresses", blockchainSpan) : [],
+    requestedWithSignals.has("mempool") ? blockchainSeries("mempool-size", blockchainSpan) : [],
+    requestedWithSignals.has("txFeesUsd") ? blockchainSeries("transaction-fees-usd", blockchainSpan) : [],
+    requestedWithSignals.has("avgBlockSize") ? blockchainSeries("avg-block-size", blockchainSpan) : [],
+    requestedWithSignals.has("dvol") ? deribitDvolDaily(days) : [],
+    requestedWithSignals.has("dxy") ? yahooPoints("DX-Y.NYB", range) : [],
+    requestedWithSignals.has("us10y") ? yahooPoints("^TNX", range) : [], // US 10Y yield
+    requestedWithSignals.has("us2y") ? yahooPoints("^IRX", range) : [], // Short rate proxy (13W)
+    requestedWithSignals.has("vix") ? yahooPoints("^VIX", range) : [],
+    requestedWithSignals.has("sp500") ? yahooPoints("^GSPC", range) : [],
+    requestedWithSignals.has("nasdaq") ? yahooPoints("^IXIC", range) : [],
+    requestedWithSignals.has("russell") ? yahooPoints("^RUT", range) : [],
+    requestedWithSignals.has("gold") ? yahooPoints("GC=F", range) : [],
+    requestedWithSignals.has("silver") ? yahooPoints("SI=F", range) : [],
+    requestedWithSignals.has("copper") ? yahooPoints("HG=F", range) : [],
+    requestedWithSignals.has("oil") ? yahooPoints("CL=F", range) : [],
+    requestedWithSignals.has("natgas") ? yahooPoints("NG=F", range) : [],
+    requestedWithSignals.has("nikkei") ? yahooPoints("^N225", range) : [],
+    requestedWithSignals.has("hangseng") ? yahooPoints("^HSI", range) : [],
+    hasRequestedKey(requestedWithSignals, ORDERBOOK_KEYS)
+      ? fetchStoredMarketSnapshots({ instId, startMs: selection.startMs, endMs: selection.endMs })
+      : [],
   ])
 
   const btcPriceB = toRawPoints(btcSwapCandles, "close")
-  const priceCandidates = isBtc ? [btcPriceA, btcPriceB] : [btcPriceB]
+  const priceCandidates = isBtc && (selection.interval.id === "1d" || selection.interval.id === "1w")
+    ? [btcPriceA, btcPriceB]
+    : [btcPriceB, btcPriceA]
   let btcPrice = chooseCompleteCandidate(priceCandidates, timeline)
-  if (range.id === "max" && btcPrice.length > 0) {
-    timeline = buildTimelineFromStart(Math.min(...btcPrice.map((point) => point.timestamp)), now)
+  if (!selection.custom && range.id === "max" && btcPrice.length > 0) {
+    timeline = compactTimeline(buildTimeline(Math.min(...btcPrice.map((point) => point.timestamp)), now, selection.interval.stepMs))
     btcPrice = chooseCompleteCandidate(priceCandidates, timeline)
   }
 
@@ -1136,6 +1361,25 @@ export async function GET(request: Request) {
   const btcDrawdown = drawdownPct(btcPrice)
   const oiChangePct = dailyChangePct(oi)
   const oiReturnZ = rollingReturnZScore(oi, 30)
+  const quantFeatures = computeQuantFeatures(btcSwapCandles, selection.interval.approxBarsPerDay)
+  const derivativeFeatures = computeDerivativeFeatures({
+    funding,
+    oi,
+    longLiquidations: liq.long,
+    shortLiquidations: liq.short,
+  })
+  const buyVolume = taker.buy
+  const sellVolume = taker.sell
+  const volumeDelta = taker.net
+  const cvd = taker.cumulativeNet
+  const orderBookSpread = pointsFromStoredSnapshots(storedSnapshots, "spread_pct")
+  const orderBookBidDepth01 = pointsFromStoredSnapshots(storedSnapshots, "bid_depth_01_usd")
+  const orderBookAskDepth01 = pointsFromStoredSnapshots(storedSnapshots, "ask_depth_01_usd")
+  const orderBookBidDepth05 = pointsFromStoredSnapshots(storedSnapshots, "bid_depth_05_usd")
+  const orderBookAskDepth05 = pointsFromStoredSnapshots(storedSnapshots, "ask_depth_05_usd")
+  const orderBookBidDepth1 = pointsFromStoredSnapshots(storedSnapshots, "bid_depth_1_usd")
+  const orderBookAskDepth1 = pointsFromStoredSnapshots(storedSnapshots, "ask_depth_1_usd")
+  const orderBookImbalance = pointsFromStoredSnapshots(storedSnapshots, "orderbook_imbalance_pct")
   const basis = buildBasis(btcSwapCandles, btcSpotCandles)
   const signalScores = buildDailySignalScores({
     candles: btcSwapCandles,
@@ -1157,9 +1401,51 @@ export async function GET(request: Request) {
     lowerWick: btcLowerWick,
     volume: btcVolumeUsd,
   })
+  const compositeSignals = computeCompositeSignals({
+    candles: btcSwapCandles,
+    barsPerDay: selection.interval.approxBarsPerDay,
+    quant: quantFeatures,
+    fundingPct90d: derivativeFeatures.fundingPct90d,
+    oiPct90d: derivativeFeatures.oiPct90d,
+    oiChange4h: derivativeFeatures.oiChange4h,
+    liquidationZScore: derivativeFeatures.liquidationZScore,
+    liquidationImbalance: derivativeFeatures.liquidationImbalance,
+    buyVolume,
+    sellVolume,
+    cvd,
+    bidDepth05: orderBookBidDepth05,
+    askDepth05: orderBookAskDepth05,
+    spread: orderBookSpread,
+  })
 
   const rawSeriesByKey = new Map<string, RawPoint[]>([
+    ["crowdingScore", compositeSignals.crowdingScore],
+    ["extensionScore", compositeSignals.extensionScore],
+    ["trendScore", compositeSignals.trendScore],
+    ["cascadeScore", compositeSignals.cascadeScore],
+    ["cascadeInProgress", compositeSignals.cascadeInProgress],
+    ["exhaustionScore", compositeSignals.exhaustionScore],
     ["btcPrice", btcPrice],
+    ["return", quantFeatures.returns],
+    ["vwap", quantFeatures.vwap],
+    ["vwapDistancePct", quantFeatures.vwapDistancePct],
+    ["vwapZScore", quantFeatures.vwapZScore],
+    ["rsi14", quantFeatures.rsi14],
+    ["atr14", quantFeatures.atr14],
+    ["atrPct", quantFeatures.atrPct],
+    ["ema20", quantFeatures.ema20],
+    ["ema50", quantFeatures.ema50],
+    ["ema200", quantFeatures.ema200],
+    ["ema20Slope", quantFeatures.ema20Slope],
+    ["ema50Slope", quantFeatures.ema50Slope],
+    ["adx14", quantFeatures.adx14],
+    ["plusDi", quantFeatures.plusDi],
+    ["minusDi", quantFeatures.minusDi],
+    ["realizedVol", quantFeatures.realizedVol],
+    ["rvPercentile30d", quantFeatures.rvPercentile30d],
+    ["rvPercentile90d", quantFeatures.rvPercentile90d],
+    ["trendRegime", quantFeatures.trendRegime],
+    ["volRegime", quantFeatures.volRegime],
     ["btcMomentum7d", btcMomentum7d],
     ["btcMomentum30d", btcMomentum30d],
     ["btcMomentum90d", btcMomentum90d],
@@ -1186,18 +1472,40 @@ export async function GET(request: Request) {
     ["defiTvl", defiTvl],
     ["oi", oi],
     ["oiChangePct", oiChangePct],
+    ["oiChange1h", derivativeFeatures.oiChange1h],
+    ["oiChange4h", derivativeFeatures.oiChange4h],
+    ["oiPct30d", derivativeFeatures.oiPct30d],
+    ["oiPct90d", derivativeFeatures.oiPct90d],
+    ["oiZScore", derivativeFeatures.oiZScore],
     ["oiReturnZ", oiReturnZ],
     ["funding", funding],
+    ["fundingPct30d", derivativeFeatures.fundingPct30d],
+    ["fundingPct90d", derivativeFeatures.fundingPct90d],
+    ["fundingZScore", derivativeFeatures.fundingZScore],
     ["ls", lsRatio],
     ["contractLs", contractLsRatio],
     ["topTraderAccount", topTrader.account],
     ["topTraderPosition", topTrader.position],
+    ["buyVolume", buyVolume],
+    ["sellVolume", sellVolume],
+    ["volumeDelta", volumeDelta],
+    ["cvd", cvd],
     ["smartBuy", taker.buy],
     ["smartSell", taker.sell],
     ["smartNet", taker.net],
     ["smartCum", taker.cumulativeNet],
     ["liqLong", liq.long],
     ["liqShort", liq.short],
+    ["liquidationZScore", derivativeFeatures.liquidationZScore],
+    ["liquidationImbalance", derivativeFeatures.liquidationImbalance],
+    ["spread", orderBookSpread],
+    ["bidDepth01", orderBookBidDepth01],
+    ["askDepth01", orderBookAskDepth01],
+    ["bidDepth05", orderBookBidDepth05],
+    ["askDepth05", orderBookAskDepth05],
+    ["bidDepth1", orderBookBidDepth1],
+    ["askDepth1", orderBookAskDepth1],
+    ["orderbookImbalance", orderBookImbalance],
     ["manipLeveragePressure", manipulationMetrics.manipLeveragePressure],
     ["manipPriceOiDivergence", manipulationMetrics.manipPriceOiDivergence],
     ["manipFundingSqueezeZ", manipulationMetrics.manipFundingSqueezeZ],
@@ -1239,7 +1547,8 @@ export async function GET(request: Request) {
       const absoluteIndex = indicatorOffset + configIndex
       if (config.key === selectedCrossSectionPriceKey) return []
       const safe = dropOutOfRange(rawSeriesByKey.get(config.key) ?? [])
-      const aligned = alignDaily(safe, timeline)
+      const group = config.group ?? "secondary"
+      const aligned = alignSeries(safe, timeline, getAlignmentMaxStaleMs(config.key, group, selection.interval.stepMs))
       const hasCoverage = STRICT_RANGE_COVERAGE_KEYS.has(config.key)
         ? hasCompleteCoverage(aligned)
         : hasUsableCoverage(aligned)
@@ -1251,11 +1560,16 @@ export async function GET(request: Request) {
         labelVars: SELECTED_INSTRUMENT_LABEL_KEYS.has(config.key) ? { ccy } : undefined,
         order: absoluteIndex + 1,
         paneIndex: Math.floor(absoluteIndex / 2),
+        group,
+        tier: config.tier ?? "secondary",
         color: config.color,
         source: config.key === "btcPrice" && !isBtc ? "OKX" : config.source,
         unit: config.unit,
         refreshMs: config.refreshMs,
         relevanceScore: config.relevanceScore,
+        nativeInterval: group === "orderbook" ? "collector" : selection.interval.id,
+        coverage: hasCompleteCoverage(aligned) ? "complete" : "partial",
+        freshness: getFreshness(group),
         data: timeline.map((t, i) => ({ time: t, value: aligned[i] })),
       }]
     })
@@ -1265,8 +1579,34 @@ export async function GET(request: Request) {
       : Math.max(30_000, Math.min(...series.map((entry) => entry.refreshMs)))
 
   return NextResponse.json({
-    range: range.id,
+    range: selection.rangeId,
     days,
+    selection: {
+      range: selection.rangeId,
+      custom: selection.custom,
+      interval: selection.interval.id,
+      okxBar: selection.interval.okxBar,
+      start: selection.startMs,
+      end: selection.endMs,
+      maxPoints: MAX_HISTORY_POINTS,
+    },
+    candles: btcSwapCandles.map((candle) => ({
+      time: candle.timestamp,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: candle.volume,
+      quoteVolume: candle.quoteVolume,
+    })),
+    signals: {
+      crowdingScore: compositeSignals.crowdingScore.at(-1)?.value ?? null,
+      extensionScore: compositeSignals.extensionScore.at(-1)?.value ?? null,
+      trendScore: compositeSignals.trendScore.at(-1)?.value ?? null,
+      cascadeScore: compositeSignals.cascadeScore.at(-1)?.value ?? null,
+      cascadeInProgress: (compositeSignals.cascadeInProgress.at(-1)?.value ?? 0) >= 1,
+      exhaustionScore: compositeSignals.exhaustionScore.at(-1)?.value ?? null,
+    },
     ccy,
     timeline,
     series,

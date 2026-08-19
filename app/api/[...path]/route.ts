@@ -24,6 +24,7 @@ const routeLoaders: Record<string, ModuleLoader> = {
   "crypto/euphoria": () => import("@/lib/api-routes/crypto/euphoria/route").then((module) => module as RouteModule),
   "crypto/history-compare": () => import("@/lib/api-routes/crypto/history-compare/route").then((module) => module as RouteModule),
   "crypto/instruments": () => import("@/lib/api-routes/crypto/instruments/route").then((module) => module as RouteModule),
+  "crypto/market-collector": () => import("@/lib/api-routes/crypto/market-collector/route").then((module) => module as RouteModule),
   "crypto/markets": () => import("@/lib/api-routes/crypto/markets/route").then((module) => module as RouteModule),
   "crypto/mining-cost": () => import("@/lib/api-routes/crypto/mining-cost/route").then((module) => module as RouteModule),
   "crypto/options-oi": () => import("@/lib/api-routes/crypto/options-oi/route").then((module) => module as RouteModule),

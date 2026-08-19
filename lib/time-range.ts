@@ -1,4 +1,5 @@
 export type TimeRangeId = "1d" | "5d" | "1mo" | "3mo" | "6mo" | "1y" | "5y" | "10y" | "max"
+export type CryptoHistoryInterval = "1m" | "5m" | "15m" | "1h" | "4h" | "1d" | "1w"
 
 export interface TimeRangeOption {
   id: TimeRangeId
@@ -105,13 +106,67 @@ export const timeRangeOptions: TimeRangeOption[] = [
 ]
 
 export const DEFAULT_TIME_RANGE: TimeRangeId = "1mo"
+export const DEFAULT_CRYPTO_HISTORY_INTERVAL: CryptoHistoryInterval = "1d"
+
+export interface CryptoHistoryIntervalOption {
+  id: CryptoHistoryInterval
+  label: string
+  okxBar: string
+  stepMs: number
+  approxBarsPerDay: number
+  description: string
+}
+
+export const cryptoHistoryIntervalOptions: readonly CryptoHistoryIntervalOption[] = [
+  { id: "1m", label: "1m", okxBar: "1m", stepMs: 60_000, approxBarsPerDay: 1440, description: "1 minute candles" },
+  { id: "5m", label: "5m", okxBar: "5m", stepMs: 5 * 60_000, approxBarsPerDay: 288, description: "5 minute candles" },
+  { id: "15m", label: "15m", okxBar: "15m", stepMs: 15 * 60_000, approxBarsPerDay: 96, description: "15 minute candles" },
+  { id: "1h", label: "1h", okxBar: "1H", stepMs: 60 * 60_000, approxBarsPerDay: 24, description: "1 hour candles" },
+  { id: "4h", label: "4h", okxBar: "4H", stepMs: 4 * 60 * 60_000, approxBarsPerDay: 6, description: "4 hour candles" },
+  { id: "1d", label: "1d", okxBar: "1D", stepMs: 86_400_000, approxBarsPerDay: 1, description: "1 day candles" },
+  { id: "1w", label: "1w", okxBar: "1W", stepMs: 7 * 86_400_000, approxBarsPerDay: 1 / 7, description: "1 week candles" },
+]
 
 export const isTimeRangeId = (value: string): value is TimeRangeId => {
   return timeRangeOptions.some((option) => option.id === value)
 }
 
+export const isCryptoHistoryInterval = (value: string): value is CryptoHistoryInterval => {
+  return cryptoHistoryIntervalOptions.some((option) => option.id === value)
+}
+
 export const getTimeRange = (id: TimeRangeId | string | null | undefined): TimeRangeOption => {
   return timeRangeOptions.find((option) => option.id === id) ?? timeRangeOptions[2]
+}
+
+export const getCryptoHistoryInterval = (
+  id: CryptoHistoryInterval | string | null | undefined,
+): CryptoHistoryIntervalOption => {
+  return cryptoHistoryIntervalOptions.find((option) => option.id === id) ?? cryptoHistoryIntervalOptions[5]
+}
+
+export const getDefaultCryptoIntervalForRange = (id: TimeRangeId): CryptoHistoryInterval => {
+  switch (id) {
+    case "1d":
+      return "5m"
+    case "5d":
+      return "15m"
+    case "1mo":
+      return "1h"
+    case "3mo":
+    case "6mo":
+      return "4h"
+    case "1y":
+    case "5y":
+      return "1d"
+    case "10y":
+    case "max":
+      return "1w"
+  }
+}
+
+export const getRangeStartMs = (id: TimeRangeId, nowMs = Date.now()): number => {
+  return getRangeStartDate(id, new Date(nowMs)).getTime()
 }
 
 /**

@@ -8,6 +8,7 @@ import { PanicWindowBanner } from "@/components/panic-window-banner"
 import { SmartMoneyTracker } from "@/components/smart-money-tracker"
 import {
   CryptoHistoryCompare,
+  type CryptoQuantSignals,
   getExpectedCryptoHistorySeriesCount,
   useCryptoHistoryPayload,
 } from "@/components/crypto-history-compare"
@@ -24,7 +25,11 @@ import { OptionsMaxPainCard } from "@/components/options-max-pain-card"
 import { DashboardFrame } from "@/components/page-frame"
 import { SymbolSelector, type SymbolOption } from "@/components/symbol-selector"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { TimeRangeSelector } from "@/components/time-range-selector"
+import {
+  CryptoIntervalSelector,
+  CustomTimeWindowPicker,
+  TimeRangeSelector,
+} from "@/components/time-range-selector"
 import {
   isDashboardTabValue,
   jsonFetcher,
@@ -35,7 +40,13 @@ import {
 import { useDelayedIdleRender } from "@/lib/client-performance"
 import { useT } from "@/lib/i18n"
 import { buildTradingOpportunities, type OpportunityInputSeries } from "@/lib/opportunity-engine"
-import { isTimeRangeId, type TimeRangeId } from "@/lib/time-range"
+import {
+  getDefaultCryptoIntervalForRange,
+  isCryptoHistoryInterval,
+  isTimeRangeId,
+  type CryptoHistoryInterval,
+  type TimeRangeId,
+} from "@/lib/time-range"
 import type { CryptoInstrument } from "@/lib/types"
 
 const CRYPTO_DEFAULT_RANGE: TimeRangeId = "1y"
@@ -49,12 +60,75 @@ const FALLBACK_INSTRUMENTS: CryptoInstrument[] = [
   { instId: "DOGE-USDT-SWAP", base: "DOGE", quote: "USDT", label: "DOGE-USDT-PERP" },
 ]
 
+const QUANT_SIGNAL_KEYS: Array<{
+  key: keyof Omit<CryptoQuantSignals, "cascadeInProgress">
+  labelKey: string
+}> = [
+  { key: "crowdingScore", labelKey: "compare.s.crowdingScore" },
+  { key: "extensionScore", labelKey: "compare.s.extensionScore" },
+  { key: "trendScore", labelKey: "compare.s.trendScore" },
+  { key: "cascadeScore", labelKey: "compare.s.cascadeScore" },
+  { key: "exhaustionScore", labelKey: "compare.s.exhaustionScore" },
+]
+
 interface CryptoInstrumentsPayload {
   instruments?: CryptoInstrument[]
 }
 
 function isInstrumentId(value: string): value is string {
   return /^[A-Z0-9]+-USDT-SWAP$/.test(value)
+}
+
+function isDatetimeLocalValue(value: string): value is string {
+  return value === "" || /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)
+}
+
+function toDatetimeLocalValue(timestamp: number): string {
+  const date = new Date(timestamp)
+  const offsetMs = date.getTimezoneOffset() * 60_000
+  return new Date(timestamp - offsetMs).toISOString().slice(0, 16)
+}
+
+function toTimestamp(value: string): number | null {
+  if (!value) return null
+  const timestamp = new Date(value).getTime()
+  return Number.isFinite(timestamp) ? timestamp : null
+}
+
+function formatSignalScore(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(0) : "—"
+}
+
+function QuantSignalRail({ ccy, signals }: { ccy: string; signals?: CryptoQuantSignals }) {
+  const t = useT()
+  return (
+    <section className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-5">
+      {QUANT_SIGNAL_KEYS.map((item) => {
+        const value = signals?.[item.key] ?? null
+        const danger = item.key === "cascadeScore" && signals?.cascadeInProgress
+        return (
+          <div
+            key={item.key}
+            className="min-w-0 rounded-md border bg-background/70 px-2.5 py-2"
+          >
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <span className="truncate text-[11px] font-medium text-muted-foreground">
+                {t(item.labelKey, { ccy })}
+              </span>
+              {danger && (
+                <span className="shrink-0 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-semibold text-destructive">
+                  Active
+                </span>
+              )}
+            </div>
+            <div className="mt-1 text-xl font-semibold tabular-nums tracking-normal">
+              {formatSignalScore(value)}
+            </div>
+          </div>
+        )
+      })}
+    </section>
+  )
 }
 
 export interface CryptoDashboardProps {
@@ -66,9 +140,49 @@ export function CryptoDashboard({
 }: CryptoDashboardProps = {}) {
   const [instId, setInstId] = usePersistentState<string>("crypto:inst-id", "BTC-USDT-SWAP", isInstrumentId)
   const [range, setRange] = usePersistentState("crypto:range", CRYPTO_DEFAULT_RANGE, isTimeRangeId)
+  const [interval, setInterval] = usePersistentState<CryptoHistoryInterval>(
+    "crypto:history-interval",
+    getDefaultCryptoIntervalForRange(CRYPTO_DEFAULT_RANGE),
+    isCryptoHistoryInterval,
+  )
+  const [customActiveValue, setCustomActiveValue] = usePersistentState<"true" | "false">(
+    "crypto:custom-window-active",
+    "false",
+    (value): value is "true" | "false" => value === "true" || value === "false",
+  )
+  const customActive = customActiveValue === "true"
+  const [customStart, setCustomStart] = usePersistentState<string>(
+    "crypto:custom-window-start",
+    toDatetimeLocalValue(Date.now() - 5 * 24 * 60 * 60 * 1000),
+    isDatetimeLocalValue,
+  )
+  const [customEnd, setCustomEnd] = usePersistentState<string>(
+    "crypto:custom-window-end",
+    toDatetimeLocalValue(Date.now()),
+    isDatetimeLocalValue,
+  )
   const [tab, setTab] = usePersistentState<DashboardTabValue>("crypto:tab", "history", isDashboardTabValue)
   const [selectedSeriesKey, setSelectedSeriesKey] = useState<string | null>(null)
-  const canHydrateDashboard = useDelayedIdleRender(`crypto:${instId}:${range}:hydrate`, 2_000, 1_000)
+  const customStartMs = customActive ? toTimestamp(customStart) : null
+  const customEndMs = customActive ? toTimestamp(customEnd) : null
+  const validCustomWindow =
+    customActive &&
+    customStartMs !== null &&
+    customEndMs !== null &&
+    customEndMs > customStartMs
+  const historySelection = useMemo(
+    () => ({
+      interval,
+      startMs: validCustomWindow ? customStartMs : null,
+      endMs: validCustomWindow ? customEndMs : null,
+    }),
+    [customEndMs, customStartMs, interval, validCustomWindow],
+  )
+  const canHydrateDashboard = useDelayedIdleRender(
+    `crypto:${instId}:${range}:${interval}:${historySelection.startMs ?? "preset"}:${historySelection.endMs ?? "now"}:hydrate`,
+    2_000,
+    1_000,
+  )
   const instrumentsPayload = usePersistentSWR<CryptoInstrumentsPayload>(
     "crypto:instruments",
     "/api/crypto/instruments",
@@ -84,7 +198,7 @@ export function CryptoDashboard({
     instrumentsPayload.data?.instruments && instrumentsPayload.data.instruments.length > 0
       ? instrumentsPayload.data.instruments
       : FALLBACK_INSTRUMENTS
-  const cryptoHistory = useCryptoHistoryPayload(instId, range, canHydrateDashboard)
+  const cryptoHistory = useCryptoHistoryPayload(instId, range, historySelection, canHydrateDashboard)
   const t = useT()
   const optionsCurrency = useMemo(() => {
     const base = instId.split("-")[0]
@@ -147,7 +261,26 @@ export function CryptoDashboard({
         </div>
         <div className="flex flex-wrap items-start justify-end gap-1.5">
           <SymbolSelector value={instId} options={symbolOptions} onChange={setInstId} />
-          <TimeRangeSelector value={range} onChange={setRange} />
+          <TimeRangeSelector
+            value={range}
+            onChange={(next) => {
+              setCustomActiveValue("false")
+              setRange(next)
+              setInterval(getDefaultCryptoIntervalForRange(next))
+            }}
+            customActive={customActive}
+            onCustomSelect={() => setCustomActiveValue("true")}
+          />
+          <CryptoIntervalSelector value={interval} onChange={setInterval} />
+          {customActive && (
+            <CustomTimeWindowPicker
+              startValue={customStart}
+              endValue={customEnd}
+              onStartChange={setCustomStart}
+              onEndChange={setCustomEnd}
+              className="basis-full sm:basis-auto"
+            />
+          )}
         </div>
       </header>
 
@@ -168,6 +301,8 @@ export function CryptoDashboard({
       {canHydrateDashboard && (
         <MarketManipulationMonitor currency={instId.split("-")[0] ?? "BTC"} />
       )}
+
+      <QuantSignalRail ccy={instId.split("-")[0] ?? "BTC"} signals={cryptoHistory.payload?.signals} />
 
       <OpportunityRadar
         assetClass="crypto"
@@ -213,6 +348,7 @@ export function CryptoDashboard({
           <CryptoHistoryCompare
             instId={instId}
             range={range}
+            selection={historySelection}
             payload={cryptoHistory.payload}
             loading={cryptoHistory.loading}
             error={cryptoHistory.error}

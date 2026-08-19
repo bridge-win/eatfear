@@ -17,9 +17,8 @@ import {
   type UTCTimestamp,
   type WhitespaceData,
 } from "lightweight-charts"
-import { RefreshCw } from "lucide-react"
+import { Info, RefreshCw } from "lucide-react"
 
-import { InfoTooltip } from "@/components/info-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
@@ -99,6 +98,35 @@ interface TimeAxisLabel {
   label: string
   positionPct: number
   align: "start" | "center" | "end"
+}
+
+function ChartInfoButton({
+  title,
+  description,
+  source,
+  className,
+  iconClassName,
+}: {
+  title: string
+  description: string
+  source?: string
+  className?: string
+  iconClassName?: string
+}) {
+  const text = source ? `${title}\n\n${description}\n\nSource: ${source}` : `${title}\n\n${description}`
+  return (
+    <button
+      type="button"
+      aria-label={title}
+      title={text}
+      className={cn(
+        "inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        className,
+      )}
+    >
+      <Info className={cn("h-3.5 w-3.5", iconClassName)} />
+    </button>
+  )
 }
 
 interface VisibleLogicalRange {
@@ -486,7 +514,10 @@ export function AlignedHistoryCompare({
       return () => {}
     }
 
-    setRenderedPaneCount(Math.min(INITIAL_RENDERED_PANES, groups.length))
+    setRenderedPaneCount((previous) => {
+      const next = Math.min(INITIAL_RENDERED_PANES, groups.length)
+      return previous === next ? previous : next
+    })
   }, [groups])
 
   useEffect(() => {
@@ -514,7 +545,10 @@ export function AlignedHistoryCompare({
     const card = cardRef.current
     if (!card) return
 
-    const updateWidth = () => setCardWidth(Math.round(card.getBoundingClientRect().width))
+    const updateWidth = () => {
+      const next = Math.round(card.getBoundingClientRect().width)
+      setCardWidth((previous) => (previous === next ? previous : next))
+    }
     updateWidth()
 
     const observer = new ResizeObserver(updateWidth)
@@ -546,9 +580,12 @@ export function AlignedHistoryCompare({
       timelineAnchorData.length > 1
         ? ({ from: 0 as Logical, to: (timelineAnchorData.length - 1) as Logical } satisfies LogicalRange)
         : null
-    setVisibleLogicalRange(
-      sharedLogicalRange ? { from: Number(sharedLogicalRange.from), to: Number(sharedLogicalRange.to) } : null,
-    )
+    const nextLogicalRange = sharedLogicalRange ? { from: Number(sharedLogicalRange.from), to: Number(sharedLogicalRange.to) } : null
+    setVisibleLogicalRange((previous) => {
+      if (!previous && !nextLogicalRange) return previous
+      if (previous && nextLogicalRange && previous.from === nextLogicalRange.from && previous.to === nextLogicalRange.to) return previous
+      return nextLogicalRange
+    })
 
     const panes: PaneChart[] = []
     renderedGroups.forEach((group) => {
@@ -651,7 +688,11 @@ export function AlignedHistoryCompare({
     let syncing = false
     const syncRange = (sourceIndex: number) => (range: LogicalRange | null) => {
       if (syncing || !range) return
-      setVisibleLogicalRange({ from: Number(range.from), to: Number(range.to) })
+      const nextRange = { from: Number(range.from), to: Number(range.to) }
+      setVisibleLogicalRange((previous) => {
+        if (previous && previous.from === nextRange.from && previous.to === nextRange.to) return previous
+        return nextRange
+      })
       syncing = true
       try {
         for (let index = 0; index < panes.length; index += 1) {
@@ -682,7 +723,7 @@ export function AlignedHistoryCompare({
       crosshairSyncing = true
       try {
         if (!param.time || typeof param.time !== "number" || !param.point) {
-          setHoverState(null)
+          setHoverState((previous) => (previous === null ? previous : null))
           for (let index = 0; index < panes.length; index += 1) {
             if (index === sourceIndex) continue
             panes[index].chart.clearCrosshairPosition()
@@ -692,9 +733,13 @@ export function AlignedHistoryCompare({
         const sourcePane = panes[sourceIndex]
         const gridRect = grid.getBoundingClientRect()
         const paneRect = sourcePane.containerEl.getBoundingClientRect()
-        setHoverState({
+        const nextHoverState = {
           time: param.time,
           x: paneRect.left - gridRect.left + param.point.x,
+        }
+        setHoverState((previous) => {
+          if (previous && previous.time === nextHoverState.time && previous.x === nextHoverState.x) return previous
+          return nextHoverState
         })
         for (let index = 0; index < panes.length; index += 1) {
           if (index === sourceIndex) continue
@@ -813,7 +858,7 @@ export function AlignedHistoryCompare({
             <CardTitle data-history-title className="h-4 max-w-full truncate text-xs leading-4">
               {title}
             </CardTitle>
-            <InfoTooltip title={title} description={infoDescription} source={infoSource} />
+            <ChartInfoButton title={title} description={infoDescription} source={infoSource} />
           </div>
           {data && seriesCount > 0 && (
             <span className="h-4 w-[7.75rem] overflow-hidden truncate text-right text-[9px] leading-4 text-muted-foreground sm:w-36">
@@ -918,7 +963,7 @@ export function AlignedHistoryCompare({
                           </span>
                         </button>
                         {spec.info && (
-                          <InfoTooltip
+                          <ChartInfoButton
                             title={spec.info.title ?? spec.label}
                             description={spec.info.description}
                             source={spec.info.source}

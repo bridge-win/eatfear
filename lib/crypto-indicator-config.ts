@@ -1,4 +1,13 @@
 export type CryptoIndicatorUnit = "usd" | "cny" | "pct" | "ratio" | "raw" | "count"
+export type CryptoIndicatorGroup =
+  | "signals"
+  | "price"
+  | "volume"
+  | "derivatives"
+  | "liquidations"
+  | "orderbook"
+  | "regime"
+  | "secondary"
 
 export interface CryptoIndicatorConfig {
   /** Stable series key; this must match the key generated in the history API. */
@@ -21,11 +30,58 @@ export interface CryptoIndicatorConfig {
   unit: CryptoIndicatorUnit
   /** 0-100 relevance score from academic evidence plus practical trading coverage. */
   relevanceScore?: number
+  /** Six-layer BTC quant grouping used by the history view. */
+  group?: CryptoIndicatorGroup
+  /** Core metrics load first; secondary context stays below the strategy layer. */
+  tier?: "core" | "secondary"
 }
 
 export const DEFAULT_CRYPTO_HISTORY_REFRESH_MS = 300_000
 
 const CRYPTO_RELEVANCE_SCORES: Record<string, number> = {
+  crowdingScore: 100,
+  extensionScore: 99,
+  trendScore: 98,
+  cascadeScore: 100,
+  exhaustionScore: 99,
+  cascadeInProgress: 97,
+  vwap: 96,
+  vwapDistancePct: 95,
+  vwapZScore: 97,
+  rsi14: 91,
+  atr14: 95,
+  atrPct: 96,
+  ema20: 94,
+  ema50: 93,
+  ema200: 92,
+  ema20Slope: 92,
+  ema50Slope: 90,
+  adx14: 92,
+  plusDi: 89,
+  minusDi: 89,
+  realizedVol: 96,
+  rvPercentile30d: 95,
+  rvPercentile90d: 95,
+  fundingPct30d: 95,
+  fundingPct90d: 96,
+  fundingZScore: 95,
+  oiChange1h: 94,
+  oiChange4h: 95,
+  oiPct30d: 94,
+  oiPct90d: 95,
+  oiZScore: 94,
+  liquidationZScore: 96,
+  liquidationImbalance: 95,
+  buyVolume: 94,
+  sellVolume: 94,
+  volumeDelta: 95,
+  cvd: 96,
+  spread: 94,
+  bidDepth05: 94,
+  askDepth05: 94,
+  orderbookImbalance: 94,
+  trendRegime: 96,
+  volRegime: 95,
   btcPrice: 100,
   btcMomentum30d: 98,
   btcMomentum90d: 96,
@@ -99,6 +155,53 @@ const CRYPTO_RELEVANCE_SCORES: Record<string, number> = {
   copper: 35,
   natgas: 34,
 }
+
+const CRYPTO_QUANT_CORE_CONFIG: readonly CryptoIndicatorConfig[] = [
+  { key: "crowdingScore", enabled: true, order: 10, refreshMs: 300_000, i18nKey: "compare.s.crowdingScore", infoI18nKey: "compare.info.crowdingScore", source: "OKX / computed quant signal", color: "rgb(217 70 239)", unit: "raw", group: "signals", tier: "core" },
+  { key: "extensionScore", enabled: true, order: 20, refreshMs: 300_000, i18nKey: "compare.s.extensionScore", infoI18nKey: "compare.info.extensionScore", source: "OKX / computed quant signal", color: "rgb(244 63 94)", unit: "raw", group: "signals", tier: "core" },
+  { key: "trendScore", enabled: true, order: 30, refreshMs: 300_000, i18nKey: "compare.s.trendScore", infoI18nKey: "compare.info.trendScore", source: "OKX / computed quant signal", color: "rgb(37 99 235)", unit: "raw", group: "signals", tier: "core" },
+  { key: "cascadeScore", enabled: true, order: 40, refreshMs: 300_000, i18nKey: "compare.s.cascadeScore", infoI18nKey: "compare.info.cascadeScore", source: "OKX / computed quant signal", color: "rgb(220 38 38)", unit: "raw", group: "signals", tier: "core" },
+  { key: "exhaustionScore", enabled: true, order: 50, refreshMs: 300_000, i18nKey: "compare.s.exhaustionScore", infoI18nKey: "compare.info.exhaustionScore", source: "OKX / computed quant signal", color: "rgb(22 163 74)", unit: "raw", group: "signals", tier: "core" },
+  { key: "btcPrice", enabled: true, order: 60, refreshMs: 300_000, i18nKey: "compare.s.price", infoI18nKey: "compare.info.btcPrice", source: "blockchain.info / OKX", color: "rgb(99 102 241)", unit: "usd", group: "price", tier: "core" },
+  { key: "vwap", enabled: true, order: 70, refreshMs: 300_000, i18nKey: "compare.s.vwap", infoI18nKey: "compare.info.vwap", source: "OKX / computed", color: "rgb(20 184 166)", unit: "usd", group: "price", tier: "core" },
+  { key: "vwapZScore", enabled: true, order: 80, refreshMs: 300_000, i18nKey: "compare.s.vwapZScore", infoI18nKey: "compare.info.vwapZScore", source: "OKX / computed", color: "rgb(14 165 233)", unit: "raw", group: "price", tier: "core" },
+  { key: "vwapDistancePct", enabled: true, order: 90, refreshMs: 300_000, i18nKey: "compare.s.vwapDistancePct", infoI18nKey: "compare.info.vwapDistancePct", source: "OKX / computed", color: "rgb(6 182 212)", unit: "pct", group: "price", tier: "core" },
+  { key: "rsi14", enabled: true, order: 100, refreshMs: 300_000, i18nKey: "compare.s.rsi14", infoI18nKey: "compare.info.rsi14", source: "OKX / computed", color: "rgb(168 85 247)", unit: "raw", group: "price", tier: "core" },
+  { key: "atrPct", enabled: true, order: 110, refreshMs: 300_000, i18nKey: "compare.s.atrPct", infoI18nKey: "compare.info.atrPct", source: "OKX / computed", color: "rgb(245 158 11)", unit: "pct", group: "price", tier: "core" },
+  { key: "atr14", enabled: true, order: 120, refreshMs: 300_000, i18nKey: "compare.s.atr14", infoI18nKey: "compare.info.atr14", source: "OKX / computed", color: "rgb(217 119 6)", unit: "usd", group: "price", tier: "core" },
+  { key: "btcReturnZ", enabled: true, order: 130, refreshMs: 300_000, i18nKey: "compare.s.returnZ", infoI18nKey: "compare.info.btcReturnZ", source: "OKX / computed", color: "rgb(244 63 94)", unit: "raw", group: "price", tier: "core" },
+  { key: "btcDrawdown", enabled: true, order: 140, refreshMs: 300_000, i18nKey: "compare.s.btcDrawdown", infoI18nKey: "compare.info.btcDrawdown", source: "OKX / computed", color: "rgb(190 18 60)", unit: "pct", group: "price", tier: "core" },
+  { key: "btcVolumeUsd", enabled: true, order: 150, refreshMs: 300_000, i18nKey: "compare.s.volumeUsd", infoI18nKey: "compare.info.btcVolumeUsd", source: "OKX", color: "rgb(37 99 235)", unit: "usd", group: "volume", tier: "core" },
+  { key: "btcVolumeZ", enabled: true, order: 160, refreshMs: 300_000, i18nKey: "compare.s.volumeZ", infoI18nKey: "compare.info.btcVolumeZ", source: "OKX / computed", color: "rgb(245 158 11)", unit: "raw", group: "volume", tier: "core" },
+  { key: "buyVolume", enabled: true, order: 170, refreshMs: 300_000, i18nKey: "compare.s.buyVolume", infoI18nKey: "compare.info.buyVolume", source: "OKX", color: "rgb(22 163 74)", unit: "raw", group: "volume", tier: "core" },
+  { key: "sellVolume", enabled: true, order: 180, refreshMs: 300_000, i18nKey: "compare.s.sellVolume", infoI18nKey: "compare.info.sellVolume", source: "OKX", color: "rgb(220 38 38)", unit: "raw", group: "volume", tier: "core" },
+  { key: "volumeDelta", enabled: true, order: 190, refreshMs: 300_000, i18nKey: "compare.s.volumeDelta", infoI18nKey: "compare.info.volumeDelta", source: "OKX / computed", color: "rgb(8 145 178)", unit: "raw", group: "volume", tier: "core" },
+  { key: "cvd", enabled: true, order: 200, refreshMs: 300_000, i18nKey: "compare.s.cvd", infoI18nKey: "compare.info.cvd", source: "OKX / computed", color: "rgb(59 130 246)", unit: "raw", group: "volume", tier: "core" },
+  { key: "funding", enabled: true, order: 210, refreshMs: 300_000, i18nKey: "compare.s.funding", infoI18nKey: "compare.info.funding", source: "OKX", color: "rgb(236 72 153)", unit: "pct", group: "derivatives", tier: "core" },
+  { key: "fundingPct90d", enabled: true, order: 220, refreshMs: 300_000, i18nKey: "compare.s.fundingPct90d", infoI18nKey: "compare.info.fundingPct90d", source: "OKX / computed", color: "rgb(219 39 119)", unit: "pct", group: "derivatives", tier: "core" },
+  { key: "fundingZScore", enabled: true, order: 230, refreshMs: 300_000, i18nKey: "compare.s.fundingZScore", infoI18nKey: "compare.info.fundingZScore", source: "OKX / computed", color: "rgb(190 24 93)", unit: "raw", group: "derivatives", tier: "core" },
+  { key: "oi", enabled: true, order: 240, refreshMs: 300_000, i18nKey: "compare.s.oi", infoI18nKey: "compare.info.oi", source: "OKX", color: "rgb(59 130 246)", unit: "usd", group: "derivatives", tier: "core" },
+  { key: "oiChange4h", enabled: true, order: 250, refreshMs: 300_000, i18nKey: "compare.s.oiChange4h", infoI18nKey: "compare.info.oiChange4h", source: "OKX / computed", color: "rgb(2 132 199)", unit: "pct", group: "derivatives", tier: "core" },
+  { key: "oiPct90d", enabled: true, order: 260, refreshMs: 300_000, i18nKey: "compare.s.oiPct90d", infoI18nKey: "compare.info.oiPct90d", source: "OKX / computed", color: "rgb(14 165 233)", unit: "pct", group: "derivatives", tier: "core" },
+  { key: "oiZScore", enabled: true, order: 270, refreshMs: 300_000, i18nKey: "compare.s.oiZScore", infoI18nKey: "compare.info.oiZScore", source: "OKX / computed", color: "rgb(56 189 248)", unit: "raw", group: "derivatives", tier: "core" },
+  { key: "liqLong", enabled: true, order: 280, refreshMs: 300_000, i18nKey: "compare.s.liqLong", infoI18nKey: "compare.info.liqLong", source: "OKX", color: "rgb(239 68 68)", unit: "usd", group: "liquidations", tier: "core" },
+  { key: "liqShort", enabled: true, order: 290, refreshMs: 300_000, i18nKey: "compare.s.liqShort", infoI18nKey: "compare.info.liqShort", source: "OKX", color: "rgb(34 197 94)", unit: "usd", group: "liquidations", tier: "core" },
+  { key: "liquidationZScore", enabled: true, order: 300, refreshMs: 300_000, i18nKey: "compare.s.liquidationZScore", infoI18nKey: "compare.info.liquidationZScore", source: "OKX / computed", color: "rgb(248 113 113)", unit: "raw", group: "liquidations", tier: "core" },
+  { key: "liquidationImbalance", enabled: true, order: 310, refreshMs: 300_000, i18nKey: "compare.s.liquidationImbalance", infoI18nKey: "compare.info.liquidationImbalance", source: "OKX / computed", color: "rgb(251 113 133)", unit: "pct", group: "liquidations", tier: "core" },
+  { key: "spread", enabled: true, order: 320, refreshMs: 300_000, i18nKey: "compare.s.spread", infoI18nKey: "compare.info.spread", source: "OKX / collected snapshots", color: "rgb(148 163 184)", unit: "pct", group: "orderbook", tier: "core" },
+  { key: "bidDepth05", enabled: true, order: 330, refreshMs: 300_000, i18nKey: "compare.s.bidDepth05", infoI18nKey: "compare.info.bidDepth05", source: "OKX / collected snapshots", color: "rgb(34 197 94)", unit: "usd", group: "orderbook", tier: "core" },
+  { key: "askDepth05", enabled: true, order: 340, refreshMs: 300_000, i18nKey: "compare.s.askDepth05", infoI18nKey: "compare.info.askDepth05", source: "OKX / collected snapshots", color: "rgb(239 68 68)", unit: "usd", group: "orderbook", tier: "core" },
+  { key: "orderbookImbalance", enabled: true, order: 350, refreshMs: 300_000, i18nKey: "compare.s.orderbookImbalance", infoI18nKey: "compare.info.orderbookImbalance", source: "OKX / collected snapshots", color: "rgb(20 184 166)", unit: "pct", group: "orderbook", tier: "core" },
+  { key: "ema20", enabled: true, order: 360, refreshMs: 300_000, i18nKey: "compare.s.ema20", infoI18nKey: "compare.info.ema20", source: "OKX / computed", color: "rgb(59 130 246)", unit: "usd", group: "regime", tier: "core" },
+  { key: "ema50", enabled: true, order: 370, refreshMs: 300_000, i18nKey: "compare.s.ema50", infoI18nKey: "compare.info.ema50", source: "OKX / computed", color: "rgb(37 99 235)", unit: "usd", group: "regime", tier: "core" },
+  { key: "ema200", enabled: true, order: 380, refreshMs: 300_000, i18nKey: "compare.s.ema200", infoI18nKey: "compare.info.ema200", source: "OKX / computed", color: "rgb(30 64 175)", unit: "usd", group: "regime", tier: "core" },
+  { key: "adx14", enabled: true, order: 390, refreshMs: 300_000, i18nKey: "compare.s.adx14", infoI18nKey: "compare.info.adx14", source: "OKX / computed", color: "rgb(124 58 237)", unit: "raw", group: "regime", tier: "core" },
+  { key: "realizedVol", enabled: true, order: 400, refreshMs: 300_000, i18nKey: "compare.s.realizedVol", infoI18nKey: "compare.info.realizedVol", source: "OKX / computed", color: "rgb(220 38 38)", unit: "pct", group: "regime", tier: "core" },
+  { key: "rvPercentile90d", enabled: true, order: 410, refreshMs: 300_000, i18nKey: "compare.s.rvPercentile90d", infoI18nKey: "compare.info.rvPercentile90d", source: "OKX / computed", color: "rgb(248 113 113)", unit: "pct", group: "regime", tier: "core" },
+  { key: "trendRegime", enabled: true, order: 420, refreshMs: 300_000, i18nKey: "compare.s.trendRegime", infoI18nKey: "compare.info.trendRegime", source: "OKX / computed", color: "rgb(37 99 235)", unit: "raw", group: "regime", tier: "core" },
+  { key: "volRegime", enabled: true, order: 430, refreshMs: 300_000, i18nKey: "compare.s.volRegime", infoI18nKey: "compare.info.volRegime", source: "OKX / computed", color: "rgb(244 63 94)", unit: "raw", group: "regime", tier: "core" },
+  { key: "cascadeInProgress", enabled: true, order: 440, refreshMs: 300_000, i18nKey: "compare.s.cascadeInProgress", infoI18nKey: "compare.info.cascadeInProgress", source: "OKX / computed quant signal", color: "rgb(185 28 28)", unit: "raw", group: "regime", tier: "core" },
+]
 
 export const CRYPTO_INDICATOR_CONFIG: readonly CryptoIndicatorConfig[] = [
   // Evidence-ranked core: market, momentum, volatility, volume, liquidity.
@@ -180,10 +283,29 @@ export const CRYPTO_INDICATOR_CONFIG: readonly CryptoIndicatorConfig[] = [
   { key: "natgas", enabled: true, order: 700, refreshMs: 300_000, i18nKey: "compare.s.natgas", infoI18nKey: "compare.info.natgas", source: "Yahoo Finance", color: "rgb(59 130 246)", unit: "usd" },
 ]
 
+function getFallbackGroup(key: string): CryptoIndicatorGroup {
+  if (key.startsWith("manip") || key.startsWith("signal")) return "secondary"
+  if (key.includes("liq") || key.includes("Liquidation")) return "liquidations"
+  if (key.includes("funding") || key.includes("oi") || key === "basis" || key.includes("Trader") || key.endsWith("Ls") || key === "ls") return "derivatives"
+  if (key.includes("Volume") || key.startsWith("smart")) return "volume"
+  if (key.includes("Regime") || key.includes("Vol")) return "regime"
+  return "secondary"
+}
+
 export function getEnabledCryptoIndicators(): CryptoIndicatorConfig[] {
-  return CRYPTO_INDICATOR_CONFIG.filter((entry) => entry.enabled).map((entry) => ({
+  const coreKeys = new Set(CRYPTO_QUANT_CORE_CONFIG.map((entry) => entry.key))
+  const secondary = CRYPTO_INDICATOR_CONFIG.filter((entry) => entry.enabled && !coreKeys.has(entry.key)).map((entry) => ({
+    ...entry,
+    order: entry.order + 1_000,
+    relevanceScore: entry.relevanceScore ?? CRYPTO_RELEVANCE_SCORES[entry.key],
+    group: entry.group ?? getFallbackGroup(entry.key),
+    tier: entry.tier ?? "secondary",
+  }))
+  return [...CRYPTO_QUANT_CORE_CONFIG, ...secondary].filter((entry) => entry.enabled).map((entry) => ({
     ...entry,
     relevanceScore: entry.relevanceScore ?? CRYPTO_RELEVANCE_SCORES[entry.key],
+    group: entry.group ?? getFallbackGroup(entry.key),
+    tier: entry.tier ?? "core",
   })).sort((a, b) => {
     const orderDelta = a.order - b.order
     if (orderDelta !== 0) return orderDelta

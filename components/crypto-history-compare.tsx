@@ -14,7 +14,7 @@ import { jsonFetcher, usePersistentSWR, writeStoredJson } from "@/lib/client-per
 import { useDelayedIdleRender } from "@/lib/client-performance"
 import { DEFAULT_CRYPTO_HISTORY_REFRESH_MS, getEnabledCryptoIndicators } from "@/lib/crypto-indicator-config"
 import { useT } from "@/lib/i18n"
-import { type TimeRangeId } from "@/lib/time-range"
+import { type CryptoHistoryInterval, type TimeRangeId } from "@/lib/time-range"
 
 const CRYPTO_INITIAL_HISTORY_LIMIT = 12
 
@@ -33,16 +33,57 @@ export interface CryptoHistorySeries {
   labelVars?: Record<string, string | number>
   order: number
   paneIndex: number
+  group?: string
+  tier?: "core" | "secondary"
   color: string
   source: string
   unit: AlignedHistoryUnit
   relevanceScore?: number
+  nativeInterval?: string
+  coverage?: "complete" | "partial"
+  freshness?: "live" | "collected" | "historical"
   data: { time: number; value: number | null }[]
+}
+
+export interface CryptoHistorySelection {
+  interval: CryptoHistoryInterval
+  startMs?: number | null
+  endMs?: number | null
+}
+
+export interface CryptoHistoryCandle {
+  time: number
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+  quoteVolume: number
+}
+
+export interface CryptoQuantSignals {
+  crowdingScore: number | null
+  extensionScore: number | null
+  trendScore: number | null
+  cascadeScore: number | null
+  cascadeInProgress: boolean
+  exhaustionScore: number | null
 }
 
 export interface CryptoHistoryPayload {
   range: string
   ccy: string
+  selection?: {
+    range: string
+    custom: boolean
+    interval: CryptoHistoryInterval
+    okxBar: string
+    start: number
+    end: number
+    maxPoints: number
+  }
+  candles?: CryptoHistoryCandle[]
+  signals?: CryptoQuantSignals
   timeline: number[]
   series: CryptoHistorySeries[]
   refreshMs: number
@@ -50,8 +91,17 @@ export interface CryptoHistoryPayload {
   updatedAt: number
 }
 
-function buildCryptoHistoryUrl(ccy: string, range: TimeRangeId, params: { limit?: number; offset?: number } = {}): string {
-  const searchParams = new URLSearchParams({ ccy, range })
+function buildCryptoHistoryUrl(
+  ccy: string,
+  range: TimeRangeId,
+  selection: CryptoHistorySelection,
+  params: { limit?: number; offset?: number } = {},
+): string {
+  const searchParams = new URLSearchParams({ ccy, range, interval: selection.interval })
+  if (selection.startMs && selection.endMs && selection.endMs > selection.startMs) {
+    searchParams.set("start", String(selection.startMs))
+    searchParams.set("end", String(selection.endMs))
+  }
   if (params.limit !== undefined) searchParams.set("limit", String(params.limit))
   if (params.offset !== undefined) searchParams.set("offset", String(params.offset))
   return `/api/crypto/history-compare?${searchParams.toString()}`
@@ -91,6 +141,9 @@ function mergeCryptoHistoryPayloads(
   return {
     ...base,
     timeline,
+    selection: priority?.selection ?? rest?.selection ?? base.selection,
+    candles: priority?.candles && priority.candles.length > 0 ? priority.candles : rest?.candles ?? base.candles,
+    signals: priority?.signals ?? rest?.signals ?? base.signals,
     series,
     refreshMs,
     paneCount: series.length === 0 ? 0 : Math.max(...series.map((item) => item.paneIndex)) + 1,
@@ -101,6 +154,7 @@ function mergeCryptoHistoryPayloads(
 export interface CryptoHistoryCompareProps {
   instId?: string
   range: TimeRangeId
+  selection: CryptoHistorySelection
   payload?: CryptoHistoryPayload | null
   loading?: boolean
   error?: string | null
@@ -110,6 +164,7 @@ export interface CryptoHistoryCompareProps {
 export function useCryptoHistoryPayload(
   instId = "BTC-USDT-SWAP",
   range: TimeRangeId,
+  selection: CryptoHistorySelection,
   enabled = true,
   initialLimit = CRYPTO_INITIAL_HISTORY_LIMIT,
 ): {
@@ -118,17 +173,18 @@ export function useCryptoHistoryPayload(
   error: string | null
 } {
   const ccy = instId.split("-")[0] ?? "BTC"
-  const fullStorageKey = `crypto-history:${ccy}:${range}:full`
-  const priorityUrl = enabled && initialLimit > 0 ? buildCryptoHistoryUrl(ccy, range, { limit: initialLimit }) : null
-  const restUrl = enabled ? buildCryptoHistoryUrl(ccy, range, { offset: initialLimit }) : null
+  const selectionKey = `${selection.interval}:${selection.startMs ?? "preset"}:${selection.endMs ?? "now"}`
+  const fullStorageKey = `crypto-history:${ccy}:${range}:${selectionKey}:full`
+  const priorityUrl = enabled && initialLimit > 0 ? buildCryptoHistoryUrl(ccy, range, selection, { limit: initialLimit }) : null
+  const restUrl = enabled ? buildCryptoHistoryUrl(ccy, range, selection, { offset: initialLimit }) : null
   const priority = usePersistentSWR<CryptoHistoryPayload>(
-    `crypto-history:${ccy}:${range}:priority:${initialLimit}`,
+    `crypto-history:${ccy}:${range}:${selectionKey}:priority:${initialLimit}`,
     priorityUrl,
     jsonFetcher,
     { revalidateIfStale: true },
   )
   const rest = usePersistentSWR<CryptoHistoryPayload>(
-    `crypto-history:${ccy}:${range}:rest:${initialLimit}`,
+    `crypto-history:${ccy}:${range}:${selectionKey}:rest:${initialLimit}`,
     restUrl,
     jsonFetcher,
     {
@@ -162,13 +218,14 @@ export function getExpectedCryptoHistorySeriesCount(instId: string): number {
 export function CryptoHistoryCompare({
   instId = "BTC-USDT-SWAP",
   range,
+  selection,
   payload: controlledPayload,
   loading: controlledLoading,
   error: controlledError,
   className,
 }: CryptoHistoryCompareProps) {
   const t = useT()
-  const fetched = useCryptoHistoryPayload(instId, range, controlledPayload === undefined)
+  const fetched = useCryptoHistoryPayload(instId, range, selection, controlledPayload === undefined)
   const payload = controlledPayload === undefined ? fetched.payload : controlledPayload
   const loading = controlledLoading ?? fetched.loading
   const error = controlledError ?? fetched.error
@@ -177,8 +234,8 @@ export function CryptoHistoryCompare({
 
   const data: AlignedHistoryData | null = useMemo(() => {
     if (!canRenderCharts || !payload) return null
-    const groupsByPane = new Map<number, AlignedHistorySeries[]>()
-    for (const spec of payload.series) {
+      const groupsByName = new Map<string, AlignedHistorySeries[]>()
+      for (const spec of payload.series) {
       const label = getCryptoSeriesLabel(t, spec)
       const series: AlignedHistorySeries = {
         key: spec.key,
@@ -193,18 +250,19 @@ export function CryptoHistoryCompare({
           source: spec.source,
         },
       }
-      const group = groupsByPane.get(spec.paneIndex)
+      const groupKey = spec.group ?? `pane-${spec.paneIndex}`
+      const group = groupsByName.get(groupKey)
       if (group) {
         group.push(series)
       } else {
-        groupsByPane.set(spec.paneIndex, [series])
+        groupsByName.set(groupKey, [series])
       }
     }
 
-    const groups: AlignedHistoryGroup[] = Array.from(groupsByPane.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([paneIndex, series]) => ({
-        key: `pane-${paneIndex}`,
+    const groups: AlignedHistoryGroup[] = Array.from(groupsByName.entries())
+      .map(([groupKey, series]) => ({
+        key: groupKey,
+        label: t(`compare.group.${groupKey}`),
         series,
       }))
 
