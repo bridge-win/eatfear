@@ -84,23 +84,14 @@ function zoneBadgeClass(score: number): string {
 function MiniRow({
   label,
   value,
-  badge,
-  badgeClass,
 }: {
   label: string
   value: string
-  badge: string
-  badgeClass: string
 }) {
   return (
-    <div className="flex items-center justify-between gap-1.5 py-0.5">
-      <span className="min-w-0 truncate text-[10.5px] text-muted-foreground">{label}</span>
-      <div className="flex shrink-0 items-center gap-1">
-        <span className="text-[10.5px] tabular-nums text-foreground">{value}</span>
-        <span className={cn("rounded border px-1 py-px text-[9.5px] font-medium leading-none", badgeClass)}>
-          {badge}
-        </span>
-      </div>
+    <div className="min-w-0 rounded border border-border/50 bg-muted/20 px-1.5 py-1">
+      <p className="truncate text-[9.5px] leading-none text-muted-foreground">{label}</p>
+      <p className="mt-0.5 truncate text-[10.5px] font-medium tabular-nums text-foreground">{value}</p>
     </div>
   )
 }
@@ -279,12 +270,12 @@ export function CyclePositionCard({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "min-w-0 shrink-0 rounded-md border bg-card/95 px-2.5 py-2 text-left shadow-sm backdrop-blur-sm",
+        "min-w-0 shrink-0 rounded-md border bg-card/95 px-2 py-1.5 text-left shadow-sm backdrop-blur-sm",
         className,
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold tracking-tight text-foreground">
+        <p className="min-w-0 truncate text-xs font-semibold text-foreground">
           {locale === "zh" ? "周期位置" : "Cycle Position"}
         </p>
         <HoverCard openDelay={120} closeDelay={180}>
@@ -293,11 +284,11 @@ export function CyclePositionCard({ className }: { className?: string }) {
               type="button"
               aria-label={locale === "zh" ? "悬停查看周期位置指标详情" : "Hover for cycle position details"}
               className={cn(
-                "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground",
+                "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground",
                 "outline-none transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring",
               )}
             >
-              <Info className="h-3.5 w-3.5" />
+              <Info className="h-3 w-3" />
             </button>
           </HoverCardTrigger>
           <HoverCardContent
@@ -313,28 +304,26 @@ export function CyclePositionCard({ className }: { className?: string }) {
 
       <p
         className={cn(
-          "mt-1 text-2xl font-bold tabular-nums leading-none tracking-tight md:text-[1.7rem]",
+          "mt-0.5 text-xl font-bold tabular-nums leading-none md:text-2xl",
           toneClass,
         )}
       >
         {scoreDisplay}
-        <span className="ml-0.5 text-base font-normal text-muted-foreground md:text-lg"> / 100</span>
+        <span className="ml-0.5 text-sm font-normal text-muted-foreground md:text-base"> / 100</span>
       </p>
 
       {signal && (
-        <p className={cn("mt-1 text-[13px] font-medium leading-snug", toneClass)}>
+        <p className={cn("mt-1 truncate text-[11px] font-medium leading-tight", toneClass)}>
           {signal}
         </p>
       )}
 
       {/* Mini metrics row */}
       {payload && !loading && !error && (
-        <div className="mt-2 space-y-0 border-t border-border/40 pt-1.5">
+        <div className="mt-1.5 grid grid-cols-3 gap-1">
           <MiniRow
             label={locale === "zh" ? "Mayer×" : "Mayer×"}
             value={payload.mayerMultiple.value !== null ? payload.mayerMultiple.value.toFixed(2) : "—"}
-            badge={locale === "zh" ? payload.mayerMultiple.zoneZh : payload.mayerMultiple.zoneEn}
-            badgeClass={zoneBadgeClass(payload.mayerMultiple.score)}
           />
           <MiniRow
             label={locale === "zh" ? "哈希带" : "Hash Ribbon"}
@@ -343,14 +332,10 @@ export function CyclePositionCard({ className }: { className?: string }) {
                 ? `${payload.hashRibbon.ma30Eh} EH`
                 : "—"
             }
-            badge={locale === "zh" ? payload.hashRibbon.statusZh : payload.hashRibbon.statusEn}
-            badgeClass={zoneBadgeClass(payload.hashRibbon.score)}
           />
           <MiniRow
             label={locale === "zh" ? "Puell×" : "Puell×"}
             value={payload.puellMultiple.value !== null ? payload.puellMultiple.value.toFixed(2) : "—"}
-            badge={locale === "zh" ? payload.puellMultiple.zoneZh : payload.puellMultiple.zoneEn}
-            badgeClass={zoneBadgeClass(payload.puellMultiple.score)}
           />
         </div>
       )}

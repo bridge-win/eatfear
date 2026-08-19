@@ -129,9 +129,9 @@ export function DateTimeRangePicker({
           )}
         >
           <CalendarRange className="size-3.5 text-muted-foreground" />
-          <span className="min-w-0 truncate">{formatTriggerValue(startValue)}</span>
+          <span suppressHydrationWarning className="min-w-0 truncate">{formatTriggerValue(startValue)}</span>
           <ArrowRight className="size-3 text-muted-foreground" />
-          <span className="min-w-0 truncate">{formatTriggerValue(endValue)}</span>
+          <span suppressHydrationWarning className="min-w-0 truncate">{formatTriggerValue(endValue)}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent

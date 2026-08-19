@@ -364,12 +364,12 @@ export function CryptoDashboard({
       {canHydrateDashboard && <PanicWindowBanner />}
 
       {canHydrateDashboard && (
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          <BlackSwanOpportunityCard instId={instId} className="h-full min-w-0" />
-          <EuphoriaOpportunityCard instId={instId} className="h-full min-w-0" />
-          <CryptoRegimeScoreCard instId={instId} className="h-full min-w-0" />
-          <CyclePositionCard className="h-full min-w-0" />
-          <CryptoBuyWindowCard className="h-full min-w-0" />
+        <div className="grid items-start gap-2 sm:grid-cols-2 xl:grid-cols-12">
+          <BlackSwanOpportunityCard instId={instId} className="min-w-0 xl:col-span-2" />
+          <EuphoriaOpportunityCard instId={instId} className="min-w-0 xl:col-span-2" />
+          <CryptoRegimeScoreCard instId={instId} className="min-w-0 xl:col-span-2" />
+          <CyclePositionCard className="min-w-0 xl:col-span-3" />
+          <CryptoBuyWindowCard className="min-w-0 xl:col-span-3" />
         </div>
       )}
 

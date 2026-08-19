@@ -96,16 +96,16 @@ function SignalRow({
       : `<${thresholds.buy}`
 
   return (
-    <div className="flex items-center justify-between gap-2 py-1">
+    <div className="flex min-w-0 items-center justify-between gap-1.5 rounded border border-border/50 bg-muted/20 px-1.5 py-1">
       <div className="min-w-0">
-        <p className="truncate text-xs font-medium text-foreground">{name}</p>
-        <p className="text-[11px] text-muted-foreground">{locale === "zh" ? "买入" : "buy"}: {thresholdHint}</p>
+        <p className="truncate text-[11px] font-medium leading-none text-foreground">{name}</p>
+        <p className="mt-0.5 truncate text-[9.5px] text-muted-foreground">{locale === "zh" ? "买入" : "buy"}: {thresholdHint}</p>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <span className="text-[13px] font-mono tabular-nums text-foreground">
+      <div className="flex shrink-0 items-center gap-1">
+        <span className="text-[11px] font-mono tabular-nums text-foreground">
           {formatSignalValue(value, unit, name)}
         </span>
-        <span className={cn("rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide", pill.className)}>
+        <span className={cn("rounded border px-1 py-px text-[9.5px] font-semibold leading-none", pill.className)}>
           {pill.label}
         </span>
       </div>
@@ -192,17 +192,17 @@ export function CryptoBuyWindowCard({ className }: { className?: string }) {
       ].join("\n")
 
   return (
-    <div className={cn("rounded-md border bg-card/95 px-2.5 py-2 shadow-sm", className)}>
+    <div className={cn("rounded-md border bg-card/95 px-2 py-1.5 shadow-sm", className)}>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <Bitcoin className="h-4 w-4 text-muted-foreground" />
-          <p className="text-sm font-semibold tracking-tight text-foreground">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Bitcoin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <p className="truncate text-xs font-semibold text-foreground">
             {locale === "zh" ? "BTC 周期低估监测" : "BTC Cycle Value Monitor"}
           </p>
         </div>
         <div className="flex items-center gap-1.5">
           {payload && (
-            <span className="text-[11px] tabular-nums text-muted-foreground">
+            <span className="text-[10.5px] tabular-nums text-muted-foreground">
               {locale === "zh" ? "综合分" : "Score"}: {payload.compositeScore}
             </span>
           )}
@@ -211,20 +211,20 @@ export function CryptoBuyWindowCard({ className }: { className?: string }) {
       </div>
 
       {loading ? (
-        <p className="mt-2 text-xs text-muted-foreground">{locale === "zh" ? "加载中…" : "Loading…"}</p>
+        <p className="mt-1.5 text-xs text-muted-foreground">{locale === "zh" ? "加载中…" : "Loading…"}</p>
       ) : !payload?.signals ? (
-        <p className="mt-2 text-xs text-muted-foreground">{locale === "zh" ? "数据不可用" : "Data unavailable"}</p>
+        <p className="mt-1.5 text-xs text-muted-foreground">{locale === "zh" ? "数据不可用" : "Data unavailable"}</p>
       ) : (
         <>
           {bandConfig && (
-            <div className={cn("mt-1.5 flex items-center gap-1.5 rounded-md border px-2 py-1.5", bandConfig.className)}>
-              <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+            <div className={cn("mt-1 flex items-center gap-1.5 rounded border px-1.5 py-1", bandConfig.className)}>
+              <ShieldAlert className="h-3 w-3 shrink-0" />
               <div>
-                <p className="text-xs font-semibold">{bandConfig.label}</p>
+                <p className="truncate text-[11px] font-semibold leading-tight">{bandConfig.label}</p>
               </div>
             </div>
           )}
-          <div className="mt-1 divide-y divide-border/50">
+          <div className="mt-1 grid gap-1">
             <SignalRow
               name={locale === "zh" ? "Mayer 倍数" : "Mayer Multiple"}
               value={payload.signals.mayerMultiple.value}

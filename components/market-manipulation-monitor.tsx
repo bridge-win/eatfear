@@ -1,76 +1,42 @@
 "use client"
 
-import { LockKeyhole } from "lucide-react"
+import { ChevronRight, LockKeyhole } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useT } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-function AvailabilityBadges() {
+function AvailabilityBadges({ compact = false }: { compact?: boolean }) {
   const t = useT()
   return (
-    <div className="flex items-center gap-1.5">
-      <Badge variant="outline" className="gap-1 text-[10px] text-muted-foreground">
+    <div className="flex shrink-0 items-center gap-1">
+      <Badge variant="outline" className={cn("gap-1 text-[10px] text-muted-foreground", compact && "px-1.5 py-0")}>
         <LockKeyhole className="size-2.5" aria-hidden="true" />
         {t("manipMonitor.unavailable")}
       </Badge>
-      <Badge variant="secondary" className="text-[10px]">
+      <Badge variant="secondary" className={cn("text-[10px]", compact && "px-1.5 py-0")}>
         {t("manipMonitor.comingSoon")}
       </Badge>
     </div>
   )
 }
 
-function LiquidationWallSilhouette() {
+function UnavailableMetric({
+  title,
+  valueLabel,
+  info,
+}: {
+  title: string
+  valueLabel: string
+  info: string
+}) {
   return (
-    <div className="relative mt-3 h-36 overflow-hidden rounded-md border border-border/60 bg-muted/20" aria-hidden="true">
-      <div className="absolute inset-y-0 left-1/2 w-px bg-border" />
-      <div className="grid h-full grid-cols-2 items-center gap-px px-5 py-4 opacity-55">
-        <div className="flex h-full flex-col items-end justify-center gap-1.5">
-          <div className="h-2.5 w-12 rounded-l bg-muted-foreground/15" />
-          <div className="h-2.5 w-20 rounded-l bg-muted-foreground/20" />
-          <div className="h-2.5 w-28 rounded-l bg-muted-foreground/25" />
-          <div className="h-2.5 w-16 rounded-l bg-muted-foreground/20" />
-          <div className="h-2.5 w-24 rounded-l bg-muted-foreground/25" />
-          <div className="h-2.5 w-10 rounded-l bg-muted-foreground/15" />
-        </div>
-        <div className="flex h-full flex-col items-start justify-center gap-1.5">
-          <div className="h-2.5 w-16 rounded-r bg-muted-foreground/20" />
-          <div className="h-2.5 w-10 rounded-r bg-muted-foreground/15" />
-          <div className="h-2.5 w-24 rounded-r bg-muted-foreground/25" />
-          <div className="h-2.5 w-28 rounded-r bg-muted-foreground/25" />
-          <div className="h-2.5 w-20 rounded-r bg-muted-foreground/20" />
-          <div className="h-2.5 w-12 rounded-r bg-muted-foreground/15" />
-        </div>
+    <div className="rounded border border-border/55 bg-muted/15 px-2 py-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-[11px] font-medium text-foreground">{title}</p>
+        <span className="shrink-0 text-[11px] font-semibold tabular-nums text-muted-foreground">{valueLabel}</span>
       </div>
-      <div className="absolute inset-0 bg-background/15 backdrop-blur-[0.5px]" />
-    </div>
-  )
-}
-
-function CancellationHistorySilhouette() {
-  return (
-    <div className="relative mt-3 h-36 overflow-hidden rounded-md border border-border/60 bg-muted/20" aria-hidden="true">
-      <svg viewBox="0 0 320 112" className="h-full w-full opacity-50" preserveAspectRatio="none">
-        <path d="M0 28H320M0 56H320M0 84H320" stroke="currentColor" strokeOpacity="0.08" />
-        <path
-          d="M0 78 C24 72 32 46 55 51 S91 88 116 65 S150 35 173 52 S207 86 232 60 S272 28 320 43"
-          fill="none"
-          stroke="currentColor"
-          strokeOpacity="0.35"
-          strokeWidth="2"
-          strokeDasharray="6 5"
-        />
-        <path
-          d="M0 88 C35 80 52 76 75 81 S112 98 140 74 S176 59 205 71 S246 91 276 72 S300 62 320 67"
-          fill="none"
-          stroke="currentColor"
-          strokeOpacity="0.18"
-          strokeWidth="2"
-        />
-      </svg>
-      <div className="absolute inset-0 bg-background/15 backdrop-blur-[0.5px]" />
+      <p className="mt-1 line-clamp-2 text-[10.5px] leading-snug text-muted-foreground">{info}</p>
     </div>
   )
 }
@@ -84,60 +50,39 @@ export function MarketManipulationMonitor({ currency, className }: MarketManipul
   const t = useT()
 
   return (
-    <section className={cn("space-y-2", className)} aria-labelledby="market-manipulation-monitor-title">
-      <div>
-        <h2 id="market-manipulation-monitor-title" className="text-sm font-semibold">
-          {t("manipMonitor.title")}
-        </h2>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">{t("manipMonitor.subtitle")}</p>
-      </div>
-      <div className="grid gap-2 lg:grid-cols-2">
-        <Card className="py-2.5" aria-disabled="true">
-          <CardHeader className="px-3 pb-1">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-sm">{t("manipMonitor.liquidation.title", { ccy: currency })}</CardTitle>
-              <AvailabilityBadges />
-            </div>
-          </CardHeader>
-          <CardContent className="px-3 pt-1">
-            <div className="grid grid-cols-3 gap-1.5 text-center">
-              <div className="rounded border border-border/60 bg-muted/20 px-1.5 py-1">
-                <p className="text-[9px] uppercase tracking-wide text-muted-foreground">{t("manipMonitor.liquidation.long")}</p>
-                <p className="text-xs font-semibold text-muted-foreground">—</p>
+    <section className={cn(className)} aria-labelledby="market-manipulation-monitor-title">
+      <details aria-disabled="true" className="group rounded-md border bg-card/70 px-2.5 py-2 shadow-sm">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 outline-none focus-visible:ring-1 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+          <div className="flex min-w-0 items-center gap-2">
+            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
+            <div className="min-w-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                <h2 id="market-manipulation-monitor-title" className="truncate text-xs font-semibold">
+                  {t("manipMonitor.title")}
+                </h2>
+                <AvailabilityBadges compact />
               </div>
-              <div className="rounded border border-border/60 bg-muted/20 px-1.5 py-1">
-                <p className="text-[9px] uppercase tracking-wide text-muted-foreground">{t("manipMonitor.liquidation.mark")}</p>
-                <p className="text-xs font-semibold text-muted-foreground">—</p>
-              </div>
-              <div className="rounded border border-border/60 bg-muted/20 px-1.5 py-1">
-                <p className="text-[9px] uppercase tracking-wide text-muted-foreground">{t("manipMonitor.liquidation.short")}</p>
-                <p className="text-xs font-semibold text-muted-foreground">—</p>
-              </div>
+              <p className="mt-0.5 truncate text-[10.5px] text-muted-foreground">{t("manipMonitor.subtitle")}</p>
             </div>
-            <LiquidationWallSilhouette />
-            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{t("manipMonitor.liquidation.info")}</p>
-            <p className="mt-1 text-[10px] text-muted-foreground/80">{t("manipMonitor.source")}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="py-2.5" aria-disabled="true">
-          <CardHeader className="px-3 pb-1">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-sm">{t("manipMonitor.cancellation.title", { ccy: currency })}</CardTitle>
-              <AvailabilityBadges />
-            </div>
-          </CardHeader>
-          <CardContent className="px-3 pt-1">
-            <div className="flex items-center justify-between rounded border border-border/60 bg-muted/20 px-2 py-1.5">
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{t("manipMonitor.cancellation.rate")}</span>
-              <span className="text-xs font-semibold text-muted-foreground">—</span>
-            </div>
-            <CancellationHistorySilhouette />
-            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{t("manipMonitor.cancellation.info")}</p>
-            <p className="mt-1 text-[10px] text-muted-foreground/80">{t("manipMonitor.source")}</p>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+          <span className="hidden shrink-0 text-[10.5px] text-muted-foreground sm:inline">
+            {t("manipMonitor.collapsedHint")}
+          </span>
+        </summary>
+        <div className="mt-2 grid gap-1.5 border-t border-border/50 pt-2 md:grid-cols-2">
+          <UnavailableMetric
+            title={t("manipMonitor.liquidation.title", { ccy: currency })}
+            valueLabel="—"
+            info={t("manipMonitor.liquidation.info")}
+          />
+          <UnavailableMetric
+            title={t("manipMonitor.cancellation.title", { ccy: currency })}
+            valueLabel="—"
+            info={t("manipMonitor.cancellation.info")}
+          />
+          <p className="text-[10px] text-muted-foreground/80 md:col-span-2">{t("manipMonitor.source")}</p>
+        </div>
+      </details>
     </section>
   )
 }

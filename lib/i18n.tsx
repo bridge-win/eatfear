@@ -984,6 +984,7 @@ const DICT: Dict = {
   // Market manipulation data availability
   "manipMonitor.title": { zh: "市场操纵观测数据", en: "Market Manipulation Data" },
   "manipMonitor.subtitle": { zh: "可验证的公开历史指标已加入历史曲线；无法可靠回溯的数据明确标记为暂不可用。", en: "Verifiable public-history observables are in History; datasets without reliable backfill are marked unavailable." },
+  "manipMonitor.collapsedHint": { zh: "展开查看缺失原因", en: "Expand for data gaps" },
   "manipMonitor.unavailable": { zh: "暂不可用", en: "Unavailable" },
   "manipMonitor.comingSoon": { zh: "即将上线", en: "Coming soon" },
   "manipMonitor.source": { zh: "来源：公开交易所 API · 需持续采集或授权数据源", en: "Source: Public exchange APIs · requires a collected or licensed feed" },
