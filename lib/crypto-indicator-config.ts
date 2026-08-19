@@ -1,5 +1,8 @@
 export type CryptoIndicatorUnit = "usd" | "cny" | "pct" | "ratio" | "raw" | "count"
 export type CryptoIndicatorGroup =
+  | "strategyCore"
+  | "wickConfirmation"
+  | "crowdingContext"
   | "signals"
   | "price"
   | "volume"
@@ -39,6 +42,19 @@ export interface CryptoIndicatorConfig {
 export const DEFAULT_CRYPTO_HISTORY_REFRESH_MS = 300_000
 
 const CRYPTO_RELEVANCE_SCORES: Record<string, number> = {
+  dev: 100,
+  atr60: 100,
+  vel5: 100,
+  ema60: 99,
+  liquidationPercentile: 99,
+  oiChange5m: 99,
+  volumeBurst: 98,
+  sigma1m: 97,
+  atrTf: 97,
+  basisZScore: 94,
+  longShortZScore: 92,
+  vel1: 92,
+  vel3: 92,
   crowdingScore: 100,
   extensionScore: 99,
   trendScore: 98,
@@ -167,6 +183,19 @@ const CRYPTO_RELEVANCE_SCORES: Record<string, number> = {
 }
 
 const CRYPTO_QUANT_CORE_CONFIG: readonly CryptoIndicatorConfig[] = [
+  { key: "dev", enabled: true, order: 1, refreshMs: 300_000, i18nKey: "compare.s.dev", infoI18nKey: "compare.info.dev", source: "OKX / computed btc-qt primitive", color: "rgb(249 115 22)", unit: "raw", group: "strategyCore", tier: "core" },
+  { key: "atr60", enabled: true, order: 2, refreshMs: 300_000, i18nKey: "compare.s.atr60", infoI18nKey: "compare.info.atr60", source: "OKX / computed btc-qt primitive", color: "rgb(234 179 8)", unit: "usd", group: "strategyCore", tier: "core" },
+  { key: "vel5", enabled: true, order: 4, refreshMs: 300_000, i18nKey: "compare.s.vel5", infoI18nKey: "compare.info.vel5", source: "OKX / computed btc-qt primitive", color: "rgb(244 63 94)", unit: "raw", group: "strategyCore", tier: "core" },
+  { key: "ema60", enabled: true, order: 7, refreshMs: 300_000, i18nKey: "compare.s.ema60", infoI18nKey: "compare.info.ema60", source: "OKX / computed btc-qt primitive", color: "rgb(14 165 233)", unit: "usd", group: "wickConfirmation", tier: "core" },
+  { key: "liquidationPercentile", enabled: true, order: 8, refreshMs: 300_000, i18nKey: "compare.s.liquidationPercentile", infoI18nKey: "compare.info.liquidationPercentile", source: "OKX liquidation history / computed", color: "rgb(239 68 68)", unit: "pct", group: "wickConfirmation", tier: "core" },
+  { key: "oiChange5m", enabled: true, order: 9, refreshMs: 300_000, i18nKey: "compare.s.oiChange5m", infoI18nKey: "compare.info.oiChange5m", source: "OKX / computed", color: "rgb(2 132 199)", unit: "pct", group: "wickConfirmation", tier: "core" },
+  { key: "volumeBurst", enabled: true, order: 10, refreshMs: 300_000, i18nKey: "compare.s.volumeBurst", infoI18nKey: "compare.info.volumeBurst", source: "OKX / computed", color: "rgb(34 197 94)", unit: "ratio", group: "wickConfirmation", tier: "core" },
+  { key: "sigma1m", enabled: true, order: 12, refreshMs: 300_000, i18nKey: "compare.s.sigma1m", infoI18nKey: "compare.info.sigma1m", source: "OKX / computed EWMA", color: "rgb(168 85 247)", unit: "pct", group: "wickConfirmation", tier: "core" },
+  { key: "atrTf", enabled: true, order: 13, refreshMs: 300_000, i18nKey: "compare.s.atrTf", infoI18nKey: "compare.info.atrTf", source: "OKX 4h candles / computed", color: "rgb(217 119 6)", unit: "usd", group: "wickConfirmation", tier: "core" },
+  { key: "basisZScore", enabled: true, order: 17, refreshMs: 300_000, i18nKey: "compare.s.basisZScore", infoI18nKey: "compare.info.basisZScore", source: "OKX spot + perpetual / computed", color: "rgb(147 51 234)", unit: "raw", group: "crowdingContext", tier: "core" },
+  { key: "longShortZScore", enabled: true, order: 18, refreshMs: 300_000, i18nKey: "compare.s.longShortZScore", infoI18nKey: "compare.info.longShortZScore", source: "OKX / computed", color: "rgb(192 132 252)", unit: "raw", group: "crowdingContext", tier: "core" },
+  { key: "vel1", enabled: true, order: 19, refreshMs: 300_000, i18nKey: "compare.s.vel1", infoI18nKey: "compare.info.vel1", source: "OKX / computed btc-qt primitive", color: "rgb(251 113 133)", unit: "raw", group: "crowdingContext", tier: "core" },
+  { key: "vel3", enabled: true, order: 20, refreshMs: 300_000, i18nKey: "compare.s.vel3", infoI18nKey: "compare.info.vel3", source: "OKX / computed btc-qt primitive", color: "rgb(232 121 249)", unit: "raw", group: "crowdingContext", tier: "core" },
   { key: "crowdingScore", enabled: true, order: 10, refreshMs: 300_000, i18nKey: "compare.s.crowdingScore", infoI18nKey: "compare.info.crowdingScore", source: "OKX / computed quant signal", color: "rgb(217 70 239)", unit: "raw", group: "signals", tier: "core" },
   { key: "extensionScore", enabled: true, order: 20, refreshMs: 300_000, i18nKey: "compare.s.extensionScore", infoI18nKey: "compare.info.extensionScore", source: "OKX / computed quant signal", color: "rgb(244 63 94)", unit: "raw", group: "signals", tier: "core" },
   { key: "trendScore", enabled: true, order: 30, refreshMs: 300_000, i18nKey: "compare.s.trendScore", infoI18nKey: "compare.info.trendScore", source: "OKX / computed quant signal", color: "rgb(37 99 235)", unit: "raw", group: "signals", tier: "core" },
@@ -223,6 +252,34 @@ const CRYPTO_QUANT_CORE_CONFIG: readonly CryptoIndicatorConfig[] = [
   { key: "volRegime", enabled: true, order: 430, refreshMs: 300_000, i18nKey: "compare.s.volRegime", infoI18nKey: "compare.info.volRegime", source: "OKX / computed", color: "rgb(244 63 94)", unit: "raw", group: "regime", tier: "core" },
   { key: "cascadeInProgress", enabled: true, order: 440, refreshMs: 300_000, i18nKey: "compare.s.cascadeInProgress", infoI18nKey: "compare.info.cascadeInProgress", source: "OKX / computed quant signal", color: "rgb(185 28 28)", unit: "raw", group: "regime", tier: "core" },
 ]
+
+const BTC_WICK_PRIORITY: Readonly<Record<string, { rank: number; group: CryptoIndicatorGroup }>> = {
+  dev: { rank: 1, group: "strategyCore" },
+  atr60: { rank: 2, group: "strategyCore" },
+  trendRegime: { rank: 3, group: "strategyCore" },
+  vel5: { rank: 4, group: "strategyCore" },
+  fundingPct90d: { rank: 5, group: "strategyCore" },
+  cascadeScore: { rank: 6, group: "strategyCore" },
+  ema60: { rank: 7, group: "wickConfirmation" },
+  liquidationPercentile: { rank: 8, group: "wickConfirmation" },
+  oiChange5m: { rank: 9, group: "wickConfirmation" },
+  volumeBurst: { rank: 10, group: "wickConfirmation" },
+  trendScore: { rank: 11, group: "wickConfirmation" },
+  adx14: { rank: 12, group: "wickConfirmation" },
+  sigma1m: { rank: 13, group: "wickConfirmation" },
+  atrTf: { rank: 14, group: "wickConfirmation" },
+  rvPercentile90d: { rank: 15, group: "crowdingContext" },
+  oiPct90d: { rank: 16, group: "crowdingContext" },
+  crowdingScore: { rank: 17, group: "crowdingContext" },
+  basisZScore: { rank: 18, group: "crowdingContext" },
+  longShortZScore: { rank: 19, group: "crowdingContext" },
+  vel1: { rank: 20, group: "crowdingContext" },
+  vel3: { rank: 21, group: "crowdingContext" },
+  extensionScore: { rank: 22, group: "crowdingContext" },
+  exhaustionScore: { rank: 23, group: "crowdingContext" },
+  cascadeInProgress: { rank: 24, group: "crowdingContext" },
+  fng: { rank: 25, group: "crowdingContext" },
+}
 
 export const CRYPTO_INDICATOR_CONFIG: readonly CryptoIndicatorConfig[] = [
   // Evidence-ranked core: market, momentum, volatility, volume, liquidity.
@@ -322,12 +379,17 @@ export function getEnabledCryptoIndicators(): CryptoIndicatorConfig[] {
     group: entry.group ?? getFallbackGroup(entry.key),
     tier: entry.tier ?? "secondary",
   }))
-  return [...CRYPTO_QUANT_CORE_CONFIG, ...secondary].filter((entry) => entry.enabled).map((entry) => ({
-    ...entry,
-    relevanceScore: entry.relevanceScore ?? CRYPTO_RELEVANCE_SCORES[entry.key],
-    group: entry.group ?? getFallbackGroup(entry.key),
-    tier: entry.tier ?? "core",
-  })).sort((a, b) => {
+  return [...CRYPTO_QUANT_CORE_CONFIG, ...secondary].filter((entry) => entry.enabled).map((entry) => {
+    const priority = BTC_WICK_PRIORITY[entry.key]
+    const tier = entry.tier ?? "core"
+    return {
+      ...entry,
+      order: priority ? priority.rank * 10 : (tier === "core" ? 10_000 : 20_000) + entry.order,
+      relevanceScore: entry.relevanceScore ?? CRYPTO_RELEVANCE_SCORES[entry.key],
+      group: priority?.group ?? entry.group ?? getFallbackGroup(entry.key),
+      tier,
+    }
+  }).sort((a, b) => {
     const orderDelta = a.order - b.order
     if (orderDelta !== 0) return orderDelta
     return a.key.localeCompare(b.key)

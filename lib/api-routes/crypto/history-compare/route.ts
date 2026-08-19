@@ -23,6 +23,7 @@ import {
 } from "@/lib/crypto-indicator-config"
 import {
   buildOrderBookDepthSnapshot,
+  computeAtrSeries,
   computeCompositeSignals,
   computeDerivativeFeatures,
   computeOiVolumeRatio,
@@ -1011,14 +1012,22 @@ async function fetchStoredMarketSnapshots({
 
 const BTC_PRICE_KEYS = [
   "btcPrice",
+  "dev",
+  "vel1",
+  "vel3",
+  "vel5",
+  "sigma1m",
+  "volumeBurst",
   "vwap",
   "vwapDistancePct",
   "vwapZScore",
   "rsi14",
   "atr14",
+  "atr60",
   "atrPct",
   "ema20",
   "ema50",
+  "ema60",
   "ema200",
   "ema20Slope",
   "ema50Slope",
@@ -1067,6 +1076,7 @@ const BTC_SWAP_CANDLE_KEYS = [
 const OI_KEYS = [
   "oi",
   "oiChangePct",
+  "oiChange5m",
   "oiChange1h",
   "oiChange4h",
   "oiPct30d",
@@ -1095,6 +1105,7 @@ const FUNDING_KEYS = [
 ] as const
 const LONG_SHORT_KEYS = [
   "ls",
+  "longShortZScore",
   "signalBuyScore",
   "signalSellScore",
   "signalRiskScore",
@@ -1104,6 +1115,7 @@ const LIQ_KEYS = [
   "liqLong",
   "liqShort",
   "liquidationZScore",
+  "liquidationPercentile",
   "liquidationImbalance",
   "liqOverOi",
   "manipLiquidationImbalancePct",
@@ -1125,7 +1137,8 @@ const SMART_MONEY_KEYS = [
   "manipTakerImbalancePct",
   "manipCvdPriceDivergence",
 ] as const
-const BASIS_KEYS = ["basis", "manipBasisDislocationZ"] as const
+const BASIS_KEYS = ["basis", "basisZScore", "manipBasisDislocationZ"] as const
+const ATR_TF_KEYS = ["atrTf"] as const
 const ORDERBOOK_KEYS = [
   "spread",
   "bidDepth01",
@@ -1180,6 +1193,7 @@ const SELECTED_INSTRUMENT_LABEL_KEYS = new Set<string>([
   ...SMART_MONEY_KEYS,
   ...COMPOSITE_SIGNAL_KEYS,
   ...INDEX_PRICE_KEYS,
+  ...ATR_TF_KEYS,
 ])
 
 const CROSS_SECTION_PRICE_KEY_BY_CCY: Readonly<Record<string, string>> = {
@@ -1208,8 +1222,16 @@ function hasRequestedKey(requestedWithSignals: Set<string>, keys: readonly strin
 
 function getAlignmentMaxStaleMs(key: string, group: CryptoIndicatorGroup, intervalMs: number): number {
   if (group === "orderbook") return Math.max(intervalMs * 2, 10 * 60_000)
+  if (key === "atrTf") return Math.max(intervalMs * 2, 8 * 60 * 60_000)
   if (key === "funding" || key.startsWith("funding")) return Math.max(intervalMs * 2, 12 * 60 * 60_000)
   return Math.max(intervalMs * 2, 7 * DAY_MS)
+}
+
+function getNativeInterval(key: string, group: CryptoIndicatorGroup, selectedInterval: string): string {
+  if (key === "atrTf") return "4h"
+  if (key === "funding" || key.startsWith("funding")) return "8h"
+  if (key.startsWith("liquidation") || key === "liqLong" || key === "liqShort") return "1d"
+  return group === "orderbook" ? "collector" : selectedInterval
 }
 
 function getFreshness(group: CryptoIndicatorGroup): "live" | "collected" | "historical" {
@@ -1277,6 +1299,7 @@ export async function GET(request: Request) {
     btcPriceA, // blockchain.info (BTC only, longer history)
     btcSwapCandles, // OKX daily swap candles (fallback / derivatives metrics)
     btcSpotCandles,
+    btcFourHourCandles,
     indexCloses, // OKX multi-venue index closes (cross-venue reference)
     ethPrice,
     solPrice,
@@ -1329,6 +1352,15 @@ export async function GET(request: Request) {
     hasRequestedKey(requestedWithSignals, BASIS_KEYS)
       ? okxCandles(`${ccy}-USDT`, okxDays, selection.interval.okxBar, okxPointLimit, candleWindow)
       : [],
+    hasRequestedKey(requestedWithSignals, ATR_TF_KEYS) && selection.interval.id !== "4h"
+      ? okxCandles(
+          instId,
+          Math.max(7, Math.ceil(days) + 7),
+          "4H",
+          Math.min(OKX_MAX_PAGES * OKX_CANDLE_PAGE_LIMIT, Math.ceil((selection.endMs - selection.startMs) / (4 * 60 * 60_000)) + 100),
+          { ...fetchWindow, stepMs: 4 * 60 * 60_000 },
+        )
+      : [],
     hasRequestedKey(requestedWithSignals, INDEX_PRICE_KEYS)
       ? okxIndexCloses(`${ccy}-USDT`, okxDays, selection.interval.okxBar, okxPointLimit, candleWindow)
       : [],
@@ -1364,12 +1396,12 @@ export async function GET(request: Request) {
     requestedWithSignals.has("stablecoinMcap")
       ? fetchStablecoinMarketCap(range, revalidate).then((r) =>
           (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
-        )
+        ).catch(() => [])
       : [],
     requestedWithSignals.has("defiTvl")
       ? fetchDefiTvl(range, revalidate).then((r) =>
           (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
-        )
+        ).catch(() => [])
       : [],
     hasRequestedKey(requestedWithSignals, MINING_COST_KEYS) ? fetchMempoolHashrateHistory(revalidate) : [],
     requestedWithSignals.has("hashRate") || hasRequestedKey(requestedWithSignals, MINING_COST_KEYS)
@@ -1489,6 +1521,9 @@ export async function GET(request: Request) {
   const orderBookAskDepth1 = pointsFromStoredSnapshots(storedSnapshots, "ask_depth_1_usd")
   const orderBookImbalance = pointsFromStoredSnapshots(storedSnapshots, "orderbook_imbalance_pct")
   const basis = buildBasis(btcSwapCandles, btcSpotCandles)
+  const basisZScore = rollingValueZScore(basis, 90)
+  const longShortZScore = rollingValueZScore(lsRatio, 90)
+  const atrTf = computeAtrSeries(selection.interval.id === "4h" ? btcSwapCandles : btcFourHourCandles, 14)
   const indexCloseByTs = new Map(indexCloses.map((point) => [point.timestamp, point.value]))
   const perpIndexPremium: RawPoint[] = btcSwapCandles
     .map((candle) => {
@@ -1543,15 +1578,24 @@ export async function GET(request: Request) {
     ["cascadeInProgress", compositeSignals.cascadeInProgress],
     ["exhaustionScore", compositeSignals.exhaustionScore],
     ["btcPrice", btcPrice],
+    ["dev", quantFeatures.dev],
+    ["vel1", quantFeatures.vel1],
+    ["vel3", quantFeatures.vel3],
+    ["vel5", quantFeatures.vel5],
+    ["sigma1m", quantFeatures.sigma1m],
+    ["volumeBurst", quantFeatures.volumeBurst],
     ["return", quantFeatures.returns],
     ["vwap", quantFeatures.vwap],
     ["vwapDistancePct", quantFeatures.vwapDistancePct],
     ["vwapZScore", quantFeatures.vwapZScore],
     ["rsi14", quantFeatures.rsi14],
     ["atr14", quantFeatures.atr14],
+    ["atr60", quantFeatures.atr60],
+    ["atrTf", atrTf],
     ["atrPct", quantFeatures.atrPct],
     ["ema20", quantFeatures.ema20],
     ["ema50", quantFeatures.ema50],
+    ["ema60", quantFeatures.ema60],
     ["ema200", quantFeatures.ema200],
     ["ema20Slope", quantFeatures.ema20Slope],
     ["ema50Slope", quantFeatures.ema50Slope],
@@ -1586,6 +1630,7 @@ export async function GET(request: Request) {
     ["btcVolumeZ", btcVolumeZ],
     ["btcVolumeUsd", btcVolumeUsd],
     ["basis", basis],
+    ["basisZScore", basisZScore],
     ["upperWick", btcUpperWick],
     ["lowerWick", btcLowerWick],
     ["signalBuyScore", signalScores.buyScore],
@@ -1596,6 +1641,7 @@ export async function GET(request: Request) {
     ["defiTvl", defiTvl],
     ["oi", oi],
     ["oiChangePct", oiChangePct],
+    ["oiChange5m", derivativeFeatures.oiChange5m],
     ["oiChange1h", derivativeFeatures.oiChange1h],
     ["oiChange4h", derivativeFeatures.oiChange4h],
     ["oiPct30d", derivativeFeatures.oiPct30d],
@@ -1608,6 +1654,7 @@ export async function GET(request: Request) {
     ["fundingPct90d", derivativeFeatures.fundingPct90d],
     ["fundingZScore", derivativeFeatures.fundingZScore],
     ["ls", lsRatio],
+    ["longShortZScore", longShortZScore],
     ["contractLs", contractLsRatio],
     ["topTraderAccount", topTrader.account],
     ["topTraderPosition", topTrader.position],
@@ -1623,6 +1670,7 @@ export async function GET(request: Request) {
     ["liqLong", liq.long],
     ["liqShort", liq.short],
     ["liquidationZScore", derivativeFeatures.liquidationZScore],
+    ["liquidationPercentile", derivativeFeatures.liquidationPercentile],
     ["liquidationImbalance", derivativeFeatures.liquidationImbalance],
     ["liqOverOi", derivativeFeatures.liqOverOi],
     ["spread", orderBookSpread],
@@ -1694,7 +1742,7 @@ export async function GET(request: Request) {
         unit: config.unit,
         refreshMs: config.refreshMs,
         relevanceScore: config.relevanceScore,
-        nativeInterval: group === "orderbook" ? "collector" : selection.interval.id,
+        nativeInterval: getNativeInterval(config.key, group, selection.interval.id),
         coverage: hasCompleteCoverage(aligned) ? "complete" : "partial",
         freshness: getFreshness(group),
         data: timeline.map((t, i) => ({ time: t, value: aligned[i] })),

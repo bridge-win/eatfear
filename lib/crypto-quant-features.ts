@@ -15,6 +15,12 @@ export interface QuantCandle {
 
 export interface QuantFeatureSet {
   returns: RawPoint[]
+  dev: RawPoint[]
+  vel1: RawPoint[]
+  vel3: RawPoint[]
+  vel5: RawPoint[]
+  sigma1m: RawPoint[]
+  volumeBurst: RawPoint[]
   ret24hNorm: RawPoint[]
   ret72hNorm: RawPoint[]
   ret7dNorm: RawPoint[]
@@ -23,9 +29,11 @@ export interface QuantFeatureSet {
   vwapZScore: RawPoint[]
   rsi14: RawPoint[]
   atr14: RawPoint[]
+  atr60: RawPoint[]
   atrPct: RawPoint[]
   ema20: RawPoint[]
   ema50: RawPoint[]
+  ema60: RawPoint[]
   ema200: RawPoint[]
   ema20Slope: RawPoint[]
   ema50Slope: RawPoint[]
@@ -169,6 +177,41 @@ function rollingAtr(candles: QuantCandle[], period: number): RawPoint[] {
   return points
 }
 
+export function computeAtrSeries(candles: QuantCandle[], period: number): RawPoint[] {
+  return rollingAtr([...candles].sort((a, b) => a.timestamp - b.timestamp), period)
+}
+
+function rollingEwmaSigma(candles: QuantCandle[], lambda = 0.94): RawPoint[] {
+  let variance = 0
+  return candles.map((candle, index) => {
+    const previous = candles[index - 1]
+    const logReturn = previous && previous.close > 0 ? Math.log(candle.close / previous.close) : 0
+    variance = index === 0 ? 0 : lambda * variance + (1 - lambda) * logReturn ** 2
+    return { timestamp: candle.timestamp, value: Math.sqrt(Math.max(variance, 0)) * 100 }
+  })
+}
+
+function normalizedVelocity(candles: QuantCandle[], sigma: RawPoint[], lookback: number): RawPoint[] {
+  return candles.map((candle, index) => {
+    const previous = candles[index - lookback]
+    const currentSigma = sigma[index]?.value ?? 0
+    if (!previous || previous.close <= 0 || currentSigma <= 0) {
+      return { timestamp: candle.timestamp, value: 0 }
+    }
+    const movePct = Math.log(candle.close / previous.close) * 100
+    return { timestamp: candle.timestamp, value: movePct / (currentSigma * Math.sqrt(lookback)) }
+  })
+}
+
+function rollingVolumeBurst(candles: QuantCandle[], windowSize: number): RawPoint[] {
+  return candles.map((candle, index) => {
+    const sample = candles.slice(Math.max(0, index - windowSize), index)
+    const baseline = mean(sample.map((row) => (row.quoteVolume > 0 ? row.quoteVolume : row.volume)))
+    const current = candle.quoteVolume > 0 ? candle.quoteVolume : candle.volume
+    return { timestamp: candle.timestamp, value: baseline > 0 ? current / baseline : 1 }
+  })
+}
+
 function rollingAdx(candles: QuantCandle[], period: number): Pick<QuantFeatureSet, "adx14" | "plusDi" | "minusDi"> {
   let smoothedTr = 0
   let smoothedPlusDm = 0
@@ -293,9 +336,12 @@ export function computeQuantFeatures(candles: QuantCandle[], barsPerDay: number)
   })
   const vwapFeatures = rollingVwap(sorted, Math.max(2, Math.round(barsPerDay)))
   const atr14 = rollingAtr(sorted, 14)
+  const atr60 = rollingAtr(sorted, 60)
   const ema20 = rollingEma(sorted, 20)
   const ema50 = rollingEma(sorted, 50)
+  const ema60 = rollingEma(sorted, 60)
   const ema200 = rollingEma(sorted, 200)
+  const sigma1m = rollingEwmaSigma(sorted)
   const rv = realizedVolatility(sorted, Math.max(2, Math.round(30 * barsPerDay)), Math.max(365, Math.round(365 * barsPerDay)))
   const adxFeatures = rollingAdx(sorted, 14)
   const donchian = rollingDonchian(sorted, 20)
@@ -328,18 +374,31 @@ export function computeQuantFeatures(candles: QuantCandle[], barsPerDay: number)
 
   return {
     returns,
+    dev: sorted.map((candle, index) => ({
+      timestamp: candle.timestamp,
+      value: (atr60[index]?.value ?? 0) > 0
+        ? (candle.close - (ema60[index]?.value ?? candle.close)) / atr60[index].value
+        : 0,
+    })),
+    vel1: normalizedVelocity(sorted, sigma1m, 1),
+    vel3: normalizedVelocity(sorted, sigma1m, 3),
+    vel5: normalizedVelocity(sorted, sigma1m, 5),
+    sigma1m,
+    volumeBurst: rollingVolumeBurst(sorted, 60),
     ret24hNorm: volNormalizedReturn(1),
     ret72hNorm: volNormalizedReturn(3),
     ret7dNorm: volNormalizedReturn(7),
     ...vwapFeatures,
     rsi14: rollingRsi(sorted, 14),
     atr14,
+    atr60,
     atrPct: atr14.map((point, index) => ({
       timestamp: point.timestamp,
       value: sorted[index]?.close ? (point.value / sorted[index].close) * 100 : 0,
     })),
     ema20,
     ema50,
+    ema60,
     ema200,
     ema20Slope: rollingSlopePct(ema20, Math.max(1, Math.round(5 * barsPerDay))),
     ema50Slope: rollingSlopePct(ema50, Math.max(1, Math.round(10 * barsPerDay))),
@@ -387,10 +446,12 @@ export function computeDerivativeFeatures(points: {
   fundingZScore: RawPoint[]
   oiChange1h: RawPoint[]
   oiChange4h: RawPoint[]
+  oiChange5m: RawPoint[]
   oiPct30d: RawPoint[]
   oiPct90d: RawPoint[]
   oiZScore: RawPoint[]
   liquidationZScore: RawPoint[]
+  liquidationPercentile: RawPoint[]
   liquidationImbalance: RawPoint[]
   liqOverOi: RawPoint[]
 } {
@@ -415,12 +476,14 @@ export function computeDerivativeFeatures(points: {
     fundingPct30d: rollingPercentile(points.funding, 90),
     fundingPct90d: rollingPercentile(points.funding, 270),
     fundingZScore: rollingZScore(points.funding, 90),
+    oiChange5m: oiChange(5 * 60 * 1000),
     oiChange1h: oiChange(60 * 60 * 1000),
     oiChange4h: oiChange(4 * 60 * 60 * 1000),
     oiPct30d: rollingPercentile(oi, 30),
     oiPct90d: rollingPercentile(oi, 90),
     oiZScore: rollingZScore(oi, 30),
     liquidationZScore: rollingZScore(liquidation, 30),
+    liquidationPercentile: rollingPercentile(liquidation, 30),
     /* Forced-flow trigger: liquidation notional relative to open interest.
        A spike toward its upper tail marks a leverage flush, not just a busy day. */
     liqOverOi: liquidation.map((point) => {
