@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import { BlackSwanOpportunityCard } from "@/components/black-swan-opportunity-card"
 import { CryptoBuyWindowCard } from "@/components/crypto-buy-window-card"
@@ -172,11 +172,11 @@ export function CryptoDashboard({
   )
   const [tab, setTab] = usePersistentState<DashboardTabValue>("crypto:tab", "history", isDashboardTabValue)
   const [selectedSeriesKey, setSelectedSeriesKey] = useState<string | null>(null)
-  /* Draft picker values apply only on the explicit confirm button, so the
-     history fetch never runs against a half-edited window. They follow the
-     applied values whenever those change (preset selection, restore). */
+  /* Draft values keep native datetime inputs responsive while applied values
+     change only after the user pauses editing. */
   const [draftStart, setDraftStart] = useState(customStart)
   const [draftEnd, setDraftEnd] = useState(customEnd)
+  const customWindowEditPending = useRef(false)
   useEffect(() => {
     setDraftStart(customStart)
   }, [customStart])
@@ -184,7 +184,7 @@ export function CryptoDashboard({
     setDraftEnd(customEnd)
   }, [customEnd])
   useEffect(() => {
-    if (customActive) return () => {}
+    if (customActive) return
     /* Persistent state restores after mount. Defer preset synchronization by
        one task so a restored custom window can cancel this update instead of
        being overwritten by the default preset. */
@@ -199,9 +199,20 @@ export function CryptoDashboard({
     }, 0)
     return () => globalThis.clearTimeout(handle)
   }, [customActive, range, setCustomEnd, setCustomStart])
-  const draftStartMs = toTimestamp(draftStart)
-  const draftEndMs = toTimestamp(draftEnd)
-  const draftValid = draftStartMs !== null && draftEndMs !== null && draftEndMs > draftStartMs
+  useEffect(() => {
+    if (!customWindowEditPending.current) return
+    const handle = globalThis.setTimeout(() => {
+      if (!customWindowEditPending.current) return
+      const nextStartMs = toTimestamp(draftStart)
+      const nextEndMs = toTimestamp(draftEnd)
+      if (nextStartMs === null || nextEndMs === null || nextEndMs <= nextStartMs) return
+      customWindowEditPending.current = false
+      setCustomStart(draftStart)
+      setCustomEnd(draftEnd)
+      setCustomActiveValue("true")
+    }, 500)
+    return () => globalThis.clearTimeout(handle)
+  }, [draftEnd, draftStart, setCustomActiveValue, setCustomEnd, setCustomStart])
   const customStartMs = customActive ? toTimestamp(customStart) : null
   const customEndMs = customActive ? toTimestamp(customEnd) : null
   const validCustomWindow =
@@ -248,6 +259,7 @@ export function CryptoDashboard({
     const nowMs = Date.now()
     const nextStart = toDatetimeLocalValue(getRangeStartMs(next, nowMs))
     const nextEnd = toDatetimeLocalValue(nowMs)
+    customWindowEditPending.current = false
     setCustomActiveValue("false")
     setRange(next)
     setInterval(getDefaultCryptoIntervalForRange(next))
@@ -259,11 +271,14 @@ export function CryptoDashboard({
     setDraftEnd(nextEnd)
   }
 
-  const applyCustomWindow = () => {
-    if (!draftValid) return
-    setCustomStart(draftStart)
-    setCustomEnd(draftEnd)
-    setCustomActiveValue("true")
+  const handleCustomStartChange = (next: string) => {
+    customWindowEditPending.current = true
+    setDraftStart(next)
+  }
+
+  const handleCustomEndChange = (next: string) => {
+    customWindowEditPending.current = true
+    setDraftEnd(next)
   }
   const optionsCurrency = useMemo(() => {
     const base = instId.split("-")[0]
@@ -317,34 +332,30 @@ export function CryptoDashboard({
 
   return (
     <DashboardFrame>
-      <header className="flex flex-wrap items-start justify-between gap-2">
+      <header className="flex flex-wrap items-start justify-between gap-2 xl:flex-nowrap">
         <div>
           <h1 className="text-xl font-bold tracking-tight">{t("crypto.title")}</h1>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             {t("crypto.subtitle", { source: "OKX" })}
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <SymbolSelector value={instId} options={symbolOptions} onChange={setInstId} />
-            <TimeRangeSelect
-              label={t("timeRange.rangeLabel")}
-              customLabel={t("timeRange.customOption")}
-              value={customActive ? "custom" : range}
-              onChange={handleRangeChange}
-            />
-            <CryptoIntervalSelect label={t("timeRange.intervalLabel")} value={interval} onChange={setInterval} />
-          </div>
+        <div className="flex max-w-full flex-wrap items-center justify-end gap-2 xl:flex-nowrap">
+          <SymbolSelector value={instId} options={symbolOptions} onChange={setInstId} />
+          <TimeRangeSelect
+            label={t("timeRange.rangeLabel")}
+            customLabel={t("timeRange.customOption")}
+            value={customActive ? "custom" : range}
+            onChange={handleRangeChange}
+          />
+          <CryptoIntervalSelect label={t("timeRange.intervalLabel")} value={interval} onChange={setInterval} />
           <CustomTimeWindowPicker
             startLabel={t("timeRange.startLabel")}
             endLabel={t("timeRange.endLabel")}
-            applyLabel={t("timeRange.apply")}
             startValue={draftStart}
             endValue={draftEnd}
-            onStartChange={setDraftStart}
-            onEndChange={setDraftEnd}
-            onApply={applyCustomWindow}
-            applyDisabled={!draftValid}
+            onStartChange={handleCustomStartChange}
+            onEndChange={handleCustomEndChange}
+            className="xl:flex-nowrap"
           />
         </div>
       </header>

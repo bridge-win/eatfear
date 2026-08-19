@@ -1,6 +1,5 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   cryptoHistoryIntervalOptions,
@@ -137,7 +136,7 @@ export function DateTimeField({ label, value, onChange, className }: DateTimeFie
         aria-label={label}
         type="datetime-local"
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onInput={(event) => onChange(event.currentTarget.value)}
         className="h-8 w-48 text-xs tabular-nums"
       />
     </div>
@@ -147,35 +146,26 @@ export function DateTimeField({ label, value, onChange, className }: DateTimeFie
 interface CustomTimeWindowPickerProps {
   startLabel: string
   endLabel: string
-  applyLabel: string
   startValue: string
   endValue: string
   onStartChange: (next: string) => void
   onEndChange: (next: string) => void
-  onApply: () => void
-  applyDisabled?: boolean
   className?: string
 }
 
 export function CustomTimeWindowPicker({
   startLabel,
   endLabel,
-  applyLabel,
   startValue,
   endValue,
   onStartChange,
   onEndChange,
-  onApply,
-  applyDisabled = false,
   className,
 }: CustomTimeWindowPickerProps) {
   return (
     <div className={cn("flex flex-wrap items-center justify-end gap-1.5", className)}>
       <DateTimeField label={startLabel} value={startValue} onChange={onStartChange} />
       <DateTimeField label={endLabel} value={endValue} onChange={onEndChange} />
-      <Button size="sm" className="h-8 px-3 text-xs" onClick={onApply} disabled={applyDisabled}>
-        {applyLabel}
-      </Button>
     </div>
   )
 }

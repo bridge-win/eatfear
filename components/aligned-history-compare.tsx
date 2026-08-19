@@ -17,8 +17,9 @@ import {
   type UTCTimestamp,
   type WhitespaceData,
 } from "lightweight-charts"
-import { Info, RefreshCw } from "lucide-react"
+import { RefreshCw } from "lucide-react"
 
+import { InfoPopover } from "@/components/info-popover"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
@@ -98,35 +99,6 @@ interface TimeAxisLabel {
   label: string
   positionPct: number
   align: "start" | "center" | "end"
-}
-
-function ChartInfoButton({
-  title,
-  description,
-  source,
-  className,
-  iconClassName,
-}: {
-  title: string
-  description: string
-  source?: string
-  className?: string
-  iconClassName?: string
-}) {
-  const text = source ? `${title}\n\n${description}\n\nSource: ${source}` : `${title}\n\n${description}`
-  return (
-    <button
-      type="button"
-      aria-label={title}
-      title={text}
-      className={cn(
-        "inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        className,
-      )}
-    >
-      <Info className={cn("h-3.5 w-3.5", iconClassName)} />
-    </button>
-  )
 }
 
 interface VisibleLogicalRange {
@@ -858,7 +830,7 @@ export function AlignedHistoryCompare({
             <CardTitle data-history-title className="h-4 max-w-full truncate text-xs leading-4">
               {title}
             </CardTitle>
-            <ChartInfoButton title={title} description={infoDescription} source={infoSource} />
+            <InfoPopover ariaLabel={title} title={title} description={infoDescription} source={infoSource} />
           </div>
           {data && seriesCount > 0 && (
             <span className="h-4 w-[7.75rem] overflow-hidden truncate text-right text-[9px] leading-4 text-muted-foreground sm:w-36">
@@ -963,7 +935,8 @@ export function AlignedHistoryCompare({
                           </span>
                         </button>
                         {spec.info && (
-                          <ChartInfoButton
+                          <InfoPopover
+                            ariaLabel={spec.info.title ?? spec.label}
                             title={spec.info.title ?? spec.label}
                             description={spec.info.description}
                             source={spec.info.source}

@@ -42,7 +42,6 @@ const DICT: Dict = {
   "timeRange.customOption": { zh: "自定义", en: "Custom" },
   "timeRange.startLabel": { zh: "开始", en: "Start" },
   "timeRange.endLabel": { zh: "结束", en: "End" },
-  "timeRange.apply": { zh: "确定", en: "Apply" },
   "crypto.title": { zh: "加密看板", en: "Crypto Dashboard" },
   "crypto.subtitle": {
     zh: "现货 + 永续衍生品（{source}）。实时与历史曲线合并展示，默认进入历史对比；数据源与时间周期在右侧切换。",

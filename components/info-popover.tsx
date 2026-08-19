@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils"
 
 interface InfoPopoverProps {
+  ariaLabel?: string
   title?: string
   description: React.ReactNode
   source?: string
@@ -16,6 +17,7 @@ interface InfoPopoverProps {
 }
 
 export function InfoPopover({
+  ariaLabel,
   title,
   description,
   source,
@@ -28,7 +30,7 @@ export function InfoPopover({
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label="More info"
+          aria-label={ariaLabel ?? "More info"}
           className={cn(
             "inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
             className,
