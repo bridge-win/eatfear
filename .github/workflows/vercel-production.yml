@@ -47,10 +47,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Link Vercel project
+        run: |
+          mkdir -p .vercel
+          printf '{"orgId":"%s","projectId":"%s"}\n' "$VERCEL_ORG_ID" "$VERCEL_PROJECT_ID" > .vercel/project.json
+
       - name: Deploy to Vercel production
         id: deploy
         run: |
-          deployment_url="$(pnpm exec vercel deploy --prod --yes --token="$VERCEL_TOKEN")"
+          pnpm exec vercel deploy --prod --yes --token="$VERCEL_TOKEN" 2>&1 | tee vercel-deploy.log
+          deployment_url="$(grep -Eo 'https://[^[:space:]]+' vercel-deploy.log | tail -n 1)"
+          test -n "$deployment_url" || (echo "::error::Vercel deployment URL not found" && exit 1)
           echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
           echo "Production deployment: $deployment_url" >> "$GITHUB_STEP_SUMMARY"
           echo "$deployment_url"
