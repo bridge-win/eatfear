@@ -75,7 +75,6 @@ jobs:
             --prod \
             --force \
             --yes \
-            --project "$VERCEL_PROJECT_ID" \
             --token="$VERCEL_TOKEN" \
             --meta githubCommitOrg=bridge-win \
             --meta githubCommitRepo=eatfear \
