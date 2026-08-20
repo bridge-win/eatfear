@@ -58,22 +58,7 @@ jobs:
             --environment=production \
             --token="$VERCEL_TOKEN"
 
-      - name: Build Vercel output
-        env:
-          VERCEL_GIT_PROVIDER: github
-          VERCEL_GIT_REPO_OWNER: bridge-win
-          VERCEL_GIT_REPO_SLUG: eatfear
-          VERCEL_GIT_REPO_ID: "1122338274"
-          VERCEL_GIT_COMMIT_REF: ${{ github.ref_name }}
-          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
-          VERCEL_GIT_COMMIT_AUTHOR_LOGIN: ${{ github.actor }}
-        run: |
-          set -euo pipefail
-          pnpm exec vercel build \
-            --prod \
-            --token="$VERCEL_TOKEN"
-
-      - name: Deploy prebuilt output to Vercel production
+      - name: Deploy source to Vercel production
         id: deploy
         env:
           VERCEL_GIT_PROVIDER: github
@@ -86,9 +71,10 @@ jobs:
         run: |
           set -uo pipefail
           pnpm exec vercel deploy \
-            --prebuilt \
             --prod \
+            --force \
             --yes \
+            --project="$VERCEL_PROJECT_ID" \
             --token="$VERCEL_TOKEN" \
             --meta githubCommitOrg=bridge-win \
             --meta githubCommitRepo=eatfear \
@@ -99,7 +85,7 @@ jobs:
             2>&1 | tee vercel-deploy.log
           deploy_status="${PIPESTATUS[0]}"
           if [ "$deploy_status" -ne 0 ]; then
-            echo "::error::Vercel prebuilt deploy failed with exit code $deploy_status"
+            echo "::error::Vercel source deploy failed with exit code $deploy_status"
             tail -n 40 vercel-deploy.log | sed "s/${VERCEL_TOKEN}/[redacted]/g" | while IFS= read -r line; do
               echo "::error::$line"
             done
