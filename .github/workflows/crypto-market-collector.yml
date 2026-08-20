@@ -1,0 +1,30 @@
+name: Crypto Market Collector
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crypto-market-collector
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    name: Collect OKX market data
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call collector endpoint
+        env:
+          COLLECTOR_URL: https://eatfear.com/api/crypto/market-collector?instId=BTC-USDT-SWAP
+          COLLECTOR_SECRET: ${{ secrets.CRYPTO_COLLECTOR_SECRET || secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "$COLLECTOR_SECRET" || (echo "::error::Missing CRYPTO_COLLECTOR_SECRET or CRON_SECRET secret" && exit 1)
+          curl --fail-with-body --silent --show-error --retry 2 --retry-delay 10 \
+            --header "Authorization: Bearer $COLLECTOR_SECRET" \
+            "$COLLECTOR_URL"
