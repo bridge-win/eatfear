@@ -70,6 +70,7 @@ jobs:
           VERCEL_GIT_COMMIT_AUTHOR_LOGIN: ${{ github.actor }}
         run: |
           set -uo pipefail
+          set +e
           pnpm exec vercel deploy \
             --prod \
             --force \
@@ -84,6 +85,7 @@ jobs:
             --meta githubCommitAuthorLogin="$GITHUB_ACTOR" \
             2>&1 | tee vercel-deploy.log
           deploy_status="${PIPESTATUS[0]}"
+          set -e
           if [ "$deploy_status" -ne 0 ]; then
             echo "::error::Vercel source deploy failed with exit code $deploy_status"
             tail -n 40 vercel-deploy.log | sed "s/${VERCEL_TOKEN}/[redacted]/g" | while IFS= read -r line; do
