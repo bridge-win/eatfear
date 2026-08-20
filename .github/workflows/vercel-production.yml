@@ -50,7 +50,28 @@ jobs:
           mkdir -p .vercel
           printf '{"orgId":"%s","projectId":"%s"}\n' "$VERCEL_ORG_ID" "$VERCEL_PROJECT_ID" > .vercel/project.json
 
-      - name: Deploy to Vercel production
+      - name: Pull Vercel production settings
+        run: |
+          pnpm exec vercel pull \
+            --yes \
+            --environment=production \
+            --token="$VERCEL_TOKEN"
+
+      - name: Build Vercel output
+        env:
+          VERCEL_GIT_PROVIDER: github
+          VERCEL_GIT_REPO_OWNER: bridge-win
+          VERCEL_GIT_REPO_SLUG: eatfear
+          VERCEL_GIT_REPO_ID: "1122338274"
+          VERCEL_GIT_COMMIT_REF: ${{ github.ref_name }}
+          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+          VERCEL_GIT_COMMIT_AUTHOR_LOGIN: ${{ github.actor }}
+        run: |
+          pnpm exec vercel build \
+            --prod \
+            --token="$VERCEL_TOKEN"
+
+      - name: Deploy prebuilt output to Vercel production
         id: deploy
         env:
           VERCEL_GIT_PROVIDER: github
@@ -62,8 +83,11 @@ jobs:
           VERCEL_GIT_COMMIT_AUTHOR_LOGIN: ${{ github.actor }}
         run: |
           pnpm exec vercel deploy \
+            --prebuilt \
             --prod \
+            --force \
             --yes \
+            --format=json \
             --token="$VERCEL_TOKEN" \
             --meta githubCommitOrg=bridge-win \
             --meta githubCommitRepo=eatfear \
@@ -71,9 +95,49 @@ jobs:
             --meta githubCommitRef="$GITHUB_REF_NAME" \
             --meta githubCommitSha="$GITHUB_SHA" \
             --meta githubCommitAuthorLogin="$GITHUB_ACTOR" \
-            2>&1 | tee vercel-deploy.log
-          deployment_url="$(grep -Eo 'https://[^[:space:]]+' vercel-deploy.log | tail -n 1)"
+            2>&1 | tee vercel-deploy.json
+          deployment_url="$(
+            node -e '
+              const fs = require("node:fs");
+              const raw = fs.readFileSync("vercel-deploy.json", "utf8").trim();
+              const line = raw.split(/\r?\n/).reverse().find((entry) => entry.trim().startsWith("{"));
+              if (!line) process.exit(1);
+              const data = JSON.parse(line);
+              const url = typeof data.url === "string" ? data.url : "";
+              console.log(url.startsWith("http") ? url : `https://${url}`);
+            '
+          )"
           test -n "$deployment_url" || (echo "::error::Vercel deployment URL not found" && exit 1)
           echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
           echo "Production deployment: $deployment_url" >> "$GITHUB_STEP_SUMMARY"
           echo "$deployment_url"
+
+      - name: Verify Vercel production deployment
+        run: |
+          pnpm exec vercel inspect \
+            "${{ steps.deploy.outputs.deployment_url }}" \
+            --wait \
+            --timeout=5m \
+            --format=json \
+            --token="$VERCEL_TOKEN" \
+            > vercel-inspect.json
+          node -e '
+            const fs = require("node:fs");
+            const data = JSON.parse(fs.readFileSync("vercel-inspect.json", "utf8"));
+            const readyState = data.readyState ?? data.state;
+            const target = data.target ?? data.meta?.target;
+            const projectId = data.projectId ?? data.project?.id ?? data.meta?.projectId;
+            if (readyState !== "READY") {
+              console.error(`::error::Vercel deployment is not READY: ${readyState ?? "unknown"}`);
+              process.exit(1);
+            }
+            if (target && target !== "production") {
+              console.error(`::error::Vercel deployment target is not production: ${target}`);
+              process.exit(1);
+            }
+            if (projectId && projectId !== process.env.VERCEL_PROJECT_ID) {
+              console.error(`::error::Vercel deployment used unexpected project: ${projectId}`);
+              process.exit(1);
+            }
+            console.log(`Verified Vercel deployment ${data.url ?? data.name ?? "unknown"} is READY.`);
+          '
