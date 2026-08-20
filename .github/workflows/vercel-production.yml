@@ -89,7 +89,6 @@ jobs:
             --prebuilt \
             --prod \
             --yes \
-            --format=json \
             --token="$VERCEL_TOKEN" \
             --meta githubCommitOrg=bridge-win \
             --meta githubCommitRepo=eatfear \
@@ -97,17 +96,18 @@ jobs:
             --meta githubCommitRef="$GITHUB_REF_NAME" \
             --meta githubCommitSha="$GITHUB_SHA" \
             --meta githubCommitAuthorLogin="$GITHUB_ACTOR" \
-            2>&1 | tee vercel-deploy.json
+            2>&1 | tee vercel-deploy.log
           deployment_url="$(
             node -e '
               const fs = require("node:fs");
-              const raw = fs.readFileSync("vercel-deploy.json", "utf8").trim();
-              const start = raw.indexOf("{");
-              const end = raw.lastIndexOf("}");
-              if (start === -1 || end === -1 || end <= start) process.exit(1);
-              const data = JSON.parse(raw.slice(start, end + 1));
-              const url = typeof data.url === "string" ? data.url : "";
-              console.log(url.startsWith("http") ? url : `https://${url}`);
+              const raw = fs.readFileSync("vercel-deploy.log", "utf8");
+              const matches = raw.match(/https:\/\/[a-zA-Z0-9.-]+\.vercel\.app\b/g) ?? [];
+              const url = matches.at(-1) ?? "";
+              if (!url) {
+                console.error("::error::Vercel deployment URL not found in deploy output");
+                process.exit(1);
+              }
+              console.log(url);
             '
           )"
           test -n "$deployment_url" || (echo "::error::Vercel deployment URL not found" && exit 1)
