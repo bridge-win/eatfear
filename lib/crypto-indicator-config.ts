@@ -1,5 +1,36 @@
 export type CryptoIndicatorUnit = "usd" | "cny" | "pct" | "ratio" | "raw" | "count"
 export type CryptoIndicatorGroup =
+  | "strategySignals"
+  | "priceAnchors"
+  | "priceDeviation"
+  | "trendStructure"
+  | "trendStrength"
+  | "volatilityPrice"
+  | "volatilityNormalized"
+  | "volumeActivity"
+  | "orderFlow"
+  | "fundingRates"
+  | "fundingExtremes"
+  | "openInterestLevel"
+  | "openInterestChange"
+  | "openInterestCrowding"
+  | "traderPositioning"
+  | "liquidationFlow"
+  | "liquidationStress"
+  | "marketLiquidity"
+  | "executionStress"
+  | "eventLifecycle"
+  | "sentiment"
+  | "smartMoney"
+  | "onchainActivity"
+  | "networkSecurity"
+  | "minerEconomics"
+  | "cryptoCrossSection"
+  | "macroEquities"
+  | "macroRates"
+  | "commodities"
+  | "manipulation"
+  | "customSignals"
   | "strategyCore"
   | "wickConfirmation"
   | "crowdingContext"
@@ -33,7 +64,7 @@ export interface CryptoIndicatorConfig {
   unit: CryptoIndicatorUnit
   /** 0-100 relevance score from academic evidence plus practical trading coverage. */
   relevanceScore?: number
-  /** Six-layer BTC quant grouping used by the history view. */
+  /** Market-mechanism grouping used by the history view. */
   group?: CryptoIndicatorGroup
   /** Core metrics load first; secondary context stays below the strategy layer. */
   tier?: "core" | "secondary"
@@ -51,6 +82,7 @@ const CRYPTO_RELEVANCE_SCORES: Record<string, number> = {
   volumeBurst: 98,
   sigma1m: 97,
   atrTf: 97,
+  atr1h: 97,
   basisZScore: 94,
   longShortZScore: 92,
   vel1: 92,
@@ -98,6 +130,25 @@ const CRYPTO_RELEVANCE_SCORES: Record<string, number> = {
   oiZScore: 94,
   liquidationZScore: 96,
   liquidationImbalance: 95,
+  liquidationNotional: 97,
+  liquidationCount: 92,
+  liqOiPercentile: 97,
+  liqDecaying: 96,
+  oiChange5mPercentile: 96,
+  normalizedTrendScore: 99,
+  trendAgree: 96,
+  donchianBreak: 95,
+  retZRobust: 98,
+  xvenueDeviation: 99,
+  spreadPercentile: 95,
+  eventActive: 98,
+  eventDirection: 96,
+  eventVwap: 96,
+  eventExtreme: 96,
+  reclaimFraction: 99,
+  eventVerdict: 99,
+  eatFearScore: 91,
+  eatGreedScore: 91,
   buyVolume: 94,
   sellVolume: 94,
   volumeDelta: 95,
@@ -251,34 +302,62 @@ const CRYPTO_QUANT_CORE_CONFIG: readonly CryptoIndicatorConfig[] = [
   { key: "trendRegime", enabled: true, order: 420, refreshMs: 300_000, i18nKey: "compare.s.trendRegime", infoI18nKey: "compare.info.trendRegime", source: "OKX / computed", color: "rgb(37 99 235)", unit: "raw", group: "regime", tier: "core" },
   { key: "volRegime", enabled: true, order: 430, refreshMs: 300_000, i18nKey: "compare.s.volRegime", infoI18nKey: "compare.info.volRegime", source: "OKX / computed", color: "rgb(244 63 94)", unit: "raw", group: "regime", tier: "core" },
   { key: "cascadeInProgress", enabled: true, order: 440, refreshMs: 300_000, i18nKey: "compare.s.cascadeInProgress", infoI18nKey: "compare.info.cascadeInProgress", source: "OKX / computed quant signal", color: "rgb(185 28 28)", unit: "raw", group: "regime", tier: "core" },
+  { key: "normalizedTrendScore", enabled: true, order: 450, refreshMs: 300_000, i18nKey: "compare.s.normalizedTrendScore", infoI18nKey: "compare.info.normalizedTrendScore", source: "OKX / computed btc-qt v2.1", color: "rgb(79 70 229)", unit: "raw", tier: "core" },
+  { key: "trendAgree", enabled: true, order: 460, refreshMs: 300_000, i18nKey: "compare.s.trendAgree", infoI18nKey: "compare.info.trendAgree", source: "OKX / computed btc-qt v2.1", color: "rgb(67 56 202)", unit: "count", tier: "core" },
+  { key: "donchianBreak", enabled: true, order: 470, refreshMs: 300_000, i18nKey: "compare.s.donchianBreak", infoI18nKey: "compare.info.donchianBreak", source: "OKX / computed btc-qt v2.1", color: "rgb(5 150 105)", unit: "raw", tier: "core" },
+  { key: "retZRobust", enabled: true, order: 480, refreshMs: 300_000, i18nKey: "compare.s.retZRobust", infoI18nKey: "compare.info.retZRobust", source: "OKX / computed median-MAD", color: "rgb(225 29 72)", unit: "raw", tier: "core" },
+  { key: "ema20Slope", enabled: true, order: 490, refreshMs: 300_000, i18nKey: "compare.s.ema20Slope", infoI18nKey: "compare.info.ema20Slope", source: "OKX / computed", color: "rgb(56 189 248)", unit: "pct", tier: "core" },
+  { key: "ema50Slope", enabled: true, order: 500, refreshMs: 300_000, i18nKey: "compare.s.ema50Slope", infoI18nKey: "compare.info.ema50Slope", source: "OKX / computed", color: "rgb(2 132 199)", unit: "pct", tier: "core" },
+  { key: "plusDi", enabled: true, order: 510, refreshMs: 300_000, i18nKey: "compare.s.plusDi", infoI18nKey: "compare.info.plusDi", source: "OKX / computed", color: "rgb(22 163 74)", unit: "raw", tier: "core" },
+  { key: "minusDi", enabled: true, order: 520, refreshMs: 300_000, i18nKey: "compare.s.minusDi", infoI18nKey: "compare.info.minusDi", source: "OKX / computed", color: "rgb(220 38 38)", unit: "raw", tier: "core" },
+  { key: "rvPercentile30d", enabled: true, order: 530, refreshMs: 300_000, i18nKey: "compare.s.rvPercentile30d", infoI18nKey: "compare.info.rvPercentile30d", source: "OKX / computed", color: "rgb(251 113 133)", unit: "pct", tier: "core" },
+  { key: "fundingPct30d", enabled: true, order: 540, refreshMs: 300_000, i18nKey: "compare.s.fundingPct30d", infoI18nKey: "compare.info.fundingPct30d", source: "OKX / computed", color: "rgb(244 114 182)", unit: "pct", tier: "core" },
+  { key: "oiChange1h", enabled: true, order: 550, refreshMs: 300_000, i18nKey: "compare.s.oiChange1h", infoI18nKey: "compare.info.oiChange1h", source: "OKX / computed", color: "rgb(3 105 161)", unit: "pct", tier: "core" },
+  { key: "oiPct30d", enabled: true, order: 560, refreshMs: 300_000, i18nKey: "compare.s.oiPct30d", infoI18nKey: "compare.info.oiPct30d", source: "OKX / computed", color: "rgb(14 116 144)", unit: "pct", tier: "core" },
+  { key: "liquidationNotional", enabled: true, order: 570, refreshMs: 300_000, i18nKey: "compare.s.liquidationNotional", infoI18nKey: "compare.info.liquidationNotional", source: "OKX liquidation history", color: "rgb(185 28 28)", unit: "usd", tier: "core" },
+  { key: "liqOiPercentile", enabled: true, order: 580, refreshMs: 300_000, i18nKey: "compare.s.liqOiPercentile", infoI18nKey: "compare.info.liqOiPercentile", source: "OKX / computed btc-qt v2.1", color: "rgb(194 65 12)", unit: "pct", tier: "core" },
+  { key: "liqDecaying", enabled: true, order: 590, refreshMs: 300_000, i18nKey: "compare.s.liqDecaying", infoI18nKey: "compare.info.liqDecaying", source: "OKX / computed btc-qt v2.1", color: "rgb(21 128 61)", unit: "raw", tier: "core" },
+  { key: "oiChange5mPercentile", enabled: true, order: 600, refreshMs: 300_000, i18nKey: "compare.s.oiChange5mPercentile", infoI18nKey: "compare.info.oiChange5mPercentile", source: "OKX / computed btc-qt v2.1", color: "rgb(7 89 133)", unit: "pct", tier: "core" },
+  { key: "xvenueDeviation", enabled: true, order: 610, refreshMs: 300_000, i18nKey: "compare.s.xvenueDeviation", infoI18nKey: "compare.info.xvenueDeviation", source: "OKX multi-venue index / computed", color: "rgb(124 58 237)", unit: "raw", tier: "core" },
+  { key: "spreadPercentile", enabled: true, order: 620, refreshMs: 300_000, i18nKey: "compare.s.spreadPercentile", infoI18nKey: "compare.info.spreadPercentile", source: "OKX collected snapshots / computed", color: "rgb(100 116 139)", unit: "pct", tier: "core" },
+  { key: "eventActive", enabled: true, order: 630, refreshMs: 300_000, i18nKey: "compare.s.eventActive", infoI18nKey: "compare.info.eventActive", source: "OKX / computed btc-qt event state", color: "rgb(234 88 12)", unit: "raw", tier: "core" },
+  { key: "eventDirection", enabled: true, order: 640, refreshMs: 300_000, i18nKey: "compare.s.eventDirection", infoI18nKey: "compare.info.eventDirection", source: "OKX / computed btc-qt event state", color: "rgb(239 68 68)", unit: "raw", tier: "core" },
+  { key: "eventVwap", enabled: true, order: 650, refreshMs: 300_000, i18nKey: "compare.s.eventVwap", infoI18nKey: "compare.info.eventVwap", source: "OKX / computed btc-qt event state", color: "rgb(13 148 136)", unit: "usd", tier: "core" },
+  { key: "eventExtreme", enabled: true, order: 655, refreshMs: 300_000, i18nKey: "compare.s.eventExtreme", infoI18nKey: "compare.info.eventExtreme", source: "OKX / computed btc-qt event state", color: "rgb(234 88 12)", unit: "usd", tier: "core" },
+  { key: "reclaimFraction", enabled: true, order: 660, refreshMs: 300_000, i18nKey: "compare.s.reclaimFraction", infoI18nKey: "compare.info.reclaimFraction", source: "OKX / computed btc-qt event state", color: "rgb(22 163 74)", unit: "pct", tier: "core" },
+  { key: "eventVerdict", enabled: true, order: 670, refreshMs: 300_000, i18nKey: "compare.s.eventVerdict", infoI18nKey: "compare.info.eventVerdict", source: "OKX / computed btc-qt event state", color: "rgb(79 70 229)", unit: "raw", tier: "core" },
+  { key: "eatFearScore", enabled: true, order: 680, refreshMs: 300_000, i18nKey: "compare.s.eatFearScore", infoI18nKey: "compare.info.eatFearScore", source: "alternative.me + OKX / computed btc-qt", color: "rgb(220 38 38)", unit: "raw", tier: "core" },
+  { key: "eatGreedScore", enabled: true, order: 690, refreshMs: 300_000, i18nKey: "compare.s.eatGreedScore", infoI18nKey: "compare.info.eatGreedScore", source: "alternative.me + OKX / computed btc-qt", color: "rgb(22 163 74)", unit: "raw", tier: "core" },
+  { key: "atr1h", enabled: true, order: 700, refreshMs: 300_000, i18nKey: "compare.s.atr1h", infoI18nKey: "compare.info.atr1h", source: "OKX 1h candles / computed btc-qt v2.1", color: "rgb(180 83 9)", unit: "usd", tier: "core" },
+  { key: "liquidationCount", enabled: true, order: 710, refreshMs: 300_000, i18nKey: "compare.s.liquidationCount", infoI18nKey: "compare.info.liquidationCount", source: "OKX liquidation history", color: "rgb(153 27 27)", unit: "count", tier: "core" },
 ]
 
-const BTC_WICK_PRIORITY: Readonly<Record<string, { rank: number; group: CryptoIndicatorGroup }>> = {
-  dev: { rank: 1, group: "strategyCore" },
-  atr60: { rank: 2, group: "strategyCore" },
-  trendRegime: { rank: 3, group: "strategyCore" },
-  vel5: { rank: 4, group: "strategyCore" },
-  fundingPct90d: { rank: 5, group: "strategyCore" },
-  cascadeScore: { rank: 6, group: "strategyCore" },
-  ema60: { rank: 7, group: "wickConfirmation" },
-  liquidationPercentile: { rank: 8, group: "wickConfirmation" },
-  oiChange5m: { rank: 9, group: "wickConfirmation" },
-  volumeBurst: { rank: 10, group: "wickConfirmation" },
-  trendScore: { rank: 11, group: "wickConfirmation" },
-  adx14: { rank: 12, group: "wickConfirmation" },
-  sigma1m: { rank: 13, group: "wickConfirmation" },
-  atrTf: { rank: 14, group: "wickConfirmation" },
-  rvPercentile90d: { rank: 15, group: "crowdingContext" },
-  oiPct90d: { rank: 16, group: "crowdingContext" },
-  crowdingScore: { rank: 17, group: "crowdingContext" },
-  basisZScore: { rank: 18, group: "crowdingContext" },
-  longShortZScore: { rank: 19, group: "crowdingContext" },
-  vel1: { rank: 20, group: "crowdingContext" },
-  vel3: { rank: 21, group: "crowdingContext" },
-  extensionScore: { rank: 22, group: "crowdingContext" },
-  exhaustionScore: { rank: 23, group: "crowdingContext" },
-  cascadeInProgress: { rank: 24, group: "crowdingContext" },
-  fng: { rank: 25, group: "crowdingContext" },
+const BTC_WICK_PRIORITY: Readonly<Record<string, number>> = {
+  dev: 1,
+  atr60: 2,
+  trendRegime: 3,
+  vel5: 4,
+  fundingPct90d: 5,
+  cascadeScore: 6,
+  ema60: 7,
+  liquidationPercentile: 8,
+  oiChange5m: 9,
+  volumeBurst: 10,
+  trendScore: 11,
+  adx14: 12,
+  sigma1m: 13,
+  atrTf: 14,
+  rvPercentile90d: 15,
+  oiPct90d: 16,
+  crowdingScore: 17,
+  basisZScore: 18,
+  longShortZScore: 19,
+  vel1: 20,
+  vel3: 21,
+  extensionScore: 22,
+  exhaustionScore: 23,
+  cascadeInProgress: 24,
+  fng: 25,
 }
 
 export const CRYPTO_INDICATOR_CONFIG: readonly CryptoIndicatorConfig[] = [
@@ -361,13 +440,46 @@ export const CRYPTO_INDICATOR_CONFIG: readonly CryptoIndicatorConfig[] = [
   { key: "natgas", enabled: true, order: 700, refreshMs: 300_000, i18nKey: "compare.s.natgas", infoI18nKey: "compare.info.natgas", source: "Yahoo Finance", color: "rgb(59 130 246)", unit: "usd" },
 ]
 
-function getFallbackGroup(key: string): CryptoIndicatorGroup {
-  if (key.startsWith("manip") || key.startsWith("signal")) return "secondary"
-  if (key.includes("liq") || key.includes("Liquidation")) return "liquidations"
-  if (key.includes("funding") || key.includes("oi") || key === "basis" || key.includes("Trader") || key.endsWith("Ls") || key === "ls") return "derivatives"
-  if (key.includes("Volume") || key.startsWith("smart")) return "volume"
-  if (key.includes("Regime") || key.includes("Vol")) return "regime"
-  return "secondary"
+const SCIENTIFIC_GROUP_KEYS: readonly [CryptoIndicatorGroup, readonly string[]][] = [
+  ["strategySignals", ["crowdingScore", "extensionScore", "trendScore", "cascadeScore", "exhaustionScore", "cascadeInProgress"]],
+  ["priceAnchors", ["btcPrice", "indexPrice", "vwap"]],
+  ["priceDeviation", ["dev", "vel1", "vel3", "vel5", "vwapDistancePct", "vwapZScore", "rsi14", "btcReturnZ", "retZRobust", "btcMomentum7d", "btcMomentum30d", "btcMomentum90d", "btcDrawdown", "upperWick", "lowerWick"]],
+  ["trendStructure", ["ema20", "ema50", "ema60", "ema200", "donchianUpper20", "donchianLower20"]],
+  ["trendStrength", ["normalizedTrendScore", "trendAgree", "ret24hNorm", "ret72hNorm", "ret7dNorm", "ema20Slope", "ema50Slope", "adx14", "plusDi", "minusDi", "donchianBreak", "trendRegime"]],
+  ["volatilityPrice", ["atr14", "atr60", "atr1h", "atrTf"]],
+  ["volatilityNormalized", ["sigma1m", "atrPct", "realizedVol", "btcRealizedVol30d", "rvPercentile30d", "rvPercentile90d", "volRegime", "dvol"]],
+  ["volumeActivity", ["btcVolumeUsd", "btcVolumeZ", "volumeBurst"]],
+  ["orderFlow", ["buyVolume", "sellVolume", "volumeDelta", "cvd", "takerImbalancePct"]],
+  ["fundingRates", ["funding", "perpIndexPremium", "basis"]],
+  ["fundingExtremes", ["fundingPct30d", "fundingPct90d", "fundingZScore", "basisZScore"]],
+  ["openInterestLevel", ["oi"]],
+  ["openInterestChange", ["oiChangePct", "oiChange5m", "oiChange1h", "oiChange4h", "oiChange5mPercentile"]],
+  ["openInterestCrowding", ["oiPct30d", "oiPct90d", "oiZScore", "oiReturnZ", "oiVolumeRatio"]],
+  ["traderPositioning", ["ls", "contractLs", "longShortZScore", "topTraderAccount", "topTraderPosition"]],
+  ["liquidationFlow", ["liqLong", "liqShort", "liquidationNotional", "liquidationCount"]],
+  ["liquidationStress", ["liquidationZScore", "liquidationPercentile", "liqOverOi", "liqOiPercentile", "liquidationImbalance", "liqDecaying"]],
+  ["marketLiquidity", ["bidDepth01", "askDepth01", "bidDepth05", "askDepth05", "bidDepth1", "askDepth1"]],
+  ["executionStress", ["spread", "spreadPercentile", "orderbookImbalance"]],
+  ["eventLifecycle", ["eventActive", "eventDirection", "eventVwap", "eventExtreme", "reclaimFraction", "eventVerdict"]],
+  ["sentiment", ["fng", "eatFearScore", "eatGreedScore"]],
+  ["smartMoney", ["smartBuy", "smartSell", "smartNet", "smartCum"]],
+  ["onchainActivity", ["activeAddrs", "nTxs", "txFeesUsd", "mempool", "avgBlockSize", "stablecoinMcap", "defiTvl"]],
+  ["networkSecurity", ["hashRate", "difficulty"]],
+  ["minerEconomics", ["miningComprehensiveCost", "miningElectricityCost"]],
+  ["cryptoCrossSection", ["ethPrice", "solPrice", "bnbPrice", "xrpPrice", "dogePrice"]],
+  ["macroEquities", ["nasdaq", "sp500", "russell", "vix", "nikkei", "hangseng"]],
+  ["macroRates", ["dxy", "us10y", "us2y"]],
+  ["commodities", ["gold", "silver", "oil", "copper", "natgas"]],
+  ["manipulation", ["manipLeveragePressure", "manipPriceOiDivergence", "manipFundingSqueezeZ", "manipBasisDislocationZ", "manipTakerImbalancePct", "manipCvdPriceDivergence", "manipLiquidationImbalancePct", "manipLiquidationIntensityZ", "manipWickAsymmetryPct", "manipVolumeImpactZ"]],
+  ["customSignals", ["signalBuyScore", "signalSellScore", "signalRiskScore", "signalDirection"]],
+]
+
+const SCIENTIFIC_GROUP_BY_KEY = new Map<string, CryptoIndicatorGroup>(
+  SCIENTIFIC_GROUP_KEYS.flatMap(([group, keys]) => keys.map((key) => [key, group] as const)),
+)
+
+function getScientificGroup(key: string): CryptoIndicatorGroup {
+  return SCIENTIFIC_GROUP_BY_KEY.get(key) ?? "secondary"
 }
 
 export function getEnabledCryptoIndicators(): CryptoIndicatorConfig[] {
@@ -376,7 +488,7 @@ export function getEnabledCryptoIndicators(): CryptoIndicatorConfig[] {
     ...entry,
     order: entry.order + 1_000,
     relevanceScore: entry.relevanceScore ?? CRYPTO_RELEVANCE_SCORES[entry.key],
-    group: entry.group ?? getFallbackGroup(entry.key),
+    group: getScientificGroup(entry.key),
     tier: entry.tier ?? "secondary",
   }))
   return [...CRYPTO_QUANT_CORE_CONFIG, ...secondary].filter((entry) => entry.enabled).map((entry) => {
@@ -384,9 +496,9 @@ export function getEnabledCryptoIndicators(): CryptoIndicatorConfig[] {
     const tier = entry.tier ?? "core"
     return {
       ...entry,
-      order: priority ? priority.rank * 10 : (tier === "core" ? 10_000 : 20_000) + entry.order,
+      order: priority ? priority * 10 : (tier === "core" ? 10_000 : 20_000) + entry.order,
       relevanceScore: entry.relevanceScore ?? CRYPTO_RELEVANCE_SCORES[entry.key],
-      group: priority?.group ?? entry.group ?? getFallbackGroup(entry.key),
+      group: getScientificGroup(entry.key),
       tier,
     }
   }).sort((a, b) => {

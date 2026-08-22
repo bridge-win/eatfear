@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils"
 export const navItems = [
   { href: "/home", key: "nav.home" },
   { href: "/crypto", key: "nav.crypto" },
-  { href: "/crypto/smart-money", key: "nav.smartMoney" },
+  { href: "/smart-money", key: "nav.smartMoney" },
   { href: "/stock", key: "nav.stock" },
   { href: "/discover", key: "nav.discover" },
   { href: "/watchlist", key: "nav.watchlist" },
@@ -33,7 +33,7 @@ function isItemActive(pathname: string, href: string) {
   return href === "/home" ? pathname === "/home" : pathname === href || pathname.startsWith(`${href}/`)
 }
 
-// Nested routes (e.g. /crypto/smart-money) match multiple items — the most
+// Nested routes match multiple items — the most
 // specific (longest) matching href wins so only one tab highlights.
 function resolveActiveHref(pathname: string): string | null {
   let best: string | null = null

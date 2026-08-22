@@ -24,6 +24,9 @@ export interface QuantFeatureSet {
   ret24hNorm: RawPoint[]
   ret72hNorm: RawPoint[]
   ret7dNorm: RawPoint[]
+  normalizedTrendScore: RawPoint[]
+  trendAgree: RawPoint[]
+  retZRobust: RawPoint[]
   vwap: RawPoint[]
   vwapDistancePct: RawPoint[]
   vwapZScore: RawPoint[]
@@ -42,6 +45,7 @@ export interface QuantFeatureSet {
   minusDi: RawPoint[]
   donchianUpper20: RawPoint[]
   donchianLower20: RawPoint[]
+  donchianBreak: RawPoint[]
   realizedVol: RawPoint[]
   rvPercentile30d: RawPoint[]
   rvPercentile90d: RawPoint[]
@@ -78,6 +82,13 @@ function standardDeviation(values: number[]): number {
   return Math.sqrt(values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length)
 }
 
+function median(values: number[]): number {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const middle = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
@@ -96,6 +107,16 @@ export function rollingZScore(points: RawPoint[], windowSize: number): RawPoint[
     const sample = points.slice(Math.max(0, index - windowSize + 1), index + 1).map((row) => row.value)
     const deviation = standardDeviation(sample)
     return { timestamp: point.timestamp, value: deviation === 0 ? 0 : (point.value - mean(sample)) / deviation }
+  })
+}
+
+function rollingRobustZScore(points: RawPoint[], windowSize: number): RawPoint[] {
+  return points.map((point, index) => {
+    const sample = points.slice(Math.max(0, index - windowSize + 1), index + 1).map((row) => row.value)
+    const center = median(sample)
+    const mad = median(sample.map((value) => Math.abs(value - center)))
+    const robustSigma = mad * 1.4826
+    return { timestamp: point.timestamp, value: robustSigma > 0 ? (point.value - center) / robustSigma : 0 }
   })
 }
 
@@ -359,6 +380,21 @@ export function computeQuantFeatures(candles: QuantCandle[], barsPerDay: number)
     })
   }
 
+  const ret24hNorm = volNormalizedReturn(1)
+  const ret72hNorm = volNormalizedReturn(3)
+  const ret7dNorm = volNormalizedReturn(7)
+  const trendConsensus = sorted.map((candle, index) => {
+    const horizons = [ret24hNorm[index]?.value ?? 0, ret72hNorm[index]?.value ?? 0, ret7dNorm[index]?.value ?? 0]
+    const weighted = horizons[0] * 0.4 + horizons[1] * 0.35 + horizons[2] * 0.25
+    const direction = Math.sign(weighted)
+    const agreement = direction === 0 ? 0 : horizons.filter((value) => Math.sign(value) === direction).length
+    return { timestamp: candle.timestamp, weighted, agreement }
+  })
+  const normalizedTrendScore = trendConsensus.map((point) => ({
+    timestamp: point.timestamp,
+    value: point.agreement >= 2 ? point.weighted : 0,
+  }))
+  const trendAgree = trendConsensus.map((point) => ({ timestamp: point.timestamp, value: point.agreement }))
   const trendRegime = sorted.map((candle, index) => {
     const e20 = ema20[index]?.value ?? candle.close
     const e50 = ema50[index]?.value ?? candle.close
@@ -385,9 +421,14 @@ export function computeQuantFeatures(candles: QuantCandle[], barsPerDay: number)
     vel5: normalizedVelocity(sorted, sigma1m, 5),
     sigma1m,
     volumeBurst: rollingVolumeBurst(sorted, 60),
-    ret24hNorm: volNormalizedReturn(1),
-    ret72hNorm: volNormalizedReturn(3),
-    ret7dNorm: volNormalizedReturn(7),
+    ret24hNorm,
+    ret72hNorm,
+    ret7dNorm,
+    normalizedTrendScore,
+    trendAgree,
+    // Keep the median/MAD window bounded for minute data. A 30-day minute
+    // window makes the rolling median quadratic and stalls the history API.
+    retZRobust: rollingRobustZScore(returns, Math.min(1_440, Math.max(30, Math.round(barsPerDay)))),
     ...vwapFeatures,
     rsi14: rollingRsi(sorted, 14),
     atr14,
@@ -405,6 +446,14 @@ export function computeQuantFeatures(candles: QuantCandle[], barsPerDay: number)
     ...adxFeatures,
     donchianUpper20: donchian.upper,
     donchianLower20: donchian.lower,
+    donchianBreak: sorted.map((candle, index) => ({
+      timestamp: candle.timestamp,
+      value: candle.close > (donchian.upper[index]?.value ?? Infinity)
+        ? 1
+        : candle.close < (donchian.lower[index]?.value ?? -Infinity)
+          ? -1
+          : 0,
+    })),
     realizedVol: rv,
     rvPercentile30d: rollingPercentile(rv, Math.max(2, Math.round(30 * barsPerDay))),
     rvPercentile90d: rvPct90,
@@ -452,8 +501,12 @@ export function computeDerivativeFeatures(points: {
   oiZScore: RawPoint[]
   liquidationZScore: RawPoint[]
   liquidationPercentile: RawPoint[]
+  liquidationNotional: RawPoint[]
   liquidationImbalance: RawPoint[]
   liqOverOi: RawPoint[]
+  liqOiPercentile: RawPoint[]
+  liqDecaying: RawPoint[]
+  oiChange5mPercentile: RawPoint[]
 } {
   const oi = [...points.oi].sort((a, b) => a.timestamp - b.timestamp)
   const oiChange = (lookbackMs: number) =>
@@ -471,25 +524,35 @@ export function computeDerivativeFeatures(points: {
   const liquidation = Array.from(liquidationByTime.entries())
     .sort(([a], [b]) => a - b)
     .map(([timestamp, row]) => ({ timestamp, value: row.long + row.short }))
+  const oiChange5m = oiChange(5 * 60 * 1000)
+  const liqOverOi = liquidation.map((point) => {
+    const oiValue = valueAt(oi, point.timestamp, 2 * DAY_MS)
+    return { timestamp: point.timestamp, value: oiValue && oiValue > 0 ? (point.value / oiValue) * 100 : 0 }
+  })
+  const liqDecaying = liquidation.map((point, index) => {
+    const recent = liquidation.slice(Math.max(0, index - 3), index + 1)
+    const previousPeak = Math.max(...recent.slice(0, -1).map((row) => row.value), 0)
+    const previous = recent.at(-2)?.value ?? point.value
+    return { timestamp: point.timestamp, value: previousPeak > 0 && point.value < previous && point.value <= previousPeak * 0.75 ? 1 : 0 }
+  })
 
   return {
     fundingPct30d: rollingPercentile(points.funding, 90),
     fundingPct90d: rollingPercentile(points.funding, 270),
     fundingZScore: rollingZScore(points.funding, 90),
-    oiChange5m: oiChange(5 * 60 * 1000),
+    oiChange5m,
     oiChange1h: oiChange(60 * 60 * 1000),
     oiChange4h: oiChange(4 * 60 * 60 * 1000),
+    oiChange5mPercentile: rollingPercentile(oiChange5m, 2_000),
     oiPct30d: rollingPercentile(oi, 30),
     oiPct90d: rollingPercentile(oi, 90),
     oiZScore: rollingZScore(oi, 30),
     liquidationZScore: rollingZScore(liquidation, 30),
     liquidationPercentile: rollingPercentile(liquidation, 30),
-    /* Forced-flow trigger: liquidation notional relative to open interest.
-       A spike toward its upper tail marks a leverage flush, not just a busy day. */
-    liqOverOi: liquidation.map((point) => {
-      const oiValue = valueAt(oi, point.timestamp, 2 * DAY_MS)
-      return { timestamp: point.timestamp, value: oiValue && oiValue > 0 ? (point.value / oiValue) * 100 : 0 }
-    }),
+    liquidationNotional: liquidation,
+    liqOverOi,
+    liqOiPercentile: rollingPercentile(liqOverOi, 1_440),
+    liqDecaying,
     liquidationImbalance: Array.from(liquidationByTime.entries())
       .sort(([a], [b]) => a - b)
       .map(([timestamp, row]) => ({
@@ -519,6 +582,133 @@ export function computeOiVolumeRatio(oi: RawPoint[], candles: QuantCandle[], bar
       const volume = valueAt(rolling24hVolume, point.timestamp, 2 * DAY_MS)
       return { timestamp: point.timestamp, value: volume && volume > 0 ? point.value / volume : 0 }
     })
+}
+
+export interface BtcQtEventFeatureSet {
+  xvenueDeviation: RawPoint[]
+  spreadPercentile: RawPoint[]
+  eventActive: RawPoint[]
+  eventDirection: RawPoint[]
+  eventVwap: RawPoint[]
+  eventExtreme: RawPoint[]
+  reclaimFraction: RawPoint[]
+  eventVerdict: RawPoint[]
+  eatFearScore: RawPoint[]
+  eatGreedScore: RawPoint[]
+}
+
+export function computeBtcQtEventFeatures(input: {
+  candles: QuantCandle[]
+  barsPerDay: number
+  quant: QuantFeatureSet
+  indexPrice: RawPoint[]
+  liqOiPercentile: RawPoint[]
+  liqDecaying: RawPoint[]
+  oiChange5mPercentile: RawPoint[]
+  spread: RawPoint[]
+  fearGreed: RawPoint[]
+  cascadeScore: RawPoint[]
+}): BtcQtEventFeatureSet {
+  const candles = [...input.candles].sort((a, b) => a.timestamp - b.timestamp)
+  const staleMs = Math.max(DAY_MS / Math.max(input.barsPerDay, 1) * 4, 10 * 60_000)
+  const xvenueDeviation = candles.map((candle, index) => {
+    const reference = valueAt(input.indexPrice, candle.timestamp, staleMs)
+    const atr = input.quant.atr60[index]?.value ?? 0
+    return { timestamp: candle.timestamp, value: reference !== null && atr > 0 ? (candle.close - reference) / atr : 0 }
+  })
+  const spreadPercentile = rollingPercentile([...input.spread].sort((a, b) => a.timestamp - b.timestamp), 2_880)
+  const eventActive: RawPoint[] = []
+  const eventDirection: RawPoint[] = []
+  const eventVwap: RawPoint[] = []
+  const eventExtreme: RawPoint[] = []
+  const reclaimFraction: RawPoint[] = []
+  const eventVerdict: RawPoint[] = []
+  const eatFearScore: RawPoint[] = []
+  const eatGreedScore: RawPoint[] = []
+  const maxEventBars = clamp(Math.round(input.barsPerDay / 48), 2, 30)
+  let event: {
+    direction: -1 | 1
+    age: number
+    reference: number
+    extreme: number
+    weightedPrice: number
+    volume: number
+  } | null = null
+
+  for (let index = 0; index < candles.length; index += 1) {
+    const candle = candles[index]
+    const timestamp = candle.timestamp
+    const robustZ = input.quant.retZRobust[index]?.value ?? 0
+    const liqTail = valueAt(input.liqOiPercentile, timestamp, Math.max(staleMs, DAY_MS))
+    const oiTail = valueAt(input.oiChange5mPercentile, timestamp, Math.max(staleMs, DAY_MS))
+    const forcedFlowConfirmed = liqTail !== null && oiTail !== null && liqTail >= 99 && oiTail <= 1
+    const degradedTrigger = liqTail === null && oiTail === null && Math.abs(robustZ) >= 4
+
+    if (!event && Math.abs(robustZ) >= 3 && (forcedFlowConfirmed || degradedTrigger)) {
+      const direction: -1 | 1 = robustZ < 0 ? -1 : 1
+      event = {
+        direction,
+        age: 0,
+        reference: candles[index - 1]?.close ?? candle.open,
+        extreme: direction < 0 ? candle.low : candle.high,
+        weightedPrice: 0,
+        volume: 0,
+      }
+    }
+
+    let verdict = 0
+    if (event) {
+      event.age += 1
+      event.extreme = event.direction < 0 ? Math.min(event.extreme, candle.low) : Math.max(event.extreme, candle.high)
+      const volume = candle.quoteVolume > 0 ? candle.quoteVolume : Math.max(candle.volume * candle.close, 1)
+      const typicalPrice = (candle.high + candle.low + candle.close) / 3
+      event.weightedPrice += typicalPrice * volume
+      event.volume += volume
+      const denominator = Math.max(Math.abs(event.reference - event.extreme), Number.EPSILON)
+      const reclaimed = event.direction < 0
+        ? (candle.close - event.extreme) / denominator
+        : (event.extreme - candle.close) / denominator
+      const reclaim = clamp(reclaimed, 0, 1.5)
+      const locallyDislocated = Math.abs(xvenueDeviation[index]?.value ?? 0) >= 0.8
+      const liquidationFading = (valueAt(input.liqDecaying, timestamp, Math.max(staleMs, DAY_MS)) ?? 0) >= 1
+      if (reclaim >= 0.3 && (locallyDislocated || liquidationFading || degradedTrigger)) verdict = -1
+      else if (event.age >= Math.min(3, maxEventBars) && reclaim < 0.1) verdict = 1
+
+      eventActive.push({ timestamp, value: 1 })
+      eventDirection.push({ timestamp, value: event.direction })
+      eventVwap.push({ timestamp, value: event.weightedPrice / Math.max(event.volume, 1) })
+      eventExtreme.push({ timestamp, value: event.extreme })
+      reclaimFraction.push({ timestamp, value: reclaim * 100 })
+      eventVerdict.push({ timestamp, value: verdict })
+      if (verdict !== 0 || event.age >= maxEventBars) event = null
+    } else {
+      eventActive.push({ timestamp, value: 0 })
+      eventDirection.push({ timestamp, value: 0 })
+      eventVerdict.push({ timestamp, value: 0 })
+    }
+
+    const fng = valueAt(input.fearGreed, timestamp, 2 * DAY_MS) ?? 50
+    const cascade = clamp(valueAt(input.cascadeScore, timestamp, staleMs) ?? 0, 0, 100)
+    const liquidationStress = clamp(liqTail ?? 50, 0, 100)
+    const returnDirection = input.quant.returns[index]?.value ?? 0
+    const fear = (100 - fng) * 0.45 + (returnDirection < 0 ? cascade : 0) * 0.35 + liquidationStress * 0.2
+    const greed = fng * 0.45 + (returnDirection > 0 ? cascade : 0) * 0.35 + liquidationStress * 0.2
+    eatFearScore.push({ timestamp, value: clamp(fear, 0, 100) })
+    eatGreedScore.push({ timestamp, value: clamp(greed, 0, 100) })
+  }
+
+  return {
+    xvenueDeviation,
+    spreadPercentile,
+    eventActive,
+    eventDirection,
+    eventVwap,
+    eventExtreme,
+    reclaimFraction,
+    eventVerdict,
+    eatFearScore,
+    eatGreedScore,
+  }
 }
 
 export function computeCompositeSignals(input: {

@@ -234,8 +234,8 @@ export function CryptoHistoryCompare({
 
   const data: AlignedHistoryData | null = useMemo(() => {
     if (!canRenderCharts || !payload) return null
-      const groupsByName = new Map<string, AlignedHistorySeries[]>()
-      for (const spec of payload.series) {
+    const groupsByName = new Map<string, AlignedHistorySeries[]>()
+    for (const spec of payload.series) {
       const label = getCryptoSeriesLabel(t, spec)
       const series: AlignedHistorySeries = {
         key: spec.key,
@@ -284,6 +284,7 @@ export function CryptoHistoryCompare({
       noDataLabel={t("chart.noData")}
       seriesCountLabel={t("compare.seriesCount")}
       expectedSeriesCount={expectedSeriesCount}
+      maxSeriesPerPane={6}
       className={className}
     />
   )

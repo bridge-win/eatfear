@@ -1,8 +1,5 @@
-import { SmartMoneyCopyDashboard } from "@/components/smart-money-copy-dashboard"
+import { permanentRedirect } from "next/navigation"
 
-// Same pattern as /crypto: static shell, client-side hydration keeps navigation instant.
-export const dynamic = "force-static"
-
-export default function SmartMoneyPage() {
-  return <SmartMoneyCopyDashboard />
+export default function LegacySmartMoneyPage() {
+  permanentRedirect("/smart-money")
 }

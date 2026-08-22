@@ -34,6 +34,10 @@ test("computes btc-qt wick primitives on the selected candle interval", () => {
   assert.ok((result.vel5.at(-1)?.value ?? 0) > 0)
   assert.ok((result.sigma1m.at(-1)?.value ?? 0) > 0)
   assert.ok((result.volumeBurst.at(-1)?.value ?? 0) > 9)
+  assert.equal(result.normalizedTrendScore.length, candles.length)
+  assert.equal(result.trendAgree.length, candles.length)
+  assert.equal(result.retZRobust.length, candles.length)
+  assert.equal(result.donchianBreak.length, candles.length)
 })
 
 test("computes five-minute OI change and liquidation burst percentile", () => {
@@ -48,6 +52,49 @@ test("computes five-minute OI change and liquidation burst percentile", () => {
 
   assert.ok(Math.abs((result.oiChange5m.at(-1)?.value ?? 0) - 10) < 0.001)
   assert.equal(result.liquidationPercentile.at(-1)?.value, 100)
+  assert.equal(result.liquidationNotional.at(-1)?.value, 100)
+  assert.equal(result.liqOiPercentile.at(-1)?.value, 100)
+  assert.equal(result.oiChange5mPercentile.at(-1)?.value, 100)
+})
+
+test("groups related crypto indicators by market mechanism", () => {
+  const indicators = new Map(getEnabledCryptoIndicators().map((indicator) => [indicator.key, indicator]))
+
+  assert.equal(indicators.get("funding")?.group, "fundingRates")
+  assert.equal(indicators.get("fundingPct90d")?.group, "fundingExtremes")
+  assert.equal(indicators.get("liquidationNotional")?.group, "liquidationFlow")
+  assert.equal(indicators.get("liqOiPercentile")?.group, "liquidationStress")
+  assert.equal(indicators.get("fng")?.group, "sentiment")
+  assert.equal(indicators.get("spreadPercentile")?.group, "executionStress")
+  assert.equal(indicators.get("eventVerdict")?.group, "eventLifecycle")
+})
+
+test("registers the chartable btc-qt v2.1 indicator inventory", () => {
+  const keys = new Set(getEnabledCryptoIndicators().map((indicator) => indicator.key))
+  const required = [
+    "atr1h",
+    "normalizedTrendScore",
+    "trendAgree",
+    "donchianBreak",
+    "retZRobust",
+    "liquidationNotional",
+    "liquidationCount",
+    "liqOiPercentile",
+    "liqDecaying",
+    "oiChange5mPercentile",
+    "xvenueDeviation",
+    "spreadPercentile",
+    "eventActive",
+    "eventDirection",
+    "eventVwap",
+    "eventExtreme",
+    "reclaimFraction",
+    "eventVerdict",
+    "eatFearScore",
+    "eatGreedScore",
+  ]
+
+  for (const key of required) assert.ok(keys.has(key), `${key} should be enabled`)
 })
 
 test("orders direct wick decision inputs ahead of display composites", () => {

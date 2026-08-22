@@ -950,7 +950,10 @@ export function AlignedHistoryCompare({
                 </div>
                 <div
                   data-pane={group.paneIndex}
-                  className="h-[42px] w-full sm:h-[62px]"
+                  className={cn(
+                    "w-full",
+                    group.specs.length > 2 ? "h-[72px] sm:h-[96px]" : "h-[42px] sm:h-[62px]",
+                  )}
                 />
                 <div
                   data-history-time-axis

@@ -24,6 +24,7 @@ import {
 import {
   buildOrderBookDepthSnapshot,
   computeAtrSeries,
+  computeBtcQtEventFeatures,
   computeCompositeSignals,
   computeDerivativeFeatures,
   computeOiVolumeRatio,
@@ -861,7 +862,7 @@ async function okxLiquidationDaily(
   instId: string,
   daysWanted: number,
   window?: FetchWindow,
-): Promise<{ long: RawPoint[]; short: RawPoint[] }> {
+): Promise<{ long: RawPoint[]; short: RawPoint[]; count: RawPoint[] }> {
   const maxDays = Math.min(daysWanted, 90)
   const cutoffMs = window
     ? Math.max(window.startMs - 30 * DAY_MS, Date.now() - 90 * DAY_MS)
@@ -869,6 +870,7 @@ async function okxLiquidationDaily(
   const ctVal = SWAP_CT_VAL[instId] ?? 0.01
   const longByDay = new Map<number, number>()
   const shortByDay = new Map<number, number>()
+  const countByDay = new Map<number, number>()
   let after: string | null = window && window.endMs < Date.now() ? String(window.endMs + 1) : null
 
   for (let page = 0; page < 30; page++) {
@@ -915,6 +917,7 @@ async function okxLiquidationDaily(
         } else {
           shortByDay.set(dayKey, (shortByDay.get(dayKey) ?? 0) + notionalUsd)
         }
+        countByDay.set(dayKey, (countByDay.get(dayKey) ?? 0) + 1)
         if (ts < oldestTs) oldestTs = ts
         added++
       }
@@ -929,6 +932,7 @@ async function okxLiquidationDaily(
   return {
     long: Array.from(longByDay.entries()).map(([ts, v]) => ({ timestamp: ts, value: v })),
     short: Array.from(shortByDay.entries()).map(([ts, v]) => ({ timestamp: ts, value: v })),
+    count: Array.from(countByDay.entries()).map(([ts, v]) => ({ timestamp: ts, value: v })),
   }
 }
 
@@ -1054,7 +1058,19 @@ const BTC_SWAP_CANDLE_KEYS = [
   "ret7dNorm",
   "donchianUpper20",
   "donchianLower20",
+  "donchianBreak",
+  "normalizedTrendScore",
+  "trendAgree",
+  "retZRobust",
+  "eventActive",
+  "eventDirection",
+  "eventVwap",
+  "reclaimFraction",
+  "eventVerdict",
+  "eatFearScore",
+  "eatGreedScore",
   "oiVolumeRatio",
+  "oiChange5mPercentile",
   "perpIndexPremium",
   "btcVolumeUsd",
   "btcVolumeZ",
@@ -1085,6 +1101,8 @@ const OI_KEYS = [
   "oiReturnZ",
   "oiVolumeRatio",
   "liqOverOi",
+  "liqOiPercentile",
+  "oiChange5mPercentile",
   "signalBuyScore",
   "signalSellScore",
   "signalRiskScore",
@@ -1097,6 +1115,8 @@ const FUNDING_KEYS = [
   "fundingPct30d",
   "fundingPct90d",
   "fundingZScore",
+  "eatFearScore",
+  "eatGreedScore",
   "signalBuyScore",
   "signalSellScore",
   "signalRiskScore",
@@ -1117,11 +1137,17 @@ const LIQ_KEYS = [
   "liquidationZScore",
   "liquidationPercentile",
   "liquidationImbalance",
+  "liquidationNotional",
+  "liquidationCount",
   "liqOverOi",
+  "liqOiPercentile",
+  "liqDecaying",
+  "eatFearScore",
+  "eatGreedScore",
   "manipLiquidationImbalancePct",
   "manipLiquidationIntensityZ",
 ] as const
-const INDEX_PRICE_KEYS = ["indexPrice", "perpIndexPremium"] as const
+const INDEX_PRICE_KEYS = ["indexPrice", "perpIndexPremium", "xvenueDeviation"] as const
 const MINING_COST_KEYS = ["miningElectricityCost", "miningComprehensiveCost"] as const
 const TOP_TRADER_KEYS = ["topTraderAccount", "topTraderPosition"] as const
 const SMART_MONEY_KEYS = [
@@ -1139,6 +1165,7 @@ const SMART_MONEY_KEYS = [
 ] as const
 const BASIS_KEYS = ["basis", "basisZScore", "manipBasisDislocationZ"] as const
 const ATR_TF_KEYS = ["atrTf"] as const
+const ATR_1H_KEYS = ["atr1h"] as const
 const ORDERBOOK_KEYS = [
   "spread",
   "bidDepth01",
@@ -1148,6 +1175,7 @@ const ORDERBOOK_KEYS = [
   "bidDepth1",
   "askDepth1",
   "orderbookImbalance",
+  "spreadPercentile",
 ] as const
 const COMPOSITE_SIGNAL_KEYS = [
   "crowdingScore",
@@ -1156,6 +1184,19 @@ const COMPOSITE_SIGNAL_KEYS = [
   "cascadeScore",
   "cascadeInProgress",
   "exhaustionScore",
+] as const
+
+const EVENT_STATE_KEYS = [
+  "xvenueDeviation",
+  "spreadPercentile",
+  "eventActive",
+  "eventDirection",
+  "eventVwap",
+  "eventExtreme",
+  "reclaimFraction",
+  "eventVerdict",
+  "eatFearScore",
+  "eatGreedScore",
 ] as const
 
 const MANIPULATION_KEYS = [
@@ -1221,21 +1262,24 @@ function hasRequestedKey(requestedWithSignals: Set<string>, keys: readonly strin
 }
 
 function getAlignmentMaxStaleMs(key: string, group: CryptoIndicatorGroup, intervalMs: number): number {
-  if (group === "orderbook") return Math.max(intervalMs * 2, 10 * 60_000)
+  if (group === "marketLiquidity" || group === "executionStress") return Math.max(intervalMs * 2, 10 * 60_000)
+  if (group === "eventLifecycle") return Math.max(intervalMs * 2, 10 * 60_000)
   if (key === "atrTf") return Math.max(intervalMs * 2, 8 * 60 * 60_000)
+  if (key === "atr1h") return Math.max(intervalMs * 2, 2 * 60 * 60_000)
   if (key === "funding" || key.startsWith("funding")) return Math.max(intervalMs * 2, 12 * 60 * 60_000)
   return Math.max(intervalMs * 2, 7 * DAY_MS)
 }
 
 function getNativeInterval(key: string, group: CryptoIndicatorGroup, selectedInterval: string): string {
+  if (key === "atr1h") return "1h"
   if (key === "atrTf") return "4h"
   if (key === "funding" || key.startsWith("funding")) return "8h"
-  if (key.startsWith("liquidation") || key === "liqLong" || key === "liqShort") return "1d"
-  return group === "orderbook" ? "collector" : selectedInterval
+  if (key.startsWith("liquidation") || key.startsWith("liq") || key === "liqLong" || key === "liqShort") return "1d"
+  return group === "marketLiquidity" || group === "executionStress" ? "collector" : selectedInterval
 }
 
 function getFreshness(group: CryptoIndicatorGroup): "live" | "collected" | "historical" {
-  return group === "orderbook" ? "collected" : "historical"
+  return group === "marketLiquidity" || group === "executionStress" ? "collected" : "historical"
 }
 
 /* ----------------------------- handler ----------------------------- */
@@ -1292,6 +1336,12 @@ export async function GET(request: Request) {
       requestedWithSignals.add(key)
     }
   }
+  if (hasRequestedKey(requestedWithSignals, EVENT_STATE_KEYS)) {
+    for (const key of [...BTC_PRICE_KEYS, ...OI_KEYS, ...FUNDING_KEYS, ...LIQ_KEYS, ...INDEX_PRICE_KEYS, ...SMART_MONEY_KEYS, ...ORDERBOOK_KEYS, ...COMPOSITE_SIGNAL_KEYS]) {
+      requestedWithSignals.add(key)
+    }
+    requestedWithSignals.add("fng")
+  }
 
   /* Staged clients request the top ordered slice first; skip lower-priority
      upstream calls until the background full-history request asks for them. */
@@ -1299,6 +1349,7 @@ export async function GET(request: Request) {
     btcPriceA, // blockchain.info (BTC only, longer history)
     btcSwapCandles, // OKX daily swap candles (fallback / derivatives metrics)
     btcSpotCandles,
+    btcOneHourCandles,
     btcFourHourCandles,
     indexCloses, // OKX multi-venue index closes (cross-venue reference)
     ethPrice,
@@ -1352,6 +1403,15 @@ export async function GET(request: Request) {
     hasRequestedKey(requestedWithSignals, BASIS_KEYS)
       ? okxCandles(`${ccy}-USDT`, okxDays, selection.interval.okxBar, okxPointLimit, candleWindow)
       : [],
+    hasRequestedKey(requestedWithSignals, ATR_1H_KEYS) && selection.interval.id !== "1h"
+      ? okxCandles(
+          instId,
+          Math.max(7, Math.ceil(days) + 7),
+          "1H",
+          Math.min(OKX_MAX_PAGES * OKX_CANDLE_PAGE_LIMIT, Math.ceil((selection.endMs - selection.startMs) / (60 * 60_000)) + 100),
+          { ...fetchWindow, stepMs: 60 * 60_000 },
+        )
+      : [],
     hasRequestedKey(requestedWithSignals, ATR_TF_KEYS) && selection.interval.id !== "4h"
       ? okxCandles(
           instId,
@@ -1387,7 +1447,7 @@ export async function GET(request: Request) {
       : { buy: [], sell: [], net: [], cumulativeNet: [] },
     hasRequestedKey(requestedWithSignals, LIQ_KEYS)
       ? okxLiquidationDaily(instId, okxDays, fetchWindow)
-      : { long: [], short: [] },
+      : { long: [], short: [], count: [] },
     requestedWithSignals.has("fng")
       ? fetchFearGreedHistory(range, revalidate).then((r) =>
           (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
@@ -1523,6 +1583,7 @@ export async function GET(request: Request) {
   const basis = buildBasis(btcSwapCandles, btcSpotCandles)
   const basisZScore = rollingValueZScore(basis, 90)
   const longShortZScore = rollingValueZScore(lsRatio, 90)
+  const atr1h = computeAtrSeries(selection.interval.id === "1h" ? btcSwapCandles : btcOneHourCandles, 14)
   const atrTf = computeAtrSeries(selection.interval.id === "4h" ? btcSwapCandles : btcFourHourCandles, 14)
   const indexCloseByTs = new Map(indexCloses.map((point) => [point.timestamp, point.value]))
   const perpIndexPremium: RawPoint[] = btcSwapCandles
@@ -1569,6 +1630,18 @@ export async function GET(request: Request) {
     askDepth05: orderBookAskDepth05,
     spread: orderBookSpread,
   })
+  const btcQtEventFeatures = computeBtcQtEventFeatures({
+    candles: btcSwapCandles,
+    barsPerDay: selection.interval.approxBarsPerDay,
+    quant: quantFeatures,
+    indexPrice: indexCloses,
+    liqOiPercentile: derivativeFeatures.liqOiPercentile,
+    liqDecaying: derivativeFeatures.liqDecaying,
+    oiChange5mPercentile: derivativeFeatures.oiChange5mPercentile,
+    spread: orderBookSpread,
+    fearGreed: fng,
+    cascadeScore: compositeSignals.cascadeScore,
+  })
 
   const rawSeriesByKey = new Map<string, RawPoint[]>([
     ["crowdingScore", compositeSignals.crowdingScore],
@@ -1591,6 +1664,7 @@ export async function GET(request: Request) {
     ["rsi14", quantFeatures.rsi14],
     ["atr14", quantFeatures.atr14],
     ["atr60", quantFeatures.atr60],
+    ["atr1h", atr1h],
     ["atrTf", atrTf],
     ["atrPct", quantFeatures.atrPct],
     ["ema20", quantFeatures.ema20],
@@ -1610,8 +1684,12 @@ export async function GET(request: Request) {
     ["ret24hNorm", quantFeatures.ret24hNorm],
     ["ret72hNorm", quantFeatures.ret72hNorm],
     ["ret7dNorm", quantFeatures.ret7dNorm],
+    ["normalizedTrendScore", quantFeatures.normalizedTrendScore],
+    ["trendAgree", quantFeatures.trendAgree],
+    ["retZRobust", quantFeatures.retZRobust],
     ["donchianUpper20", quantFeatures.donchianUpper20],
     ["donchianLower20", quantFeatures.donchianLower20],
+    ["donchianBreak", quantFeatures.donchianBreak],
     ["indexPrice", indexCloses],
     ["perpIndexPremium", perpIndexPremium],
     ["btcMomentum7d", btcMomentum7d],
@@ -1644,6 +1722,7 @@ export async function GET(request: Request) {
     ["oiChange5m", derivativeFeatures.oiChange5m],
     ["oiChange1h", derivativeFeatures.oiChange1h],
     ["oiChange4h", derivativeFeatures.oiChange4h],
+    ["oiChange5mPercentile", derivativeFeatures.oiChange5mPercentile],
     ["oiPct30d", derivativeFeatures.oiPct30d],
     ["oiPct90d", derivativeFeatures.oiPct90d],
     ["oiZScore", derivativeFeatures.oiZScore],
@@ -1671,8 +1750,12 @@ export async function GET(request: Request) {
     ["liqShort", liq.short],
     ["liquidationZScore", derivativeFeatures.liquidationZScore],
     ["liquidationPercentile", derivativeFeatures.liquidationPercentile],
+    ["liquidationNotional", derivativeFeatures.liquidationNotional],
+    ["liquidationCount", liq.count],
     ["liquidationImbalance", derivativeFeatures.liquidationImbalance],
     ["liqOverOi", derivativeFeatures.liqOverOi],
+    ["liqOiPercentile", derivativeFeatures.liqOiPercentile],
+    ["liqDecaying", derivativeFeatures.liqDecaying],
     ["spread", orderBookSpread],
     ["bidDepth01", orderBookBidDepth01],
     ["askDepth01", orderBookAskDepth01],
@@ -1681,6 +1764,16 @@ export async function GET(request: Request) {
     ["bidDepth1", orderBookBidDepth1],
     ["askDepth1", orderBookAskDepth1],
     ["orderbookImbalance", orderBookImbalance],
+    ["xvenueDeviation", btcQtEventFeatures.xvenueDeviation],
+    ["spreadPercentile", btcQtEventFeatures.spreadPercentile],
+    ["eventActive", btcQtEventFeatures.eventActive],
+    ["eventDirection", btcQtEventFeatures.eventDirection],
+    ["eventVwap", btcQtEventFeatures.eventVwap],
+    ["eventExtreme", btcQtEventFeatures.eventExtreme],
+    ["reclaimFraction", btcQtEventFeatures.reclaimFraction],
+    ["eventVerdict", btcQtEventFeatures.eventVerdict],
+    ["eatFearScore", btcQtEventFeatures.eatFearScore],
+    ["eatGreedScore", btcQtEventFeatures.eatGreedScore],
     ["manipLeveragePressure", manipulationMetrics.manipLeveragePressure],
     ["manipPriceOiDivergence", manipulationMetrics.manipPriceOiDivergence],
     ["manipFundingSqueezeZ", manipulationMetrics.manipFundingSqueezeZ],
