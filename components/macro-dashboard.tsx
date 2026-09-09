@@ -8,6 +8,7 @@ import {
   type AlignedHistorySeries,
   type AlignedHistoryUnit,
 } from "@/components/aligned-history-compare"
+import { MacroDataSourceCatalog } from "@/components/macro-data-source-catalog"
 import { MarketIndicatorCards, type MarketIndicatorItem } from "@/components/market-indicator-cards"
 import { MarketIndicatorDetail } from "@/components/market-indicator-detail"
 import { OpportunityRadar } from "@/components/opportunity-radar"
@@ -305,8 +306,8 @@ export function MacroDashboard({
         assetClass="macro"
         title={{ zh: "宏观机会雷达", en: "Macro Opportunity Radar" }}
         subtitle={{
-          zh: "把利率、美元、信用、VIX、M2、通胀与就业合成风险资产顺风/逆风和冲击风险。",
-          en: "Combines rates, USD, credit, VIX, M2, inflation, and labor data into risk-asset tailwind/headwind and shock-risk reads.",
+          zh: "把利率、美元、信用、VIX、M2、通胀、就业与中美利差/人民币压力合成风险资产顺风/逆风和冲击风险。",
+          en: "Combines rates, USD, credit, VIX, M2, inflation, labor and the US–CN rate spread / RMB pressure into risk-asset tailwind/headwind and shock-risk reads.",
         }}
         opportunities={opportunities}
         loading={isLoading}
@@ -346,7 +347,7 @@ export function MacroDashboard({
               addCompareLabel={t("macro.detail.addCompare")}
               chartTitle={t("macro.detail.chartTitle")}
               chartInfo={t("macro.detail.chartInfo")}
-              chartInfoSource="FRED · IMF/World Bank via FRED · Yahoo Finance · aligned timeline"
+              chartInfoSource="FRED · BIS/IMF/OECD/World Bank via FRED · Yahoo Finance · Eastmoney (PBoC/NBS/海关/中债) · NBS/PBoC/BIS snapshot · aligned timeline"
               loadingLabel={t("macro.loading")}
               noDataLabel={t("chart.noData")}
               seriesCountLabel={t("compare.seriesCount")}
@@ -371,7 +372,7 @@ export function MacroDashboard({
             data={macroHistoryData}
             title={t("macro.historyCompare.title")}
             infoDescription={t("macro.historyCompare.info")}
-            infoSource="FRED · IMF/World Bank via FRED · Yahoo Finance · TradingView Lightweight Charts"
+            infoSource="FRED · BIS/IMF/OECD/World Bank via FRED · Yahoo Finance · Eastmoney (PBoC/NBS/海关/中债) · NBS/PBoC/BIS snapshot · TradingView Lightweight Charts"
             loading={isLoading || !canRenderHistory}
             error={error}
             loadingLabel={t("macro.loading")}
@@ -381,6 +382,8 @@ export function MacroDashboard({
           />
         </TabsContent>
       </Tabs>
+
+      <MacroDataSourceCatalog />
     </DashboardFrame>
   )
 }
