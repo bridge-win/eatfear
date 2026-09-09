@@ -199,8 +199,8 @@ const DICT: Dict = {
   // Macro dashboard
   "macro.title": { zh: "宏观看板", en: "Macro Dashboard" },
   "macro.subtitle": {
-    zh: "按普通投资者最常用的宏观顺序展示：利率/央行政策、10年期国债、通胀、社融/M2/信贷、PMI、GDP、就业、汇率、房地产、消费，再展开工业、投资、盈利、资金流、成交、商品、贸易、财政、行业与政策信号。每个指标右上角说明数据源、意义和影响方向。",
-    en: "Ordered by the macro checklist ordinary investors use most: policy rates, 10Y yields, inflation, M2/credit, PMI, GDP, jobs, FX, real estate, consumption, then industrial activity, investment, earnings, flows, turnover, commodities, trade, fiscal impulse, sectors and policy proxies. Each indicator tooltip explains source, meaning and market direction.",
+    zh: "按普通投资者最常用的宏观顺序展示：利率/央行政策、10年期国债、通胀、社融/M2/信贷、PMI、GDP、就业、汇率、房地产、消费，再展开工业、投资、盈利、资金流、成交、商品、贸易、财政、行业、政策信号，以及人民币/跨境资金专题。中美两套数据并列：美国经 FRED/Yahoo，中国经 Eastmoney（PBoC/NBS/海关/中债）和 NBS/PBoC/BIS 快照。每个指标右上角说明数据源、意义和影响方向。",
+    en: "Ordered by the macro checklist ordinary investors use most: policy rates, 10Y yields, inflation, M2/credit, PMI, GDP, jobs, FX, real estate, consumption, then industrial activity, investment, earnings, flows, turnover, commodities, trade, fiscal impulse, sectors, policy proxies and an RMB / cross-border block. U.S. and China series sit side by side: U.S. via FRED/Yahoo, China via Eastmoney (PBoC/NBS/customs/CDC yields) and versioned NBS/PBoC/BIS snapshots. Each indicator tooltip explains source, meaning and market direction.",
   },
   "macro.tab.realtime": { zh: "实时", en: "Realtime" },
   "macro.tab.history": { zh: "历史曲线", en: "History" },
@@ -227,8 +227,21 @@ const DICT: Dict = {
   "macro.group.RealEstate": { zh: "房地产", en: "Real Estate" },
   "macro.group.Sentiment": { zh: "情绪", en: "Sentiment" },
   "macro.group.CrossAsset": { zh: "跨资产", en: "Cross-Asset" },
+  "macro.group.Trade": { zh: "贸易", en: "Trade" },
 
   // Macro FRED hint
+  "macro.sources.title": { zh: "数据源覆盖", en: "Data source coverage" },
+  "macro.sources.subtitle": {
+    zh: "每个宏观指标来自哪里、多久更新、哪些还没接入。快照数据有逐条来源链接，可在 lib/data/china-official-snapshot.json 查看。",
+    en: "Where each macro series comes from, how often it updates, and what is still missing. Snapshot data carries per-observation source links in lib/data/china-official-snapshot.json.",
+  },
+  "macro.sources.live": { zh: "实时 / 自动拉取", en: "Live / auto-fetched" },
+  "macro.sources.snapshot": { zh: "版本化快照", en: "Versioned snapshot" },
+  "macro.sources.gaps": { zh: "尚未接入", en: "Not yet wired" },
+  "macro.sources.count": { zh: "{count} 个指标", en: "{count} series" },
+  "macro.sources.asOf": { zh: "快照日期 {date}", en: "Snapshot as of {date}" },
+  "macro.sources.toggle": { zh: "展开明细", en: "Show details" },
+  "macro.sources.collapse": { zh: "收起", en: "Collapse" },
   "macro.fredHint.title": { zh: "FRED 数据未启用", en: "FRED data not enabled" },
   "macro.fredHint.body": {
     zh: "美联储利率 / 通胀 / 就业 / 流动性 / M1/M2 / PMI / GDP / 房地产 / 消费 / 工业 / 投资 / 企业盈利 / 贸易 / 财政 / World Bank 市值与成交等指标需要 FRED 免费 API key。前往 fred.stlouisfed.org 注册后在 .env.local 添加 FRED_API_KEY=YOUR_KEY，重启服务即可生效。",

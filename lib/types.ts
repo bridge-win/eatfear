@@ -76,12 +76,15 @@ export type MacroGroup =
   | "RealEstate"
   | "Sentiment"
   | "CrossAsset"
+  | "Trade"
 
 export type MacroUnit = "index" | "percent" | "usd" | "cny" | "ratio" | "count"
 
 export type MacroDataSource =
   | "Yahoo Finance"
   | "FRED"
+  | "Eastmoney"
+  | "NBS/PBoC/BIS Snapshot"
 
 export interface MacroIndicator {
   symbol: string
