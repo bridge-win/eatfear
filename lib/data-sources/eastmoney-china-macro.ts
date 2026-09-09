@@ -163,6 +163,16 @@ export const EASTMONEY_REPORTS = {
     pageSize: 2000,
     paginate: false,
   },
+  FDI: {
+    endpoint: "v1",
+    reportName: "RPT_ECONOMY_FDI",
+    columns:
+      "REPORT_DATE,TIME,ACTUAL_FOREIGN,ACTUAL_FOREIGN_SAME,ACTUAL_FOREIGN_SEQUENTIAL,ACTUAL_FOREIGN_ACCUMULATE,FOREIGN_ACCUMULATE_SAME",
+    dateField: "REPORT_DATE",
+    sortColumns: "REPORT_DATE",
+    pageSize: 2000,
+    paginate: false,
+  },
   STOCK_STATISTICS: {
     endpoint: "v1",
     reportName: "RPT_ECONOMY_STOCK_STATISTICS",

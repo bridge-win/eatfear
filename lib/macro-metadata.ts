@@ -1808,7 +1808,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   // ============================================================
   {
     symbol: "EM:CN_US_10Y_SPREAD",
-    providerSymbol: "US_CN_10Y_SPREAD",
+    providerSymbol: "EM:TREASURY_YIELD:EMG00001310-EMM00166466",
     source: "Eastmoney",
     name: "US–CN 10Y Yield Spread (中美利差)",
     group: "FX",
@@ -1821,7 +1821,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_10Y",
-    providerSymbol: "CN_10Y",
+    providerSymbol: "EM:TREASURY_YIELD:EMM00166466",
     source: "Eastmoney",
     name: "China 10Y Treasury Yield (中债 10Y)",
     group: "Rates",
@@ -1833,7 +1833,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_2Y",
-    providerSymbol: "CN_2Y",
+    providerSymbol: "EM:TREASURY_YIELD:EMM00588704",
     source: "Eastmoney",
     name: "China 2Y Treasury Yield (中债 2Y)",
     group: "Rates",
@@ -1845,7 +1845,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_10Y_2Y",
-    providerSymbol: "CN_10Y_2Y",
+    providerSymbol: "EM:TREASURY_YIELD:EMM01276014",
     source: "Eastmoney",
     name: "China 10Y–2Y Term Spread",
     group: "Rates",
@@ -1857,7 +1857,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_LPR_1Y",
-    providerSymbol: "CN_LPR_1Y",
+    providerSymbol: "EM:LPR:LPR1Y",
     source: "Eastmoney",
     name: "China 1Y LPR",
     group: "Rates",
@@ -1869,7 +1869,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_LPR_5Y",
-    providerSymbol: "CN_LPR_5Y",
+    providerSymbol: "EM:LPR:LPR5Y",
     source: "Eastmoney",
     name: "China 5Y LPR (房贷锚)",
     group: "Rates",
@@ -1881,7 +1881,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_RRR_LARGE",
-    providerSymbol: "CN_RRR_LARGE",
+    providerSymbol: "EM:DEPOSIT_RESERVE:INTEREST_RATE_BA",
     source: "Eastmoney",
     name: "China RRR (大型机构存款准备金率)",
     group: "Liquidity",
@@ -1965,7 +1965,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_FX_RESERVES",
-    providerSymbol: "CN_FX_RESERVES",
+    providerSymbol: "EM:GOLD_CURRENCY:FOREX*100000000",
     source: "Eastmoney",
     name: "China FX Reserves (外管局)",
     group: "Liquidity",
@@ -1975,11 +1975,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     audience: ["宏观", "中国", "FX"],
     description:
       "国家外汇储备余额（美元）。当月变化 = 交易性变动 + 估值效应；连续下降且与贸易顺差背离时说明央行在卖美元托汇率或资本在流出。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_GOLD_RESERVES",
-    providerSymbol: "CN_GOLD_RESERVES",
+    providerSymbol: "EM:GOLD_CURRENCY:GOLD_RESERVES",
     source: "Eastmoney",
     name: "China Gold Reserves (万盎司)",
     group: "Liquidity",
@@ -1991,7 +1990,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_FX_DEPOSITS",
-    providerSymbol: "CN_FX_DEPOSITS",
+    providerSymbol: "EM:FOREX_DEPOSIT:BASE*100000000",
     source: "Eastmoney",
     name: "China Onshore FX Deposits (外汇存款余额)",
     group: "Liquidity",
@@ -2001,11 +2000,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     audience: ["宏观", "中国", "FX"],
     description:
       "金融机构外汇存款余额（美元）。企业和居民'囤美元不结汇'的直接证据：余额上升 = 贬值预期或等待更好汇率；余额下降 = 结汇意愿回升，往往领先人民币升值。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_FX_LOANS",
-    providerSymbol: "CN_FX_LOANS",
+    providerSymbol: "EM:FOREX_LOAN:BASE*100000000",
     source: "Eastmoney",
     name: "China Onshore FX Loans (外汇贷款余额)",
     group: "Credit",
@@ -2014,11 +2012,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国", "FX"],
     description: "金融机构外汇贷款余额（美元）。企业借美元意愿：升值预期下借美元套利增加，贬值预期下主动偿还美元债。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_M2",
-    providerSymbol: "CN_M2",
+    providerSymbol: "EM:CURRENCY_SUPPLY:BASIC_CURRENCY*100000000",
     source: "Eastmoney",
     name: "China M2 (PBoC current)",
     group: "Liquidity",
@@ -2027,11 +2024,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国"],
     description: "广义货币 M2 余额（人民币），PBoC 最新月度值。替代 FRED/IMF 停更于 2019 年的历史序列。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_M2_YOY",
-    providerSymbol: "CN_M2_YOY",
+    providerSymbol: "EM:CURRENCY_SUPPLY:BASIC_CURRENCY_SAME",
     source: "Eastmoney",
     name: "China M2 YoY",
     group: "Liquidity",
@@ -2043,7 +2039,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_M1_YOY",
-    providerSymbol: "CN_M1_YOY",
+    providerSymbol: "EM:CURRENCY_SUPPLY:CURRENCY_SAME",
     source: "Eastmoney",
     name: "China M1 YoY (企业活期)",
     group: "Liquidity",
@@ -2055,7 +2051,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_M0_YOY",
-    providerSymbol: "CN_M0_YOY",
+    providerSymbol: "EM:CURRENCY_SUPPLY:FREE_CASH_SAME",
     source: "Eastmoney",
     name: "China M0 YoY (流通现金)",
     group: "Liquidity",
@@ -2067,7 +2063,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_NEW_LOANS",
-    providerSymbol: "CN_NEW_LOANS",
+    providerSymbol: "EM:RMB_LOAN:RMB_LOAN*100000000",
     source: "Eastmoney",
     name: "China New RMB Loans (当月新增)",
     group: "Credit",
@@ -2076,11 +2072,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国"],
     description: "当月新增人民币贷款（元）。信贷投放是社融最大分项，1 月'开门红'和季末冲量的季节性很强，看同比而非环比。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_CPI_YOY",
-    providerSymbol: "CN_CPI_YOY",
+    providerSymbol: "EM:CPI:NATIONAL_SAME",
     source: "Eastmoney",
     name: "China CPI YoY",
     group: "Inflation",
@@ -2092,7 +2087,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_PPI_YOY",
-    providerSymbol: "CN_PPI_YOY",
+    providerSymbol: "EM:PPI:BASE_SAME",
     source: "Eastmoney",
     name: "China PPI YoY",
     group: "Inflation",
@@ -2116,7 +2111,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_PMI_MFG",
-    providerSymbol: "CN_PMI_MFG",
+    providerSymbol: "EM:PMI:MAKE_INDEX",
     source: "Eastmoney",
     name: "China Manufacturing PMI (官方)",
     group: "Growth",
@@ -2128,7 +2123,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_PMI_NONMFG",
-    providerSymbol: "CN_PMI_NONMFG",
+    providerSymbol: "EM:PMI:NMAKE_INDEX",
     source: "Eastmoney",
     name: "China Non-Manufacturing PMI",
     group: "Growth",
@@ -2140,7 +2135,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_GDP_YOY",
-    providerSymbol: "CN_GDP_YOY",
+    providerSymbol: "EM:GDP:SUM_SAME",
     source: "Eastmoney",
     name: "China Real GDP YoY",
     group: "Growth",
@@ -2152,7 +2147,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_INDUSTRIAL_YOY",
-    providerSymbol: "CN_INDUSTRIAL_YOY",
+    providerSymbol: "EM:INDUS_GROW:BASE_SAME",
     source: "Eastmoney",
     name: "China Industrial Value-Added YoY",
     group: "Growth",
@@ -2164,7 +2159,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_FAI_YTD_YOY",
-    providerSymbol: "CN_FAI_YTD_YOY",
+    providerSymbol: "EM:ASSET_INVEST:BASE_SAME",
     source: "Eastmoney",
     name: "China Fixed-Asset Investment YoY",
     group: "Growth",
@@ -2176,7 +2171,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_RETAIL_YOY",
-    providerSymbol: "CN_RETAIL_YOY",
+    providerSymbol: "EM:TOTAL_RETAIL:RETAIL_TOTAL_SAME",
     source: "Eastmoney",
     name: "China Retail Sales YoY",
     group: "Growth",
@@ -2188,7 +2183,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_CONSUMER_CONFIDENCE",
-    providerSymbol: "CN_CONSUMER_CONFIDENCE",
+    providerSymbol: "EM:FAITH_INDEX:CONSUMERS_FAITH_INDEX",
     source: "Eastmoney",
     name: "China Consumer Confidence Index",
     group: "Sentiment",
@@ -2200,7 +2195,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_EXPORTS",
-    providerSymbol: "CN_EXPORTS",
+    providerSymbol: "EM:CUSTOMS:EXIT_BASE*100000000",
     source: "Eastmoney",
     name: "China Exports (当月，美元)",
     group: "Trade",
@@ -2209,11 +2204,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国", "贸易"],
     description: "海关总署当月出口金额（美元）。出口总额而非顺差才是贸易繁荣度指标。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_IMPORTS",
-    providerSymbol: "CN_IMPORTS",
+    providerSymbol: "EM:CUSTOMS:IMPORT_BASE*100000000",
     source: "Eastmoney",
     name: "China Imports (当月，美元)",
     group: "Trade",
@@ -2222,11 +2216,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国", "贸易"],
     description: "海关总署当月进口金额（美元）。进口塌得比出口快形成的'衰退型顺差'不是好信号。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_TRADE_BALANCE",
-    providerSymbol: "CN_TRADE_BALANCE",
+    providerSymbol: "EM:CUSTOMS:EXIT_BASE-IMPORT_BASE*100000000",
     source: "Eastmoney",
     name: "China Trade Balance (当月顺差)",
     group: "Trade",
@@ -2235,11 +2228,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国", "贸易", "FX"],
     description: "当月出口减进口（美元）。经常项目顺差是人民币升值压力的根本来源；顺差扩大但外储不增、外汇存款上升，说明美元留在了企业手里。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_EXPORTS_YOY",
-    providerSymbol: "CN_EXPORTS_YOY",
+    providerSymbol: "EM:CUSTOMS:EXIT_BASE_SAME",
     source: "Eastmoney",
     name: "China Exports YoY",
     group: "Trade",
@@ -2251,7 +2243,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_IMPORTS_YOY",
-    providerSymbol: "CN_IMPORTS_YOY",
+    providerSymbol: "EM:CUSTOMS:IMPORT_BASE_SAME",
     source: "Eastmoney",
     name: "China Imports YoY",
     group: "Trade",
@@ -2275,7 +2267,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_A_TOTAL_MCAP",
-    providerSymbol: "CN_A_TOTAL_MCAP",
+    providerSymbol: "EM:STOCK_STATISTICS:TOTAL_MARKE_SH+TOTAL_MARKE_SZ*100000000",
     source: "Eastmoney",
     name: "A-Share Total Market Cap (沪深合计)",
     group: "Equity",
@@ -2284,11 +2276,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["股票", "中国"],
     description: "上海 + 深圳市价总值（元）。除以名义 GDP 即中国版'巴菲特指标'，World Bank 年度口径的月度补充。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_A_TURNOVER",
-    providerSymbol: "CN_A_TURNOVER",
+    providerSymbol: "EM:STOCK_STATISTICS:DEAL_AMOUNT_SH+DEAL_AMOUNT_SZ*100000000",
     source: "Eastmoney",
     name: "A-Share Monthly Turnover (沪深成交额)",
     group: "Equity",
@@ -2297,11 +2288,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["股票", "中国"],
     description: "上海 + 深圳当月成交金额（元）。成交额/市值 = 换手率，衡量市场热度。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_FISCAL_REVENUE",
-    providerSymbol: "CN_FISCAL_REVENUE",
+    providerSymbol: "EM:FISCAL_INCOME:BASE*100000000",
     source: "Eastmoney",
     name: "China Fiscal Revenue (当月财政收入)",
     group: "Growth",
@@ -2310,12 +2300,11 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国", "财政"],
     description: "全国一般公共预算收入当月值（元）。土地出让金不在此口径，需另看政府性基金收入。",
-    transform: (value) => value * 100_000_000,
   },
   // --- Additional PBoC / NBS / 海关 series (Eastmoney datacenter) ---
   {
     symbol: "EM:CN_M1",
-    providerSymbol: "CN_M1",
+    providerSymbol: "EM:CURRENCY_SUPPLY:CURRENCY*100000000",
     source: "Eastmoney",
     name: "China M1 (PBoC current)",
     group: "Liquidity",
@@ -2324,11 +2313,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国"],
     description: "狭义货币 M1 余额（元，2024 年起新口径含个人活期与非银支付备付金）。企业活期存款为主，是实体经济“想花钱”的资金。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_M0",
-    providerSymbol: "CN_M0",
+    providerSymbol: "EM:CURRENCY_SUPPLY:FREE_CASH*100000000",
     source: "Eastmoney",
     name: "China M0 (流通中现金)",
     group: "Liquidity",
@@ -2337,11 +2325,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国"],
     description: "流通中现金余额（元）。春节前后季节性最强；持续高增长往往对应现金偏好上升与非正规经济活跃。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_M1_M2_GAP",
-    providerSymbol: "CN_M1_M2_GAP",
+    providerSymbol: "EM:CURRENCY_SUPPLY:CURRENCY_SAME-BASIC_CURRENCY_SAME",
     source: "Eastmoney",
     name: "China M1–M2 剪刀差",
     group: "Liquidity",
@@ -2353,7 +2340,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_NEW_LOANS_YTD",
-    providerSymbol: "CN_NEW_LOANS_YTD",
+    providerSymbol: "EM:RMB_LOAN:RMB_LOAN_ACCUMULATE*100000000",
     source: "Eastmoney",
     name: "China New RMB Loans YTD (累计新增贷款)",
     group: "Credit",
@@ -2362,11 +2349,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国"],
     description: "年初至今新增人民币贷款累计值（元）。剔除单月季节性后看信贷投放节奏。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_FX_RESERVES_YOY",
-    providerSymbol: "CN_FX_RESERVES_YOY",
+    providerSymbol: "EM:GOLD_CURRENCY:FOREX_SAME",
     source: "Eastmoney",
     name: "China FX Reserves YoY",
     group: "FX",
@@ -2378,7 +2364,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_RRR_SMALL",
-    providerSymbol: "CN_RRR_SMALL",
+    providerSymbol: "EM:DEPOSIT_RESERVE:INTEREST_RATE_SA",
     source: "Eastmoney",
     name: "China RRR (中小机构存款准备金率)",
     group: "Liquidity",
@@ -2390,7 +2376,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_CPI_MOM",
-    providerSymbol: "CN_CPI_MOM",
+    providerSymbol: "EM:CPI:NATIONAL_SEQUENTIAL",
     source: "Eastmoney",
     name: "China CPI MoM",
     group: "Inflation",
@@ -2402,7 +2388,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "EM:CN_GDP_YTD",
-    providerSymbol: "CN_GDP_YTD",
+    providerSymbol: "EM:GDP:DOMESTICL_PRODUCT_BASE*100000000",
     source: "Eastmoney",
     name: "China Nominal GDP YTD (累计)",
     group: "Growth",
@@ -2411,11 +2397,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Quarterly",
     audience: ["宏观", "中国"],
     description: "名义 GDP 年初至今累计值（元）。与 M2 相除得货币化率，与总市值相除得巴菲特指标。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_RETAIL_SALES",
-    providerSymbol: "CN_RETAIL_SALES",
+    providerSymbol: "EM:TOTAL_RETAIL:RETAIL_TOTAL*100000000",
     source: "Eastmoney",
     name: "China Retail Sales (社零当月)",
     group: "Growth",
@@ -2424,11 +2409,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国", "消费"],
     description: "社会消费品零售总额当月值（元）。1-2 月合并公布，季节性强，看同比更稳。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_TRADE_BALANCE_YTD",
-    providerSymbol: "CN_TRADE_BALANCE_YTD",
+    providerSymbol: "EM:CUSTOMS:EXIT_ACCUMULATE-IMPORT_ACCUMULATE*100000000",
     source: "Eastmoney",
     name: "China Trade Balance YTD (累计顺差)",
     group: "Trade",
@@ -2437,11 +2421,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国", "FX"],
     description: "年初至今累计货物贸易顺差（美元）。顺差是人民币升值压力的基本面来源；结售汇顺差远小于贸易顺差时说明企业在囤美元。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_FDI",
-    providerSymbol: "CN_FDI",
+    providerSymbol: "EM:FDI:ACTUAL_FOREIGN*100000000",
     source: "Eastmoney",
     name: "China FDI (实际使用外资当月)",
     group: "FX",
@@ -2450,11 +2433,10 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     frequency: "Monthly",
     audience: ["宏观", "中国", "FX"],
     description: "实际使用外资金额当月值（美元）。直接投资项下的美元流入，与贸易顺差共同构成结售汇的供给端。",
-    transform: (value) => value * 100_000_000,
   },
   {
     symbol: "EM:CN_FDI_YTD_YOY",
-    providerSymbol: "CN_FDI_YTD_YOY",
+    providerSymbol: "EM:FDI:FOREIGN_ACCUMULATE_SAME",
     source: "Eastmoney",
     name: "China FDI YTD YoY",
     group: "FX",
@@ -2466,7 +2448,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:NBS_UNEMPLOYMENT",
-    providerSymbol: "NBS_UNEMPLOYMENT",
+    providerSymbol: "CN:annual:unemployment",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Urban Surveyed Unemployment (年末)",
     group: "Employment",
@@ -2479,7 +2461,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   // --- NBS 统计公报 / PBoC / BIS snapshot (ported from bridge-win/house) ---
   {
     symbol: "SNAP:NBS_INCOME",
-    providerSymbol: "NBS_INCOME",
+    providerSymbol: "CN:annual:income",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Per-Capita Disposable Income (人均可支配收入)",
     group: "Growth",
@@ -2491,7 +2473,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:NBS_URBAN_INCOME",
-    providerSymbol: "NBS_URBAN_INCOME",
+    providerSymbol: "CN:annual:urban_income",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Urban Per-Capita Income (城镇人均可支配收入)",
     group: "Growth",
@@ -2503,7 +2485,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:NBS_INCOME_MEDIAN",
-    providerSymbol: "NBS_INCOME_MEDIAN",
+    providerSymbol: "CN:annual:income_median",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Median Disposable Income (收入中位数)",
     group: "Growth",
@@ -2515,7 +2497,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:NBS_DEPOSITS",
-    providerSymbol: "NBS_DEPOSITS",
+    providerSymbol: "CN:annual:deposits",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Household RMB Deposits (住户存款余额)",
     group: "Liquidity",
@@ -2528,7 +2510,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:NBS_URBAN_POPULATION",
-    providerSymbol: "NBS_URBAN_POPULATION",
+    providerSymbol: "CN:annual:urban_population",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Urban Population (城镇常住人口)",
     group: "Growth",
@@ -2540,7 +2522,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:PBOC_MORTGAGE_RATE",
-    providerSymbol: "PBOC_MORTGAGE_RATE",
+    providerSymbol: "CN:mortgage_rate",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China New Mortgage Rate (12月新发放房贷利率)",
     group: "RealEstate",
@@ -2552,7 +2534,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:BIS_HPI_CN",
-    providerSymbol: "BIS_HPI_CN",
+    providerSymbol: "CN:hpi:CN",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Real House Price Index (BIS)",
     group: "RealEstate",
@@ -2564,7 +2546,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:NBS_SALES",
-    providerSymbol: "NBS_SALES",
+    providerSymbol: "CN:annual:sales",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Residential Sales Area (商品住宅销售面积)",
     group: "RealEstate",
@@ -2576,7 +2558,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:NBS_INVESTMENT",
-    providerSymbol: "NBS_INVESTMENT",
+    providerSymbol: "CN:annual:investment",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Real Estate Development Investment (房地产开发投资)",
     group: "RealEstate",
@@ -2589,7 +2571,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:NBS_STARTS",
-    providerSymbol: "NBS_STARTS",
+    providerSymbol: "CN:annual:starts",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Housing Starts (住宅新开工面积)",
     group: "RealEstate",
@@ -2601,7 +2583,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:NBS_COMPLETIONS",
-    providerSymbol: "NBS_COMPLETIONS",
+    providerSymbol: "CN:annual:completions",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Housing Completions (住宅竣工面积)",
     group: "RealEstate",
@@ -2613,7 +2595,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:NBS_INVENTORY",
-    providerSymbol: "NBS_INVENTORY",
+    providerSymbol: "CN:annual:inventory",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Unsold Housing Inventory (商品住宅待售面积)",
     group: "RealEstate",
@@ -2625,7 +2607,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:NBS_MORTGAGE_FLOW",
-    providerSymbol: "NBS_MORTGAGE_FLOW",
+    providerSymbol: "CN:annual:mortgage_flow",
     source: "NBS/PBoC/BIS Snapshot",
     name: "China Developer Mortgage Receipts (开发企业到位资金-个人按揭)",
     group: "RealEstate",
@@ -2638,7 +2620,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:BIS_HPI_US",
-    providerSymbol: "BIS_HPI_US",
+    providerSymbol: "CN:hpi:US",
     source: "NBS/PBoC/BIS Snapshot",
     name: "U.S. Real House Price Index (BIS)",
     group: "RealEstate",
@@ -2650,7 +2632,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:BIS_HPI_JP",
-    providerSymbol: "BIS_HPI_JP",
+    providerSymbol: "CN:hpi:JP",
     source: "NBS/PBoC/BIS Snapshot",
     name: "Japan Real House Price Index (BIS)",
     group: "RealEstate",
@@ -2662,7 +2644,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:BIS_HPI_DE",
-    providerSymbol: "BIS_HPI_DE",
+    providerSymbol: "CN:hpi:DE",
     source: "NBS/PBoC/BIS Snapshot",
     name: "Germany Real House Price Index (BIS)",
     group: "RealEstate",
@@ -2674,7 +2656,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:BIS_HPI_UK",
-    providerSymbol: "BIS_HPI_UK",
+    providerSymbol: "CN:hpi:UK",
     source: "NBS/PBoC/BIS Snapshot",
     name: "U.K. Real House Price Index (BIS)",
     group: "RealEstate",
@@ -2686,7 +2668,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   {
     symbol: "SNAP:BIS_HPI_AU",
-    providerSymbol: "BIS_HPI_AU",
+    providerSymbol: "CN:hpi:AU",
     source: "NBS/PBoC/BIS Snapshot",
     name: "Australia Real House Price Index (BIS)",
     group: "RealEstate",
