@@ -53,9 +53,7 @@ interface SnapshotFile {
 const SNAPSHOT = snapshot as SnapshotFile
 const MANUAL = manualSnapshot as ManualSnapshotFile
 
-export const CHINA_MANUAL_SNAPSHOT_AS_OF = MANUAL.asOf
 
-export const CHINA_SNAPSHOT_AS_OF = SNAPSHOT.asOf
 export const CHINA_SNAPSHOT_LAST_FULL_YEAR = SNAPSHOT.lastFullYear
 
 /**

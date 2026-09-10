@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { ChevronDown, ExternalLink } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
-import { CHINA_MANUAL_SNAPSHOT_AS_OF, CHINA_SNAPSHOT_AS_OF } from "@/lib/data-sources/china-official-snapshot"
+import { CHINA_MANUAL_SNAPSHOT_AS_OF, CHINA_SNAPSHOT_AS_OF } from "@/lib/data/china-snapshot-meta"
 import { useI18n } from "@/lib/i18n"
 import { getConfiguredMacroIndicatorMetas } from "@/lib/macro-indicator-config"
 import { SKIPPED_INDICATORS } from "@/lib/macro-metadata"

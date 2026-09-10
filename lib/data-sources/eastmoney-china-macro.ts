@@ -265,6 +265,12 @@ const LEGACY_BASE = "https://datacenter.eastmoney.com/api/data/get"
 // Public token embedded in Eastmoney's own web pages for the legacy endpoint; not a secret.
 const LEGACY_TOKEN = "894050c76af8597a853f5b408b759f5d"
 const MAX_PAGES = 20
+// The catch-all API route runs with maxDuration = 10s and /api/macro fans out over
+// every indicator, so a single report must never be able to eat the whole budget:
+// paginating 20 pages at 5s each would kill the request and take the other ~200
+// series down with it. Cap both the per-page wait and the total time per report.
+const PAGE_TIMEOUT_MS = 4_000
+const REPORT_BUDGET_MS = 6_000
 const REVALIDATE_SECONDS = 3600
 const BROWSER_HEADERS = { "User-Agent": "Mozilla/5.0", Referer: "https://data.eastmoney.com/" }
 
@@ -319,11 +325,13 @@ async function fetchReportRows(reportId: EastmoneyReportId, startDate: Date): Pr
 
   const task = (async () => {
     const rows: EastmoneyRow[] = []
+    const deadline = Date.now() + REPORT_BUDGET_MS
     let page = 1
     let totalPages = 1
     while (page <= totalPages && page <= MAX_PAGES) {
       const payload = await fetchJson<EastmoneyPayload>(buildPageUrl(spec, page), {
         revalidate: REVALIDATE_SECONDS,
+        timeoutMs: PAGE_TIMEOUT_MS,
         headers: BROWSER_HEADERS,
       })
       const data = payload?.result?.data
@@ -333,6 +341,9 @@ async function fetchReportRows(reportId: EastmoneyReportId, startDate: Date): Pr
       totalPages = payload.result?.pages ?? 1
       const oldest = parseRowDate(data.at(-1)?.[spec.dateField])
       if (oldest && oldest.timestamp < startDate.getTime()) break
+      // Out of budget: return the pages already fetched (newest first, so the
+      // recent end of the series is intact) rather than failing the indicator.
+      if (Date.now() >= deadline) break
       page += 1
     }
     return rows

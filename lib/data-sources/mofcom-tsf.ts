@@ -16,7 +16,8 @@ import { getRangeStartDate } from "@/lib/time-range"
 
 const TSF_URL = "https://data.mofcom.gov.cn/datamofcom/front/gnmy/shrzgmQuery"
 const REVALIDATE_SECONDS = 6 * 3_600
-const TIMEOUT_MS = 8_000
+// Kept under the route's 10s budget; see the note in eastmoney-china-macro.ts.
+const TIMEOUT_MS = 4_000
 
 export const MOFCOM_TSF_FIELDS = {
   TSF_TOTAL: 6,
