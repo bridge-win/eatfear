@@ -20,7 +20,11 @@ const REVALIDATE_SECONDS = 6 * 3_600
 const PAGE_TIMEOUT_MS = 4_000
 // Same reasoning as the Eastmoney fetcher: /api/macro has a 10s budget to share.
 const BUDGET_MS = 6_000
-const PAGE_SIZE = 300
+// chinamoney answers pageSize<=50 and serves a 403 anti-bot page for 100 or 300,
+// so windows are kept short enough that one page covers them: the index is
+// published weekly, giving ~13 points per quarter.
+const PAGE_SIZE = 50
+const WINDOW_MONTHS = 3
 const MAX_WINDOWS = 12
 const HEADERS = {
   "User-Agent":
@@ -76,7 +80,7 @@ async function fetchWindows(startDate: Date): Promise<RmbIdxRecord[]> {
 
   for (let index = 0; index < MAX_WINDOWS; index += 1) {
     const windowStart = new Date(windowEnd)
-    windowStart.setUTCFullYear(windowStart.getUTCFullYear() - 1)
+    windowStart.setUTCMonth(windowStart.getUTCMonth() - WINDOW_MONTHS)
     const from = windowStart < startDate ? startDate : windowStart
 
     const payload = await fetchJson<RmbIdxPayload>(buildUrl(iso(from), iso(windowEnd)), {
@@ -117,6 +121,8 @@ export async function fetchCfetsIndexSeries(
   if (!basket) return null
 
   // The index series starts at its 2014-12-31 base; "max" should not ask for more.
+  // MAX_WINDOWS quarters caps how far back one request reaches (~3 years); longer
+  // ranges render what fits in the budget rather than timing out.
   const requestedStart = range.id === "max" ? new Date("2014-12-31T00:00:00Z") : getRangeStartDate(range.id)
   const startDate = requestedStart < new Date("2014-12-31T00:00:00Z") ? new Date("2014-12-31T00:00:00Z") : requestedStart
 
