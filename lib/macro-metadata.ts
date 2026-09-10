@@ -2434,7 +2434,7 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     priority: 21.05,
     frequency: "Monthly (10th-15th)",
     audience: ["宏观", "中国", "人民币"],
-    description: "社会融资规模当月增量（元）。实体经济从整个金融体系拿到的钱，比新增贷款口径更宽（含政府债、企业债、股票、表外）。1 月季节性最强，与去年同期比更有意义。",
+    description: "社会融资规模当月增量（元）。实体经济从整个金融体系拿到的钱，比新增贷款口径更宽（含政府债、企业债、股票、表外）。1 月季节性最强，与去年同期比更有意义。注意：分项里没有政府债券（镜像表不含该列），所以各分项之和会明显小于总量，差额基本就是政府债。",
   },
   {
     symbol: "MOFCOM:TSF_RMB_LOANS",
@@ -3020,8 +3020,9 @@ export const SKIPPED_INDICATORS: readonly SkippedIndicator[] = [
     url: "https://www.safe.gov.cn/safe/yhjsh/index.html",
   },
   {
-    name: "社融存量及同比 / 政府债券分项",
-    reason: "商务部镜像只含增量与 7 个分项（无政府债券、无存量）；存量同比需解析央行月度新闻稿。增量已接入。",
+    name: "社融：政府债券分项、委托贷款、外币贷款、存量及同比",
+    reason:
+      "商务部镜像不含政府债券列与存量口径；委托贷款、外币贷款两列实测为空。总量与人民币贷款、企业债券、股票融资、信托贷款、未贴现票据五个分项已接入并与公布总量结构自洽。",
     url: "http://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html",
   },
   {
