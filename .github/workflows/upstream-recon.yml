@@ -27,6 +27,9 @@ jobs:
               ["rrr-no-extras", "https://datacenter-web.eastmoney.com/api/data/v1/get?columns=REPORT_DATE%2CPUBLISH_DATE%2CTRADE_DATE%2CINTEREST_RATE_BB%2CINTEREST_RATE_BA%2CINTEREST_RATE_SB%2CINTEREST_RATE_SA&pageNumber=1&pageSize=50&sortColumns=PUBLISH_DATE%2CTRADE_DATE&sortTypes=-1%2C-1&source=WEB&client=WEB&reportName=RPT_ECONOMY_DEPOSIT_RESERVE"],
               // CFETS RMB index: JSON sibling of the Excel export pedquant uses.
               ["cfets-rmbidx-ags-fx", "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-fx/RmbIdxHis?lang=CN&startDate=2026-01-01&endDate=2026-09-10&pageNum=1&pageSize=50"],
+              ["cfets-pagesize-300", "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-fx/RmbIdxHis?lang=CN&startDate=2025-09-10&endDate=2026-09-10&pageNum=1&pageSize=300"],
+              ["cfets-pagesize-100", "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-fx/RmbIdxHis?lang=CN&startDate=2025-09-10&endDate=2026-09-10&pageNum=1&pageSize=100"],
+              ["cfets-no-referer-header", "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-fx/RmbIdxHis?lang=CN&startDate=2026-06-01&endDate=2026-09-10&pageNum=1&pageSize=50"],
               ["cfets-rmbidx-ags-currency", "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-currency/RmbIdxHis?lang=CN&startDate=2026-01-01&endDate=2026-09-10&pageNum=1&pageSize=50"],
               ["cfets-rmbidx-excel", "https://www.chinamoney.com.cn/dqs/rest/cm-u-bk-fx/RmbIdxHisExcel?lang=CN&startDate=2026-07-01&endDate=2026-09-10"],
               // PBoC daily fixing, a keyless JSON already used by several projects.
