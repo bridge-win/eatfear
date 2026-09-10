@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Probe
+        continue-on-error: true
         run: |
           node -e '
             const candidates = [
@@ -65,5 +66,7 @@ jobs:
                 const message = `${lines[index]} ${lines[index + 1] ?? ""}`.slice(0, 900).replace(/%/g, "%25");
                 console.log(`::notice title=recon-${index / 2}::${message}`);
               }
-            })();
+            })().catch((error) => {
+              console.log(`::notice title=recon-error::${String(error && error.stack ? error.stack : error).slice(0, 900).replace(/%/g, "%25")}`);
+            });
           '
