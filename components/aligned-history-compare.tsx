@@ -21,6 +21,7 @@ import { RefreshCw } from "lucide-react"
 
 import { InfoPopover } from "@/components/info-popover"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { groupImportance, orderGroupsByImportance } from "@/lib/history-order"
 import { cn } from "@/lib/utils"
 
 export type AlignedHistoryUnit = "usd" | "cny" | "pct" | "ratio" | "raw" | "count"
@@ -33,6 +34,9 @@ export interface AlignedHistoryPoint {
 export interface AlignedHistorySeries {
   key: string
   order?: number
+  /** Higher = more important; drives sort order and pagination. */
+  importance?: number
+  tier?: "core" | "secondary"
   label: string
   color: string
   unit: AlignedHistoryUnit
@@ -276,9 +280,10 @@ function getTimelineForGroups(baseTimeline: number[] | undefined, groups: Series
   return Array.from(timeline).sort((a, b) => a - b)
 }
 
-function getGroups(data: AlignedHistoryData, maxSeriesPerPane: number): SeriesGroup[] {
+function getGroups(data: AlignedHistoryData, maxSeriesPerPane: number, enabledGroups?: Set<string>): SeriesGroup[] {
   const groups: SeriesGroup[] = []
-  for (const group of data.groups) {
+  for (const group of orderGroupsByImportance(data.groups)) {
+    if (enabledGroups && !enabledGroups.has(group.key)) continue
     const specs = group.series.filter((series) => series.data.length > 0)
     for (let index = 0; index < specs.length; index += maxSeriesPerPane) {
       const chunk = specs.slice(index, index + maxSeriesPerPane)
@@ -440,6 +445,62 @@ function HistoryPaneLoading({
   )
 }
 
+function GroupFilterPanel({
+  catalog, active, onToggle, onAll, onNone, open, onOpenChange,
+}: {
+  catalog: { key: string; label: string; count: number; importance: number }[]
+  active: Set<string>
+  onToggle: (key: string) => void
+  onAll: () => void
+  onNone: () => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const enabledCount = catalog.filter((g) => active.has(g.key)).length
+  return (
+    <aside className={cn("shrink-0 self-start rounded-md border border-border/60 bg-card/60 text-[11px]", open ? "w-52" : "w-8")}>
+      <div className="flex items-center justify-between px-1.5 py-1">
+        {open && <span className="font-medium">分组筛选 <span className="text-muted-foreground">{enabledCount}/{catalog.length}</span></span>}
+        <button type="button" onClick={() => onOpenChange(!open)} className="rounded px-1 text-muted-foreground hover:text-foreground" aria-label={open ? "收起筛选" : "展开筛选"}>
+          {open ? "«" : "»"}
+        </button>
+      </div>
+      {open && (
+        <>
+          <div className="flex gap-1 px-1.5 pb-1">
+            <button type="button" onClick={onAll} className="rounded border border-border px-1.5 py-0.5 hover:text-foreground">全选</button>
+            <button type="button" onClick={onNone} className="rounded border border-border px-1.5 py-0.5 hover:text-foreground">清空</button>
+          </div>
+          <div className="max-h-[60vh] overflow-y-auto border-t border-border/60">
+            {catalog.map((g) => (
+              <label key={g.key} className="flex cursor-pointer items-center gap-1.5 px-1.5 py-1 hover:bg-muted/40">
+                <input type="checkbox" checked={active.has(g.key)} onChange={() => onToggle(g.key)} className="accent-primary" />
+                <span className="min-w-0 flex-1 truncate" title={g.label}>{g.label}</span>
+                <span className="tabular-nums text-muted-foreground" title="曲线数 · 最高重要度">{g.count}<span className="opacity-60"> · R{Math.round(g.importance)}</span></span>
+              </label>
+            ))}
+          </div>
+          <p className="px-1.5 py-1 text-[10px] leading-snug text-muted-foreground">组按最高重要度排序;组内曲线也按重要度排。</p>
+        </>
+      )}
+    </aside>
+  )
+}
+
+function Pager({ page, pageCount, panesPerPage, onPage, onPanesPerPage, paneCount }: { page: number; pageCount: number; panesPerPage: number; onPage: (p: number) => void; onPanesPerPage: (n: number) => void; paneCount: number }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 py-1 text-[11px] text-muted-foreground">
+      <span>按重要度排序 · 共 {paneCount} 个面板</span>
+      <div className="flex items-center gap-1">
+        <label>每页 <select value={panesPerPage} onChange={(e) => onPanesPerPage(Number(e.target.value))} className="rounded border border-border bg-transparent px-1 py-0.5">{[4, 6, 10, 20].map((n) => <option key={n} value={n}>{n}</option>)}</select> 面板</label>
+        <button type="button" disabled={page <= 0} onClick={() => onPage(page - 1)} className="rounded border border-border px-1.5 py-0.5 disabled:opacity-40">‹ 上一页</button>
+        <span className="tabular-nums">{page + 1} / {pageCount}</span>
+        <button type="button" disabled={page >= pageCount - 1} onClick={() => onPage(page + 1)} className="rounded border border-border px-1.5 py-0.5 disabled:opacity-40">下一页 ›</button>
+      </div>
+    </div>
+  )
+}
+
 export function AlignedHistoryCompare({
   data,
   title,
@@ -464,7 +525,24 @@ export function AlignedHistoryCompare({
   const [cardWidth, setCardWidth] = useState(0)
   const [visibleLogicalRange, setVisibleLogicalRange] = useState<VisibleLogicalRange | null>(null)
   const [renderedPaneCount, setRenderedPaneCount] = useState(0)
-  const groups = useMemo(() => (data ? getGroups(data, maxSeriesPerPane) : []), [data, maxSeriesPerPane])
+  const [enabledGroups, setEnabledGroups] = useState<Set<string> | null>(null)
+  const [page, setPage] = useState(0)
+  const [panesPerPage, setPanesPerPage] = useState(6)
+  const [filterOpen, setFilterOpen] = useState(true)
+  const groupCatalog = useMemo(
+    () => (data ? orderGroupsByImportance(data.groups).map((g) => ({ key: g.key, label: g.label ?? g.key, count: g.series.filter((x) => x.data.length > 0).length, importance: groupImportance(g) })) : []),
+    [data],
+  )
+  const activeGroups = useMemo(() => enabledGroups ?? new Set(groupCatalog.map((g) => g.key)), [enabledGroups, groupCatalog])
+  const allPanes = useMemo(() => (data ? getGroups(data, maxSeriesPerPane, activeGroups) : []), [data, maxSeriesPerPane, activeGroups])
+  const pageCount = Math.max(1, Math.ceil(allPanes.length / panesPerPage))
+  const safePage = Math.min(page, pageCount - 1)
+  const groups = useMemo(
+    () => allPanes.slice(safePage * panesPerPage, (safePage + 1) * panesPerPage).map((g, i) => ({ ...g, paneIndex: i })),
+    [allPanes, safePage, panesPerPage],
+  )
+  const totalSeriesCount = useMemo(() => allPanes.reduce((count, group) => count + group.specs.length, 0), [allPanes])
+  useEffect(() => { setPage(0) }, [activeGroups, panesPerPage])
   const isCompact = cardWidth > 0 && cardWidth < COMPACT_WIDTH
   const seriesCount = useMemo(() => groups.reduce((count, group) => count + group.specs.length, 0), [groups])
   const renderedGroups = useMemo(
@@ -487,10 +565,10 @@ export function AlignedHistoryCompare({
     }
 
     setRenderedPaneCount((previous) => {
-      const next = Math.min(INITIAL_RENDERED_PANES, groups.length)
+      const next = Math.min(Math.max(INITIAL_RENDERED_PANES, panesPerPage), groups.length)
       return previous === next ? previous : next
     })
-  }, [groups])
+  }, [groups, panesPerPage])
 
   useEffect(() => {
     const sentinel = loadMoreRef.current
@@ -834,7 +912,7 @@ export function AlignedHistoryCompare({
           </div>
           {data && seriesCount > 0 && (
             <span className="h-4 w-[7.75rem] overflow-hidden truncate text-right text-[9px] leading-4 text-muted-foreground sm:w-36">
-              {visibleSeriesCount}/{displaySeriesCount} {seriesCountLabel}
+              {visibleSeriesCount}/{totalSeriesCount} {seriesCountLabel} · 第 {safePage + 1}/{pageCount} 页
               {loading && (
                 <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground/60" />
               )}
@@ -874,6 +952,18 @@ export function AlignedHistoryCompare({
         ) : !data || seriesCount === 0 || timeline.length === 0 ? (
           <p className="py-12 text-center text-xs text-muted-foreground">{noDataLabel}</p>
         ) : (
+          <div className="flex gap-2">
+          <GroupFilterPanel
+            catalog={groupCatalog}
+            active={activeGroups}
+            onToggle={(key) => setEnabledGroups((prev) => { const next = new Set(prev ?? groupCatalog.map((g) => g.key)); if (next.has(key)) next.delete(key); else next.add(key); return next })}
+            onAll={() => setEnabledGroups(null)}
+            onNone={() => setEnabledGroups(new Set())}
+            open={filterOpen}
+            onOpenChange={setFilterOpen}
+          />
+          <div className="min-w-0 flex-1">
+          <Pager page={safePage} pageCount={pageCount} panesPerPage={panesPerPage} onPage={setPage} onPanesPerPage={setPanesPerPage} paneCount={allPanes.length} />
           <div ref={gridRef} className="relative flex flex-col gap-px sm:gap-0.5">
             {renderedGroups.map((group) => (
               <section
@@ -1018,6 +1108,9 @@ export function AlignedHistoryCompare({
                 </div>
               </div>
             ))}
+          </div>
+          {pageCount > 1 && <Pager page={safePage} pageCount={pageCount} panesPerPage={panesPerPage} onPage={setPage} onPanesPerPage={setPanesPerPage} paneCount={allPanes.length} />}
+          </div>
           </div>
         )}
       </CardContent>

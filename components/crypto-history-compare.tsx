@@ -240,6 +240,8 @@ export function CryptoHistoryCompare({
       const series: AlignedHistorySeries = {
         key: spec.key,
         order: spec.order,
+        importance: spec.relevanceScore,
+        tier: spec.tier,
         label,
         color: spec.color,
         unit: spec.unit,
