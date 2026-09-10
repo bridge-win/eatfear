@@ -458,7 +458,7 @@ function GroupFilterPanel({
 }) {
   const enabledCount = catalog.filter((g) => active.has(g.key)).length
   return (
-    <aside className={cn("shrink-0 self-start rounded-md border border-border/60 bg-card/60 text-[11px]", open ? "w-52" : "w-8")}>
+    <aside className={cn("sticky top-14 z-10 max-h-[calc(100vh-4rem)] shrink-0 self-start overflow-y-auto rounded-md border border-border/60 bg-card/95 text-[11px] backdrop-blur", open ? "w-52" : "w-8")}>
       <div className="flex items-center justify-between px-1.5 py-1">
         {open && <span className="font-medium">分组筛选 <span className="text-muted-foreground">{enabledCount}/{catalog.length}</span></span>}
         <button type="button" onClick={() => onOpenChange(!open)} className="rounded px-1 text-muted-foreground hover:text-foreground" aria-label={open ? "收起筛选" : "展开筛选"}>
