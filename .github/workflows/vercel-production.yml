@@ -88,9 +88,11 @@ jobs:
           set -e
           if [ "$deploy_status" -ne 0 ]; then
             echo "::error::Vercel source deploy failed with exit code $deploy_status"
-            tail -n 150 vercel-deploy.log | sed "s/${VERCEL_TOKEN}/[redacted]/g" | while IFS= read -r line; do
-              echo "::error::$line"
-            done
+            # GitHub caps the number of annotations per step, so collapse the whole
+            # tail into one multi-line annotation (%0A) instead of one per line.
+            tail -n 200 vercel-deploy.log \
+              | sed "s/${VERCEL_TOKEN}/[redacted]/g" \
+              | python3 -c 'import sys; print("::error title=vercel-build-log::" + sys.stdin.read().replace("%","%25").replace("\r","").replace("\n","%0A"))'
             exit "$deploy_status"
           fi
           deployment_url="$(
