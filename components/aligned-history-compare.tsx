@@ -471,7 +471,7 @@ function GroupFilterPanel({
             <button type="button" onClick={onAll} className="rounded border border-border px-1.5 py-0.5 hover:text-foreground">全选</button>
             <button type="button" onClick={onNone} className="rounded border border-border px-1.5 py-0.5 hover:text-foreground">清空</button>
           </div>
-          <div className="max-h-[60vh] overflow-y-auto border-t border-border/60">
+          <div className="border-t border-border/60">
             {catalog.map((g) => (
               <label key={g.key} className="flex cursor-pointer items-center gap-1.5 px-1.5 py-1 hover:bg-muted/40">
                 <input type="checkbox" checked={active.has(g.key)} onChange={() => onToggle(g.key)} className="accent-primary" />
@@ -492,10 +492,14 @@ function Pager({ page, pageCount, panesPerPage, onPage, onPanesPerPage, paneCoun
     <div className="flex flex-wrap items-center justify-between gap-2 py-1 text-[11px] text-muted-foreground">
       <span>按重要度排序 · 共 {paneCount} 个面板</span>
       <div className="flex items-center gap-1">
-        <label>每页 <select value={panesPerPage} onChange={(e) => onPanesPerPage(Number(e.target.value))} className="rounded border border-border bg-transparent px-1 py-0.5">{[4, 6, 10, 20].map((n) => <option key={n} value={n}>{n}</option>)}</select> 面板</label>
-        <button type="button" disabled={page <= 0} onClick={() => onPage(page - 1)} className="rounded border border-border px-1.5 py-0.5 disabled:opacity-40">‹ 上一页</button>
-        <span className="tabular-nums">{page + 1} / {pageCount}</span>
-        <button type="button" disabled={page >= pageCount - 1} onClick={() => onPage(page + 1)} className="rounded border border-border px-1.5 py-0.5 disabled:opacity-40">下一页 ›</button>
+        <label>每页 <select value={Number.isFinite(panesPerPage) ? String(panesPerPage) : "all"} onChange={(e) => onPanesPerPage(e.target.value === "all" ? Infinity : Number(e.target.value))} className="rounded border border-border bg-transparent px-1 py-0.5">{[10, 20, 40].map((n) => <option key={n} value={n}>{n}</option>)}<option value="all">全部</option></select> 面板</label>
+        {Number.isFinite(panesPerPage) && (
+          <>
+            <button type="button" disabled={page <= 0} onClick={() => onPage(page - 1)} className="rounded border border-border px-1.5 py-0.5 disabled:opacity-40">‹ 上一页</button>
+            <span className="tabular-nums">{page + 1} / {pageCount}</span>
+            <button type="button" disabled={page >= pageCount - 1} onClick={() => onPage(page + 1)} className="rounded border border-border px-1.5 py-0.5 disabled:opacity-40">下一页 ›</button>
+          </>
+        )}
       </div>
     </div>
   )
@@ -527,7 +531,7 @@ export function AlignedHistoryCompare({
   const [renderedPaneCount, setRenderedPaneCount] = useState(0)
   const [enabledGroups, setEnabledGroups] = useState<Set<string> | null>(null)
   const [page, setPage] = useState(0)
-  const [panesPerPage, setPanesPerPage] = useState(6)
+  const [panesPerPage, setPanesPerPage] = useState<number>(20)   // Infinity = 显示全部
   const [filterOpen, setFilterOpen] = useState(true)
   const groupCatalog = useMemo(
     () => (data ? orderGroupsByImportance(data.groups).map((g) => ({ key: g.key, label: g.label ?? g.key, count: g.series.filter((x) => x.data.length > 0).length, importance: groupImportance(g) })) : []),
@@ -535,10 +539,10 @@ export function AlignedHistoryCompare({
   )
   const activeGroups = useMemo(() => enabledGroups ?? new Set(groupCatalog.map((g) => g.key)), [enabledGroups, groupCatalog])
   const allPanes = useMemo(() => (data ? getGroups(data, maxSeriesPerPane, activeGroups) : []), [data, maxSeriesPerPane, activeGroups])
-  const pageCount = Math.max(1, Math.ceil(allPanes.length / panesPerPage))
+  const pageCount = Number.isFinite(panesPerPage) ? Math.max(1, Math.ceil(allPanes.length / panesPerPage)) : 1
   const safePage = Math.min(page, pageCount - 1)
   const groups = useMemo(
-    () => allPanes.slice(safePage * panesPerPage, (safePage + 1) * panesPerPage).map((g, i) => ({ ...g, paneIndex: i })),
+    () => (Number.isFinite(panesPerPage) ? allPanes.slice(safePage * panesPerPage, (safePage + 1) * panesPerPage) : allPanes).map((g, i) => ({ ...g, paneIndex: i })),
     [allPanes, safePage, panesPerPage],
   )
   const totalSeriesCount = useMemo(() => allPanes.reduce((count, group) => count + group.specs.length, 0), [allPanes])
@@ -565,7 +569,7 @@ export function AlignedHistoryCompare({
     }
 
     setRenderedPaneCount((previous) => {
-      const next = Math.min(Math.max(INITIAL_RENDERED_PANES, panesPerPage), groups.length)
+      const next = Math.min(Math.max(INITIAL_RENDERED_PANES, Number.isFinite(panesPerPage) ? panesPerPage : 20), groups.length)
       return previous === next ? previous : next
     })
   }, [groups, panesPerPage])
@@ -912,7 +916,7 @@ export function AlignedHistoryCompare({
           </div>
           {data && seriesCount > 0 && (
             <span className="h-4 w-[7.75rem] overflow-hidden truncate text-right text-[9px] leading-4 text-muted-foreground sm:w-36">
-              {visibleSeriesCount}/{totalSeriesCount} {seriesCountLabel} · 第 {safePage + 1}/{pageCount} 页
+              {visibleSeriesCount}/{totalSeriesCount} {seriesCountLabel}{pageCount > 1 ? ` · 第 ${safePage + 1}/${pageCount} 页` : ""}
               {loading && (
                 <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground/60" />
               )}
