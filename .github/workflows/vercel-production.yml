@@ -71,9 +71,11 @@ jobs:
         run: |
           set -uo pipefail
           set +e
+          # No --force: it skips the build cache on every run, which burns the
+          # Hobby build-minute budget and was the likeliest trigger for Vercel's
+          # "Resource provisioning failed".
           pnpm exec vercel deploy \
             --prod \
-            --force \
             --yes \
             --logs \
             --token="$VERCEL_TOKEN" \
