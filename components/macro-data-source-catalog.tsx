@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { ChevronDown, ExternalLink } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
-import { CHINA_SNAPSHOT_AS_OF } from "@/lib/data-sources/china-official-snapshot"
+import { CHINA_MANUAL_SNAPSHOT_AS_OF, CHINA_SNAPSHOT_AS_OF } from "@/lib/data-sources/china-official-snapshot"
 import { useI18n } from "@/lib/i18n"
 import { getConfiguredMacroIndicatorMetas } from "@/lib/macro-indicator-config"
 import { SKIPPED_INDICATORS } from "@/lib/macro-metadata"
@@ -41,9 +41,16 @@ const SOURCE_ROWS: readonly SourceRow[] = [
     homepage: "https://data.eastmoney.com/cjsj/",
   },
   {
+    source: "MOFCOM",
+    label: { zh: "商务部数据中心（央行社融表镜像）", en: "MOFCOM data center (mirror of the PBoC TSF table)" },
+    cadence: { zh: "月度，央行发布后同步；社融增量及 7 个分项", en: "Monthly, follows the PBoC release; TSF flow and 7 components" },
+    access: { zh: "免费，无 key（POST 接口，非官方 JSON）", en: "Free, no key (POST endpoint, unofficial JSON)" },
+    homepage: "https://data.mofcom.gov.cn/gnmy/shrzgm.shtml",
+  },
+  {
     source: "NBS/PBoC/BIS Snapshot",
-    label: { zh: "国家统计局年度公报 / 央行货币政策报告 / BIS 房价库（版本化快照）", en: "NBS annual bulletins / PBoC policy reports / BIS property DB (versioned snapshot)" },
-    cadence: { zh: "年度 / 季度，脚本刷新，每条观测带来源链接", en: "Annual / quarterly, script-refreshed, per-observation source links" },
+    label: { zh: "国家统计局年度公报 / 央行货币政策报告 / BIS 房价库 + 外汇局结售汇 / CFETS 指数 / 政策利率（版本化快照）", en: "NBS annual bulletins / PBoC policy reports / BIS property DB + SAFE FX settlement / CFETS index / policy rates (versioned snapshot)" },
+    cadence: { zh: "年度 / 季度 / 月度 / 周度，手工或脚本刷新，每条观测带来源链接", en: "Annual / quarterly / monthly / weekly, hand- or script-refreshed, per-observation source links" },
     access: { zh: "仓库内 JSON，永不失败", en: "In-repo JSON, never fails at runtime" },
     homepage: "https://github.com/bridge-win/house",
   },
@@ -83,7 +90,7 @@ export function MacroDataSourceCatalog() {
               {" · "}
               {lang === "zh" ? `中国相关 ${chinaCount}` : `China-related ${chinaCount}`}
               {" · "}
-              {t("macro.sources.asOf", { date: CHINA_SNAPSHOT_AS_OF })}
+              {t("macro.sources.asOf", { date: `${CHINA_SNAPSHOT_AS_OF} · SAFE/CFETS ${CHINA_MANUAL_SNAPSHOT_AS_OF}` })}
             </p>
           </div>
           <span className="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground">

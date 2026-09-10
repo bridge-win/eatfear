@@ -1,0 +1,682 @@
+{
+ "asOf": "2026-09-10",
+ "origin": "Hand-verified from SAFE / CFETS / PBoC releases (via official pages and wire reports). No keyless API exists for these; refresh by editing this file with the next monthly release.",
+ "safe": {
+  "settlement": {
+   "name": "银行结汇（当月）",
+   "unit": "亿美元",
+   "publisher": "国家外汇管理局",
+   "frequency": "Monthly",
+   "observations": [
+    {
+     "date": "2026-03-31",
+     "value": 2736,
+     "source": "https://www.safe.gov.cn/zhejiang/2026/0508/2377.html",
+     "title": "国家外汇管理局公布2026年3月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-04-30",
+     "value": 2573,
+     "source": "https://finance.sina.cn/forex/hsxw/2026-05-18/detail-inhyiewh3925745.d.html",
+     "title": "国家外汇管理局公布2026年4月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-05-31",
+     "value": 2439,
+     "source": "https://www.jwview.com/jingwei/html/06-15/675107.shtml",
+     "title": "国家外汇管理局公布2026年5月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-06-30",
+     "value": 2978,
+     "source": "http://www.safe.gov.cn/qinghai/2026/0717/2033.html",
+     "title": "国家外汇管理局公布2026年6月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-07-31",
+     "value": 2663,
+     "source": "https://www.safe.gov.cn/gansu/2026/0821/2590.html",
+     "title": "国家外汇管理局公布2026年7月银行结售汇和银行代客涉外收付款数据"
+    }
+   ]
+  },
+  "sales": {
+   "name": "银行售汇（当月）",
+   "unit": "亿美元",
+   "publisher": "国家外汇管理局",
+   "frequency": "Monthly",
+   "observations": [
+    {
+     "date": "2026-03-31",
+     "value": 2576,
+     "source": "https://www.safe.gov.cn/zhejiang/2026/0508/2377.html",
+     "title": "国家外汇管理局公布2026年3月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-04-30",
+     "value": 2172,
+     "source": "https://finance.sina.cn/forex/hsxw/2026-05-18/detail-inhyiewh3925745.d.html",
+     "title": "国家外汇管理局公布2026年4月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-05-31",
+     "value": 2081,
+     "source": "https://www.jwview.com/jingwei/html/06-15/675107.shtml",
+     "title": "国家外汇管理局公布2026年5月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-06-30",
+     "value": 2412,
+     "source": "http://www.safe.gov.cn/qinghai/2026/0717/2033.html",
+     "title": "国家外汇管理局公布2026年6月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-07-31",
+     "value": 2480,
+     "source": "https://www.safe.gov.cn/gansu/2026/0821/2590.html",
+     "title": "国家外汇管理局公布2026年7月银行结售汇和银行代客涉外收付款数据"
+    }
+   ]
+  },
+  "net_settlement": {
+   "name": "银行结售汇差额（当月）",
+   "unit": "亿美元",
+   "publisher": "国家外汇管理局",
+   "frequency": "Monthly",
+   "note": "结汇减售汇；为正=市场净卖出美元，人民币升值压力",
+   "observations": [
+    {
+     "date": "2026-03-31",
+     "value": 160,
+     "source": "https://www.safe.gov.cn/zhejiang/2026/0508/2377.html",
+     "title": "国家外汇管理局公布2026年3月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-04-30",
+     "value": 401,
+     "source": "https://finance.sina.cn/forex/hsxw/2026-05-18/detail-inhyiewh3925745.d.html",
+     "title": "国家外汇管理局公布2026年4月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-05-31",
+     "value": 358,
+     "source": "https://www.jwview.com/jingwei/html/06-15/675107.shtml",
+     "title": "国家外汇管理局公布2026年5月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-06-30",
+     "value": 566,
+     "source": "http://www.safe.gov.cn/qinghai/2026/0717/2033.html",
+     "title": "国家外汇管理局公布2026年6月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-07-31",
+     "value": 183,
+     "source": "https://www.safe.gov.cn/gansu/2026/0821/2590.html",
+     "title": "国家外汇管理局公布2026年7月银行结售汇和银行代客涉外收付款数据"
+    }
+   ]
+  },
+  "receipts": {
+   "name": "银行代客涉外收入（当月）",
+   "unit": "亿美元",
+   "publisher": "国家外汇管理局",
+   "frequency": "Monthly",
+   "observations": [
+    {
+     "date": "2026-03-31",
+     "value": 8239,
+     "source": "https://www.safe.gov.cn/zhejiang/2026/0508/2377.html",
+     "title": "国家外汇管理局公布2026年3月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-04-30",
+     "value": 8320,
+     "source": "https://finance.sina.cn/forex/hsxw/2026-05-18/detail-inhyiewh3925745.d.html",
+     "title": "国家外汇管理局公布2026年4月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-05-31",
+     "value": 7738,
+     "source": "https://www.jwview.com/jingwei/html/06-15/675107.shtml",
+     "title": "国家外汇管理局公布2026年5月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-06-30",
+     "value": 8943,
+     "source": "http://www.safe.gov.cn/qinghai/2026/0717/2033.html",
+     "title": "国家外汇管理局公布2026年6月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-07-31",
+     "value": 8656,
+     "source": "https://www.safe.gov.cn/gansu/2026/0821/2590.html",
+     "title": "国家外汇管理局公布2026年7月银行结售汇和银行代客涉外收付款数据"
+    }
+   ]
+  },
+  "payments": {
+   "name": "银行代客对外付款（当月）",
+   "unit": "亿美元",
+   "publisher": "国家外汇管理局",
+   "frequency": "Monthly",
+   "observations": [
+    {
+     "date": "2026-03-31",
+     "value": 8559,
+     "source": "https://www.safe.gov.cn/zhejiang/2026/0508/2377.html",
+     "title": "国家外汇管理局公布2026年3月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-04-30",
+     "value": 7700,
+     "source": "https://finance.sina.cn/forex/hsxw/2026-05-18/detail-inhyiewh3925745.d.html",
+     "title": "国家外汇管理局公布2026年4月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-05-31",
+     "value": 7112,
+     "source": "https://www.jwview.com/jingwei/html/06-15/675107.shtml",
+     "title": "国家外汇管理局公布2026年5月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-06-30",
+     "value": 8572,
+     "source": "http://www.safe.gov.cn/qinghai/2026/0717/2033.html",
+     "title": "国家外汇管理局公布2026年6月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-07-31",
+     "value": 8058,
+     "source": "https://www.safe.gov.cn/gansu/2026/0821/2590.html",
+     "title": "国家外汇管理局公布2026年7月银行结售汇和银行代客涉外收付款数据"
+    }
+   ]
+  },
+  "net_receipts": {
+   "name": "银行代客涉外收付款差额（当月）",
+   "unit": "亿美元",
+   "publisher": "国家外汇管理局",
+   "frequency": "Monthly",
+   "note": "涉外收入减付款；跨境资金净流入毛口径，不区分是否换汇",
+   "observations": [
+    {
+     "date": "2026-03-31",
+     "value": -320,
+     "source": "https://www.safe.gov.cn/zhejiang/2026/0508/2377.html",
+     "title": "国家外汇管理局公布2026年3月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-04-30",
+     "value": 620,
+     "source": "https://finance.sina.cn/forex/hsxw/2026-05-18/detail-inhyiewh3925745.d.html",
+     "title": "国家外汇管理局公布2026年4月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-05-31",
+     "value": 626,
+     "source": "https://www.jwview.com/jingwei/html/06-15/675107.shtml",
+     "title": "国家外汇管理局公布2026年5月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-06-30",
+     "value": 371,
+     "source": "http://www.safe.gov.cn/qinghai/2026/0717/2033.html",
+     "title": "国家外汇管理局公布2026年6月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-07-31",
+     "value": 598,
+     "source": "https://www.safe.gov.cn/gansu/2026/0821/2590.html",
+     "title": "国家外汇管理局公布2026年7月银行结售汇和银行代客涉外收付款数据"
+    }
+   ]
+  },
+  "settlement_ratio_proxy": {
+   "name": "结汇率代理（结汇/涉外收入）",
+   "unit": "%",
+   "publisher": "国家外汇管理局（自算）",
+   "frequency": "Monthly",
+   "note": "外汇局公布的口径是结汇/外汇收入，此处分母为全部涉外收入（含人民币），只作趋势代理，绝对值偏低",
+   "observations": [
+    {
+     "date": "2026-03-31",
+     "value": 33.21,
+     "source": "https://www.safe.gov.cn/zhejiang/2026/0508/2377.html",
+     "title": "国家外汇管理局公布2026年3月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-04-30",
+     "value": 30.93,
+     "source": "https://finance.sina.cn/forex/hsxw/2026-05-18/detail-inhyiewh3925745.d.html",
+     "title": "国家外汇管理局公布2026年4月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-05-31",
+     "value": 31.52,
+     "source": "https://www.jwview.com/jingwei/html/06-15/675107.shtml",
+     "title": "国家外汇管理局公布2026年5月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-06-30",
+     "value": 33.3,
+     "source": "http://www.safe.gov.cn/qinghai/2026/0717/2033.html",
+     "title": "国家外汇管理局公布2026年6月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-07-31",
+     "value": 30.76,
+     "source": "https://www.safe.gov.cn/gansu/2026/0821/2590.html",
+     "title": "国家外汇管理局公布2026年7月银行结售汇和银行代客涉外收付款数据"
+    }
+   ]
+  },
+  "sales_ratio_proxy": {
+   "name": "购汇率代理（售汇/涉外付款）",
+   "unit": "%",
+   "publisher": "国家外汇管理局（自算）",
+   "frequency": "Monthly",
+   "note": "同上，分母含人民币付款，只作趋势代理",
+   "observations": [
+    {
+     "date": "2026-03-31",
+     "value": 30.1,
+     "source": "https://www.safe.gov.cn/zhejiang/2026/0508/2377.html",
+     "title": "国家外汇管理局公布2026年3月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-04-30",
+     "value": 28.21,
+     "source": "https://finance.sina.cn/forex/hsxw/2026-05-18/detail-inhyiewh3925745.d.html",
+     "title": "国家外汇管理局公布2026年4月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-05-31",
+     "value": 29.26,
+     "source": "https://www.jwview.com/jingwei/html/06-15/675107.shtml",
+     "title": "国家外汇管理局公布2026年5月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-06-30",
+     "value": 28.14,
+     "source": "http://www.safe.gov.cn/qinghai/2026/0717/2033.html",
+     "title": "国家外汇管理局公布2026年6月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-07-31",
+     "value": 30.78,
+     "source": "https://www.safe.gov.cn/gansu/2026/0821/2590.html",
+     "title": "国家外汇管理局公布2026年7月银行结售汇和银行代客涉外收付款数据"
+    }
+   ]
+  },
+  "net_settlement_ytd": {
+   "name": "银行结售汇差额（年初至今累计）",
+   "unit": "亿美元",
+   "publisher": "国家外汇管理局",
+   "frequency": "Monthly",
+   "observations": [
+    {
+     "date": "2026-03-31",
+     "value": 1387,
+     "source": "https://www.safe.gov.cn/zhejiang/2026/0508/2377.html",
+     "title": "国家外汇管理局公布2026年3月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-04-30",
+     "value": 1788,
+     "source": "https://finance.sina.cn/forex/hsxw/2026-05-18/detail-inhyiewh3925745.d.html",
+     "title": "国家外汇管理局公布2026年4月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-05-31",
+     "value": 2145,
+     "source": "https://www.jwview.com/jingwei/html/06-15/675107.shtml",
+     "title": "国家外汇管理局公布2026年5月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-06-30",
+     "value": 2712,
+     "source": "http://www.safe.gov.cn/qinghai/2026/0717/2033.html",
+     "title": "国家外汇管理局公布2026年6月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-07-31",
+     "value": 2894,
+     "source": "https://www.safe.gov.cn/gansu/2026/0821/2590.html",
+     "title": "国家外汇管理局公布2026年7月银行结售汇和银行代客涉外收付款数据"
+    }
+   ]
+  },
+  "net_receipts_ytd": {
+   "name": "银行代客涉外收付款差额（年初至今累计）",
+   "unit": "亿美元",
+   "publisher": "国家外汇管理局",
+   "frequency": "Monthly",
+   "observations": [
+    {
+     "date": "2026-03-31",
+     "value": 856,
+     "source": "https://www.safe.gov.cn/zhejiang/2026/0508/2377.html",
+     "title": "国家外汇管理局公布2026年3月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-04-30",
+     "value": 1475,
+     "source": "https://finance.sina.cn/forex/hsxw/2026-05-18/detail-inhyiewh3925745.d.html",
+     "title": "国家外汇管理局公布2026年4月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-05-31",
+     "value": 2101,
+     "source": "https://www.jwview.com/jingwei/html/06-15/675107.shtml",
+     "title": "国家外汇管理局公布2026年5月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-06-30",
+     "value": 2472,
+     "source": "http://www.safe.gov.cn/qinghai/2026/0717/2033.html",
+     "title": "国家外汇管理局公布2026年6月银行结售汇和银行代客涉外收付款数据"
+    },
+    {
+     "date": "2026-07-31",
+     "value": 3070,
+     "source": "https://www.safe.gov.cn/gansu/2026/0821/2590.html",
+     "title": "国家外汇管理局公布2026年7月银行结售汇和银行代客涉外收付款数据"
+    }
+   ]
+  }
+ },
+ "cfets": {
+  "cfets": {
+   "name": "CFETS人民币汇率指数",
+   "unit": "index (2014-12-31=100)",
+   "publisher": "中国外汇交易中心 CFETS",
+   "frequency": "Weekly (sparse snapshot)",
+   "note": "官方每周五公布；本快照只收录能核到公开来源的日期，完整历史见 chinamoney.com.cn/chinese/bkrmbidx/",
+   "observations": [
+    {
+     "date": "2024-06-14",
+     "value": 99.89,
+     "source": "https://www.cnfin.com/yw-lb/detail/20240617/4062134_1.html",
+     "title": "新华财经：2024年6月14日三大人民币汇率指数"
+    },
+    {
+     "date": "2025-12-31",
+     "value": 97.99,
+     "source": "https://baike.baidu.com/item/CFETS%E4%BA%BA%E6%B0%91%E5%B8%81%E6%B1%87%E7%8E%87%E6%8C%87%E6%95%B0/19138547",
+     "title": "2025年末 CFETS 人民币汇率指数 97.99（较2024年末贬值3.4%）"
+    },
+    {
+     "date": "2026-05-08",
+     "value": 99.7,
+     "source": "https://www.cnfin.com/yw-lb/detail/20260511/4410712_1.html",
+     "title": "新华财经：2026年5月8日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-06-26",
+     "value": 102.57,
+     "source": "https://www.cnfin.com/gs-lb/detail/20260629/4432922_1.html",
+     "title": "新华财经：2026年6月26日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-07-10",
+     "value": 102.35,
+     "source": "https://www.cnfin.com/hs-lb/detail/20260713/4439369_1.html",
+     "title": "新华财经：2026年7月10日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-07-24",
+     "value": 102.75,
+     "source": "https://www.cnfin.com/gs-lb/detail/20260727/4446426_1.html",
+     "title": "新华财经：2026年7月24日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-08-28",
+     "value": 101.72,
+     "source": "https://www.cnfin.com/hs-lb/detail/20260831/4462668_1.html",
+     "title": "新华财经：2026年8月28日三大人民币汇率指数"
+    }
+   ]
+  },
+  "bis_basket": {
+   "name": "BIS货币篮子人民币汇率指数",
+   "unit": "index (2014-12-31=100)",
+   "publisher": "中国外汇交易中心 CFETS",
+   "frequency": "Weekly (sparse snapshot)",
+   "note": "官方每周五公布；本快照只收录能核到公开来源的日期，完整历史见 chinamoney.com.cn/chinese/bkrmbidx/",
+   "observations": [
+    {
+     "date": "2024-06-14",
+     "value": 105.84,
+     "source": "https://www.cnfin.com/yw-lb/detail/20240617/4062134_1.html",
+     "title": "新华财经：2024年6月14日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-05-08",
+     "value": 107.23,
+     "source": "https://www.cnfin.com/yw-lb/detail/20260511/4410712_1.html",
+     "title": "新华财经：2026年5月8日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-06-26",
+     "value": 110.29,
+     "source": "https://www.cnfin.com/gs-lb/detail/20260629/4432922_1.html",
+     "title": "新华财经：2026年6月26日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-07-10",
+     "value": 110.18,
+     "source": "https://www.cnfin.com/hs-lb/detail/20260713/4439369_1.html",
+     "title": "新华财经：2026年7月10日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-07-24",
+     "value": 110.55,
+     "source": "https://www.cnfin.com/gs-lb/detail/20260727/4446426_1.html",
+     "title": "新华财经：2026年7月24日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-08-28",
+     "value": 108.96,
+     "source": "https://www.cnfin.com/hs-lb/detail/20260831/4462668_1.html",
+     "title": "新华财经：2026年8月28日三大人民币汇率指数"
+    }
+   ]
+  },
+  "sdr_basket": {
+   "name": "SDR货币篮子人民币汇率指数",
+   "unit": "index (2014-12-31=100)",
+   "publisher": "中国外汇交易中心 CFETS",
+   "frequency": "Weekly (sparse snapshot)",
+   "note": "官方每周五公布；本快照只收录能核到公开来源的日期，完整历史见 chinamoney.com.cn/chinese/bkrmbidx/",
+   "observations": [
+    {
+     "date": "2024-06-14",
+     "value": 94.45,
+     "source": "https://www.cnfin.com/yw-lb/detail/20240617/4062134_1.html",
+     "title": "新华财经：2024年6月14日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-05-08",
+     "value": 95.14,
+     "source": "https://www.cnfin.com/yw-lb/detail/20260511/4410712_1.html",
+     "title": "新华财经：2026年5月8日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-06-26",
+     "value": 97.02,
+     "source": "https://www.cnfin.com/gs-lb/detail/20260629/4432922_1.html",
+     "title": "新华财经：2026年6月26日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-07-10",
+     "value": 96.94,
+     "source": "https://www.cnfin.com/hs-lb/detail/20260713/4439369_1.html",
+     "title": "新华财经：2026年7月10日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-07-24",
+     "value": 97.33,
+     "source": "https://www.cnfin.com/gs-lb/detail/20260727/4446426_1.html",
+     "title": "新华财经：2026年7月24日三大人民币汇率指数"
+    },
+    {
+     "date": "2026-08-28",
+     "value": 96.49,
+     "source": "https://www.cnfin.com/hs-lb/detail/20260831/4462668_1.html",
+     "title": "新华财经：2026年8月28日三大人民币汇率指数"
+    }
+   ]
+  }
+ },
+ "rates": {
+  "omo_7d": {
+   "name": "公开市场7天期逆回购操作利率（政策利率）",
+   "unit": "%",
+   "publisher": "中国人民银行",
+   "frequency": "Event (step)",
+   "stepwise": true,
+   "note": "2024年7月起明确为主要政策利率；临时隔夜正/逆回购利率 = 本利率 −20bp / +50bp",
+   "observations": [
+    {
+     "date": "2018-03-22",
+     "value": 2.55,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行公开市场业务公告"
+    },
+    {
+     "date": "2019-11-18",
+     "value": 2.5,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行公开市场业务公告"
+    },
+    {
+     "date": "2020-02-03",
+     "value": 2.4,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行公开市场业务公告"
+    },
+    {
+     "date": "2020-03-30",
+     "value": 2.2,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行公开市场业务公告"
+    },
+    {
+     "date": "2022-01-17",
+     "value": 2.1,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行公开市场业务公告"
+    },
+    {
+     "date": "2022-08-15",
+     "value": 2.0,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行公开市场业务公告"
+    },
+    {
+     "date": "2023-06-13",
+     "value": 1.9,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行公开市场业务公告"
+    },
+    {
+     "date": "2023-08-15",
+     "value": 1.8,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行公开市场业务公告"
+    },
+    {
+     "date": "2024-07-22",
+     "value": 1.7,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行公开市场业务公告"
+    },
+    {
+     "date": "2024-09-27",
+     "value": 1.5,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行公开市场业务公告"
+    },
+    {
+     "date": "2025-05-08",
+     "value": 1.4,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/5699842/index.html",
+     "title": "中国人民银行公开市场业务公告［2025］第1号"
+    },
+    {
+     "date": "2026-09-01",
+     "value": 1.4,
+     "source": "https://www.ceicdata.com/zh-hans/china/open-market-operation-daily/cn-reverse-repurchase-rate-central-bank-7-day",
+     "title": "CEIC：7天逆回购利率 2026-09-01 为 1.40%（无变动确认）"
+    }
+   ]
+  },
+  "mlf_1y": {
+   "name": "1年期MLF利率（2025-03起停止公布）",
+   "unit": "%",
+   "publisher": "中国人民银行",
+   "frequency": "Event (step, retired)",
+   "stepwise": true,
+   "stepwise_until": "2025-03-24",
+   "note": "2025年3月24日起MLF改为多重价位中标，不再有统一中标利率，政策利率功能退出；序列在此截止",
+   "observations": [
+    {
+     "date": "2019-11-05",
+     "value": 3.25,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行中期借贷便利操作公告"
+    },
+    {
+     "date": "2020-02-17",
+     "value": 3.15,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行中期借贷便利操作公告"
+    },
+    {
+     "date": "2020-04-15",
+     "value": 2.95,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行中期借贷便利操作公告"
+    },
+    {
+     "date": "2022-01-17",
+     "value": 2.85,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行中期借贷便利操作公告"
+    },
+    {
+     "date": "2022-08-15",
+     "value": 2.75,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行中期借贷便利操作公告"
+    },
+    {
+     "date": "2023-06-15",
+     "value": 2.65,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行中期借贷便利操作公告"
+    },
+    {
+     "date": "2023-08-15",
+     "value": 2.5,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行中期借贷便利操作公告"
+    },
+    {
+     "date": "2024-07-25",
+     "value": 2.3,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行中期借贷便利操作公告"
+    },
+    {
+     "date": "2024-09-25",
+     "value": 2.0,
+     "source": "https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125431/125469/index.html",
+     "title": "中国人民银行中期借贷便利操作公告"
+    }
+   ]
+  }
+ }
+}

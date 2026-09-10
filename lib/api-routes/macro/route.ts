@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { fetchChinaSnapshotSeries } from "@/lib/data-sources/china-official-snapshot"
 import { fetchEastmoneySeries } from "@/lib/data-sources/eastmoney-china-macro"
 import { fetchFredSeries } from "@/lib/data-sources/fred"
+import { fetchMofcomTsfSeries } from "@/lib/data-sources/mofcom-tsf"
 import { fetchYahooSeries } from "@/lib/data-sources/yahoo"
 import {
   DEFAULT_MACRO_INDICATOR_REFRESH_MS,
@@ -78,6 +79,9 @@ async function fetchByMeta(meta: MacroIndicatorMeta, range: TimeRangeOption): Pr
     }
     case "Eastmoney": {
       return fetchEastmoneySeries(symbol, range)
+    }
+    case "MOFCOM": {
+      return fetchMofcomTsfSeries(symbol, range)
     }
     case "NBS/PBoC/BIS Snapshot": {
       return fetchChinaSnapshotSeries(symbol, range)

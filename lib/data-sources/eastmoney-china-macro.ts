@@ -20,6 +20,8 @@ interface EastmoneyReportSpec {
   pageSize: number
   /** Monthly reports fit in one page; daily reports (LPR, yields) need pagination. */
   paginate: boolean
+  /** Eastmoney filter expression, e.g. `(MUTUAL_TYPE="005")`. */
+  filter?: string
 }
 
 export const EASTMONEY_REPORTS = {
@@ -173,6 +175,35 @@ export const EASTMONEY_REPORTS = {
     pageSize: 2000,
     paginate: false,
   },
+  MUTUAL_DEAL_NORTH: {
+    endpoint: "v1",
+    reportName: "RPT_MUTUAL_DEAL_HISTORY",
+    columns: "ALL",
+    dateField: "TRADE_DATE",
+    sortColumns: "TRADE_DATE",
+    pageSize: 1000,
+    paginate: true,
+    filter: '(MUTUAL_TYPE="005")',
+  },
+  MUTUAL_DEAL_SOUTH: {
+    endpoint: "v1",
+    reportName: "RPT_MUTUAL_DEAL_HISTORY",
+    columns: "ALL",
+    dateField: "TRADE_DATE",
+    sortColumns: "TRADE_DATE",
+    pageSize: 1000,
+    paginate: true,
+    filter: '(MUTUAL_TYPE="006")',
+  },
+  MARGIN_DAILY: {
+    endpoint: "v1",
+    reportName: "RPTA_WEB_MARGIN_DAILYTRADE",
+    columns: "ALL",
+    dateField: "STATISTICS_DATE",
+    sortColumns: "STATISTICS_DATE",
+    pageSize: 500,
+    paginate: true,
+  },
   STOCK_STATISTICS: {
     endpoint: "v1",
     reportName: "RPT_ECONOMY_STOCK_STATISTICS",
@@ -263,6 +294,7 @@ function buildPageUrl(spec: EastmoneyReportSpec, page: number): string {
     client: "WEB",
   })
   if (spec.columns === "ALL") params.set("token", LEGACY_TOKEN)
+  if (spec.filter) params.set("filter", spec.filter)
   return `${V1_BASE}?${params.toString()}`
 }
 
