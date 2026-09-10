@@ -1,0 +1,63 @@
+name: Macro Endpoint Check
+
+# Probes the deployed /api/macro for the China / RMB series and reports, per
+# symbol, how many points came back. Upstream sources here (Eastmoney datacenter,
+# MOFCOM) are unofficial JSON endpoints that can change or start blocking Vercel's
+# egress, and a silent failure looks like a missing card rather than an error —
+# so this makes coverage explicit. Run it after touching those fetchers.
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Deployment to probe
+        required: false
+        default: https://eatfear.com
+      range:
+        description: Time range passed to /api/macro
+        required: false
+        default: 5y
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe /api/macro
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Request the China / RMB series and summarise coverage
+        env:
+          BASE_URL: ${{ inputs.base_url || 'https://eatfear.com' }}
+          RANGE: ${{ inputs.range || '5y' }}
+        run: |
+          set -euo pipefail
+          symbols="EM:CN_M2,EM:CN_M1,EM:CN_M0,EM:CN_M1_M2_GAP,EM:CN_NEW_LOANS,EM:CN_TOTAL_DEPOSITS,EM:CN_FX_RESERVES,EM:CN_GOLD_RESERVES,EM:CN_FX_LOANS,EM:CN_10Y,EM:CN_2Y,EM:CN_US_10Y_SPREAD,EM:CN_LPR_1Y,EM:CN_RRR_LARGE,EM:CN_CPI_YOY,EM:CN_PPI_YOY,EM:CN_PMI_MFG,EM:CN_GDP_YOY,EM:CN_RETAIL_SALES,EM:CN_EXPORTS,EM:CN_IMPORTS,EM:CN_TRADE_BALANCE,EM:CN_FDI,EM:CN_A_TOTAL_MCAP,EM:CN_A_TURNOVER,EM:CN_MARGIN_BALANCE,EM:CN_MARGIN_FIN_BALANCE,EM:HSGT_NORTH_TURNOVER,EM:HSGT_NORTH_HOLDINGS,EM:HSGT_SOUTH_NET_BUY,MOFCOM:TSF_TOTAL,MOFCOM:TSF_RMB_LOANS,SNAP:SAFE_NET_SETTLEMENT,SNAP:SAFE_SETTLEMENT_RATIO,SNAP:CFETS_INDEX,SNAP:PBOC_OMO_7D,SNAP:PBOC_MORTGAGE_RATE,SNAP:NBS_INCOME"
+          curl --fail-with-body -sS --max-time 120 \
+            --get "$BASE_URL/api/macro" \
+            --data-urlencode "range=$RANGE" \
+            --data-urlencode "symbols=$symbols" \
+            -o macro.json
+          SYMBOLS="$symbols" node -e '
+            const fs = require("node:fs");
+            const payload = JSON.parse(fs.readFileSync("macro.json", "utf8"));
+            const asked = process.env.SYMBOLS.split(",");
+            const bySymbol = new Map((payload.indicators ?? []).map((i) => [i.symbol, i]));
+            const lines = [];
+            lines.push(`requested=${payload.requested} returned=${payload.returned} fredEnabled=${payload.fredEnabled}`);
+            const missing = [];
+            for (const symbol of asked) {
+              const found = bySymbol.get(symbol);
+              if (!found) { missing.push(symbol); lines.push(`MISSING  ${symbol}`); continue; }
+              const points = found.history?.length ?? 0;
+              const last = points ? found.history[points - 1].date : "-";
+              lines.push(`ok n=${String(points).padStart(4)} last=${last} ${symbol} = ${found.value} (${found.unit})`);
+            }
+            const body = lines.join("%0A").replace(/%(?!0A)/g, "%25");
+            console.log(`::notice title=macro-endpoint-coverage::${body}`);
+            if (missing.length > 0) {
+              console.log(`::error::No data for ${missing.length} symbol(s): ${missing.join(", ")}`);
+              process.exit(1);
+            }
+          '
