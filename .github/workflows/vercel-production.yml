@@ -97,7 +97,20 @@ jobs:
             # re-read the build log for that deployment to get the actual error.
             failed_url="$(grep -o 'https://[a-zA-Z0-9.-]*\.vercel\.app' vercel-deploy.log | tail -n 1 || true)"
             if [ -n "$failed_url" ]; then
-              pnpm exec vercel inspect "$failed_url" --logs --token="$VERCEL_TOKEN" > vercel-build.log 2>&1 || true
+              # `vercel inspect --logs` only reports status, so read the build
+              # events straight from the REST API.
+              dep_id="$(
+                curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+                  "https://api.vercel.com/v13/deployments/${failed_url#https://}?teamId=$VERCEL_ORG_ID" \
+                  | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{const j=JSON.parse(d);console.log(j.id??"")}catch{console.log("")}})'
+              )"
+              if [ -n "$dep_id" ]; then
+                curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+                  "https://api.vercel.com/v3/deployments/$dep_id/events?builds=1&limit=400&teamId=$VERCEL_ORG_ID" \
+                  | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{let j;try{j=JSON.parse(d)}catch{console.log(d.slice(0,4000));return}const rows=Array.isArray(j)?j:(j.events??[]);for(const e of rows){const t=e?.payload?.text??e?.text;if(t)process.stdout.write(String(t).replace(/\n$/,"")+"\n")}})' \
+                  > vercel-build.log 2>&1 || true
+              fi
+              pnpm exec vercel inspect "$failed_url" --logs --token="$VERCEL_TOKEN" >> vercel-build.log 2>&1 || true
               tail -n 200 vercel-build.log \
                 | sed "s/${VERCEL_TOKEN}/[redacted]/g" \
                 | python3 -c 'import sys; print("::error title=vercel-build-log::" + sys.stdin.read().replace("%","%25").replace("\r","").replace("\n","%0A"))'
