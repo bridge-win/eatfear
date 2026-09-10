@@ -280,10 +280,10 @@ export function MacroDashboard({
 
   return (
     <DashboardFrame>
-      <header className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">{t("macro.title")}</h1>
-          <p className="mt-0.5 max-w-3xl text-[11px] text-muted-foreground">{t("macro.subtitle")}</p>
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold tracking-tight">{t("macro.title")}</h1>
+          <p className="text-[11px] leading-4 text-muted-foreground">{t("macro.subtitle")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <TimeRangeSelector value={range} onChange={setRange} />

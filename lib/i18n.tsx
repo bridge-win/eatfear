@@ -199,10 +199,10 @@ const DICT: Dict = {
   // Macro dashboard
   "macro.title": { zh: "宏观看板", en: "Macro Dashboard" },
   "macro.subtitle": {
-    zh: "按普通投资者最常用的宏观顺序展示：利率/央行政策、10年期国债、通胀、社融/M2/信贷、PMI、GDP、就业、汇率、房地产、消费，再展开工业、投资、盈利、资金流、成交、商品、贸易、财政、行业、政策信号，以及人民币/跨境资金专题。中美两套数据并列：美国经 FRED/Yahoo，中国经 Eastmoney（PBoC/NBS/海关/中债）和 NBS/PBoC/BIS 快照。每个指标右上角说明数据源、意义和影响方向。",
-    en: "Ordered by the macro checklist ordinary investors use most: policy rates, 10Y yields, inflation, M2/credit, PMI, GDP, jobs, FX, real estate, consumption, then industrial activity, investment, earnings, flows, turnover, commodities, trade, fiscal impulse, sectors, policy proxies and an RMB / cross-border block. U.S. and China series sit side by side: U.S. via FRED/Yahoo, China via Eastmoney (PBoC/NBS/customs/CDC yields) and versioned NBS/PBoC/BIS snapshots. Each indicator tooltip explains source, meaning and market direction.",
+    zh: "中美宏观并列，按利率、通胀、信贷、增长、汇率的顺序排列，含人民币与跨境资金专题。指标卡右上角说明数据源与影响方向。",
+    en: "U.S. and China macro side by side, ordered by rates, inflation, credit, growth and FX, with an RMB / cross-border block. Each card's tooltip explains its source and market direction.",
   },
-  "macro.tab.realtime": { zh: "实时", en: "Realtime" },
+    "macro.tab.realtime": { zh: "实时", en: "Realtime" },
   "macro.tab.history": { zh: "历史曲线", en: "History" },
   "macro.historyCompare.title": { zh: "宏观历史对比 · 统一时间轴", en: "Macro History Compare · Unified time axis" },
   "macro.historyCompare.info": {

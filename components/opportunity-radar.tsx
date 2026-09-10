@@ -1,19 +1,16 @@
 "use client"
 
-import { Activity, AlertTriangle, BookOpen, Clock, Database, ShieldCheck, TrendingUp } from "lucide-react"
+import { Activity, AlertTriangle, BookOpen, Database, ShieldCheck, TrendingUp } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import {
   DATA_CATEGORY_CATALOG,
   SIGNAL_METHOD_CATALOG,
   SOURCE_ROADMAP,
-  getDataCategoriesForAssetClass,
-  type DataCategoryDefinition,
   type LocalizedText,
   type OpportunityAssetClass,
   type OpportunityConfidence,
   type OpportunityDirection,
-  type SignalMethodId,
   type TradingOpportunity,
 } from "@/lib/opportunity-engine"
 import { RESEARCH_CORPUS_STATS } from "@/lib/research-corpus"
@@ -79,67 +76,17 @@ function scoreTone(score: number, direction: OpportunityDirection): string {
   return "text-amber-600 dark:text-amber-400"
 }
 
-function methodLabel(method: SignalMethodId, locale: "zh" | "en"): string {
-  const definition = SIGNAL_METHOD_CATALOG.find((item) => item.id === method)
-  return definition ? text(definition.title, locale) : method
-}
-
-function SourceStatusBadge({ status }: { status: "wired" | "planned" | "research" }) {
-  const { locale } = useI18n()
-  const label =
-    status === "wired"
-      ? { zh: "已接入", en: "Wired" }
-      : status === "planned"
-        ? { zh: "计划接入", en: "Planned" }
-        : { zh: "研究", en: "Research" }
-  return (
-    <Badge
-      variant="outline"
-      className={cn(
-        "h-5 rounded-sm px-1.5 text-[10px]",
-        status === "wired" && "border-emerald-500/40 text-emerald-700 dark:text-emerald-300",
-        status === "planned" && "border-amber-500/40 text-amber-700 dark:text-amber-300",
-      )}
-    >
-      {text(label, locale)}
-    </Badge>
-  )
-}
-
-function CategoryPill({ category }: { category: DataCategoryDefinition }) {
-  const { locale } = useI18n()
-  return (
-    <article className="min-w-0 rounded-md border bg-card/70 px-2.5 py-2">
-      <div className="flex items-center gap-1.5">
-        <Database className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <h3 className="truncate text-[11px] font-semibold">{text(category.title, locale)}</h3>
-      </div>
-      <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-muted-foreground">
-        {text(category.purpose, locale)}
-      </p>
-      <div className="mt-2 flex flex-wrap gap-1">
-        {category.methods.slice(0, 3).map((method) => (
-          <span key={method} className="rounded-sm bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">
-            {methodLabel(method, locale)}
-          </span>
-        ))}
-      </div>
-    </article>
-  )
-}
-
 function LoadingOpportunityCard({ index }: { index: number }) {
   return (
-    <article className="min-h-44 rounded-md border bg-card/60 px-3 py-2.5 shadow-sm">
-      <div className="flex items-start justify-between gap-2">
-        <span className="h-4 w-28 animate-pulse rounded bg-muted" />
-        <span className="h-6 w-12 animate-pulse rounded bg-muted" />
+    <article className="rounded-md border bg-card/60 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="h-4 w-40 animate-pulse rounded bg-muted" />
+        <span className="h-5 w-8 animate-pulse rounded bg-muted" />
       </div>
-      <span className="mt-4 block h-3 w-full animate-pulse rounded bg-muted" />
-      <span className="mt-2 block h-3 w-5/6 animate-pulse rounded bg-muted" />
-      <div className="mt-4 grid grid-cols-2 gap-1.5">
+      <span className="mt-2 block h-3 w-4/5 animate-pulse rounded bg-muted" />
+      <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
         {Array.from({ length: 4 }, (_, offset) => (
-          <span key={`${index}-${offset}`} className="h-8 animate-pulse rounded bg-muted" />
+          <span key={`${index}-${offset}`} className="h-7 animate-pulse rounded bg-muted" />
         ))}
       </div>
     </article>
@@ -152,66 +99,47 @@ function OpportunityCard({ opportunity }: { opportunity: TradingOpportunity }) {
     <article
       data-opportunity-card={opportunity.assetClass}
       data-opportunity-id={opportunity.id}
-      className="min-w-0 rounded-md border bg-card/85 px-3 py-2.5 shadow-sm"
+      className="min-w-0 rounded-md border bg-card/85 px-3 py-2 shadow-sm"
     >
-      <header className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <Badge variant="outline" className={cn("h-5 rounded-sm px-1.5 text-[10px]", directionTone(opportunity.direction))}>
-              {directionLabel(opportunity.direction, locale)}
-            </Badge>
-            <Badge variant="outline" className="h-5 rounded-sm px-1.5 text-[10px]">
-              {confidenceLabel(opportunity.confidence, locale)}
-            </Badge>
-          </div>
-          <h3 className="mt-1 truncate text-sm font-semibold" title={text(opportunity.title, locale)}>
-            {text(opportunity.title, locale)}
-          </h3>
-        </div>
-        <p className={cn("shrink-0 text-2xl font-bold tabular-nums leading-7", scoreTone(opportunity.score, opportunity.direction))}>
+      <header className="flex min-w-0 items-center gap-1.5">
+        <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold" title={text(opportunity.title, locale)}>
+          {text(opportunity.title, locale)}
+        </h3>
+        <Badge variant="outline" className={cn("h-5 shrink-0 rounded-sm px-1.5 text-[10px]", directionTone(opportunity.direction))}>
+          {directionLabel(opportunity.direction, locale)}
+        </Badge>
+        <span className="shrink-0 text-[10px] text-muted-foreground">{confidenceLabel(opportunity.confidence, locale)}</span>
+        <p className={cn("shrink-0 text-lg font-bold leading-none tabular-nums", scoreTone(opportunity.score, opportunity.direction))}>
           {opportunity.score}
         </p>
       </header>
 
-      <p className="mt-2 line-clamp-2 min-h-8 text-[11px] leading-4 text-muted-foreground">
+      <p className="mt-1 truncate text-[11px] leading-4 text-muted-foreground" title={text(opportunity.thesis, locale)}>
         {text(opportunity.thesis, locale)}
       </p>
 
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5">
-          <Clock className="h-3 w-3" />
-          {text(opportunity.horizon, locale)}
-        </span>
-        <span className="truncate rounded-sm bg-muted px-1.5 py-0.5">{opportunity.sourceCoverage}</span>
-      </div>
-
-      <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+      {/* Flat single row: four drivers side by side instead of a 2x2 block. */}
+      <div className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
         {opportunity.evidence.slice(0, 4).map((item) => (
-          <div key={`${item.label.en}-${item.value}`} className="min-w-0 rounded-sm border bg-background/60 px-2 py-1">
-            <p className="truncate text-[9px] text-muted-foreground">{text(item.label, locale)}</p>
-            <p className={cn("truncate text-[11px] font-semibold tabular-nums", evidenceTone(item.tone))}>{item.value}</p>
+          <div key={`${item.label.en}-${item.value}`} className="min-w-0 rounded-sm border bg-background/60 px-1.5 py-1">
+            <p className="truncate text-[9px] leading-3 text-muted-foreground">{text(item.label, locale)}</p>
+            <p className={cn("truncate text-[11px] font-semibold leading-4 tabular-nums", evidenceTone(item.tone))}>{item.value}</p>
           </div>
         ))}
       </div>
 
-      {opportunity.contradictions.length > 0 && (
-        <div className="mt-2 flex items-start gap-1.5 rounded-sm border border-amber-500/30 bg-amber-50/60 px-2 py-1.5 text-[10px] text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
-          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-          <p className="line-clamp-2">
-            {opportunity.contradictions.map((item) => `${text(item.label, locale)} ${item.value}`).join(" · ")}
-          </p>
-        </div>
-      )}
-
-      <footer className="mt-2 flex flex-wrap items-center justify-between gap-1.5 text-[9px] text-muted-foreground">
-        <div className="flex min-w-0 flex-wrap gap-1">
-          {opportunity.methods.slice(0, 4).map((method) => (
-            <span key={method} className="rounded-sm bg-muted px-1.5 py-0.5">
-              {methodLabel(method, locale)}
+      <footer className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[9px] text-muted-foreground">
+        {opportunity.contradictions.length > 0 && (
+          <span className="inline-flex min-w-0 items-center gap-1 text-amber-700 dark:text-amber-300">
+            <AlertTriangle className="h-3 w-3 shrink-0" />
+            <span className="truncate">
+              {opportunity.contradictions.map((item) => `${text(item.label, locale)} ${item.value}`).join(" · ")}
             </span>
-          ))}
-        </div>
-        <span className="shrink-0">{formatUpdatedAt(opportunity.updatedAt, locale)}</span>
+          </span>
+        )}
+        <span className="ml-auto shrink-0">
+          {text(opportunity.horizon, locale)} · {formatUpdatedAt(opportunity.updatedAt, locale)}
+        </span>
       </footer>
     </article>
   )
@@ -226,72 +154,36 @@ export function OpportunityRadar({
   className,
 }: OpportunityRadarProps) {
   const { locale } = useI18n()
-  const categories = getDataCategoriesForAssetClass(assetClass)
-  const sourceItems = SOURCE_ROADMAP.filter((item) => categories.some((category) => category.id === item.category)).slice(0, 4)
   const emptyLabel = locale === "zh" ? "暂无足够数据生成机会卡片。" : "Not enough data to synthesize opportunity cards yet."
+  // Cards size themselves to the viewport rather than sitting in fixed thirds, so
+  // two cards fill the row instead of leaving a third of the width empty.
+  const gridClass = "grid gap-1.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,26rem),1fr))]"
 
   return (
-    <section className={cn("space-y-2", className)} data-opportunity-radar={assetClass}>
-      <header className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <Activity className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-bold tracking-tight">{text(title, locale)}</h2>
-          </div>
-          <p className="mt-0.5 max-w-3xl text-[11px] leading-4 text-muted-foreground">{text(subtitle, locale)}</p>
-        </div>
-        <Badge variant="outline" className="h-6 rounded-sm px-2 text-[10px]">
-          {locale === "zh" ? "研究驱动" : "Research-backed"}
-        </Badge>
+    <section className={cn("space-y-1.5", className)} data-opportunity-radar={assetClass}>
+      <header className="flex min-w-0 items-center gap-1.5">
+        <Activity className="h-4 w-4 shrink-0 text-primary" />
+        <h2 className="shrink-0 text-sm font-bold tracking-tight">{text(title, locale)}</h2>
+        <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={text(subtitle, locale)}>
+          {text(subtitle, locale)}
+        </p>
       </header>
 
       {loading && opportunities.length === 0 ? (
-        <div className="grid gap-1.5 lg:grid-cols-3">
-          {Array.from({ length: 3 }, (_, index) => (
+        <div className={gridClass}>
+          {Array.from({ length: 2 }, (_, index) => (
             <LoadingOpportunityCard key={index} index={index} />
           ))}
         </div>
       ) : opportunities.length === 0 ? (
-        <div className="rounded-md border px-3 py-6 text-center text-xs text-muted-foreground">{emptyLabel}</div>
+        <div className="rounded-md border px-3 py-3 text-center text-xs text-muted-foreground">{emptyLabel}</div>
       ) : (
-        <div className="grid gap-1.5 lg:grid-cols-3">
+        <div className={gridClass}>
           {opportunities.map((opportunity) => (
             <OpportunityCard key={opportunity.id} opportunity={opportunity} />
           ))}
         </div>
       )}
-
-      <div className="grid gap-1.5 lg:grid-cols-[1.35fr_1fr]">
-        <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
-          {categories.slice(0, 3).map((category) => (
-            <CategoryPill key={category.id} category={category} />
-          ))}
-        </div>
-        <div className="rounded-md border bg-card/70 px-2.5 py-2">
-          <div className="flex items-center gap-1.5">
-            <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
-            <h3 className="text-[11px] font-semibold">{locale === "zh" ? "数据源路线" : "Source Roadmap"}</h3>
-          </div>
-          <div className="mt-2 grid gap-1">
-            {sourceItems.map((item) => (
-              <a
-                key={item.id}
-                href={item.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex min-w-0 items-center justify-between gap-2 rounded-sm px-1.5 py-1 text-[10px] transition-colors hover:bg-muted"
-              >
-                <span className="min-w-0 truncate">
-                  <span className="font-medium">{item.title}</span>
-                  {" "}
-                  <span className="ml-1 text-muted-foreground">{text(item.useCase, locale)}</span>
-                </span>
-                <SourceStatusBadge status={item.status} />
-              </a>
-            ))}
-          </div>
-        </div>
-      </div>
     </section>
   )
 }
