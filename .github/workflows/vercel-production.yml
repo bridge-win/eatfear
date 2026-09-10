@@ -75,6 +75,7 @@ jobs:
             --prod \
             --force \
             --yes \
+            --logs \
             --token="$VERCEL_TOKEN" \
             --meta githubCommitOrg=bridge-win \
             --meta githubCommitRepo=eatfear \
@@ -87,7 +88,7 @@ jobs:
           set -e
           if [ "$deploy_status" -ne 0 ]; then
             echo "::error::Vercel source deploy failed with exit code $deploy_status"
-            tail -n 40 vercel-deploy.log | sed "s/${VERCEL_TOKEN}/[redacted]/g" | while IFS= read -r line; do
+            tail -n 150 vercel-deploy.log | sed "s/${VERCEL_TOKEN}/[redacted]/g" | while IFS= read -r line; do
               echo "::error::$line"
             done
             exit "$deploy_status"
