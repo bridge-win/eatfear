@@ -92,7 +92,16 @@ jobs:
             # tail into one multi-line annotation (%0A) instead of one per line.
             tail -n 200 vercel-deploy.log \
               | sed "s/${VERCEL_TOKEN}/[redacted]/g" \
-              | python3 -c 'import sys; print("::error title=vercel-build-log::" + sys.stdin.read().replace("%","%25").replace("\r","").replace("\n","%0A"))'
+              | python3 -c 'import sys; print("::error title=vercel-cli-log::" + sys.stdin.read().replace("%","%25").replace("\r","").replace("\n","%0A"))'
+            # `vercel deploy --logs` stops streaming as soon as the build fails, so
+            # re-read the build log for that deployment to get the actual error.
+            failed_url="$(grep -o 'https://[a-zA-Z0-9.-]*\.vercel\.app' vercel-deploy.log | tail -n 1 || true)"
+            if [ -n "$failed_url" ]; then
+              pnpm exec vercel inspect "$failed_url" --logs --token="$VERCEL_TOKEN" > vercel-build.log 2>&1 || true
+              tail -n 200 vercel-build.log \
+                | sed "s/${VERCEL_TOKEN}/[redacted]/g" \
+                | python3 -c 'import sys; print("::error title=vercel-build-log::" + sys.stdin.read().replace("%","%25").replace("\r","").replace("\n","%0A"))'
+            fi
             exit "$deploy_status"
           fi
           deployment_url="$(
