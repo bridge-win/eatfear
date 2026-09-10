@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 
 import { BlackSwanOpportunityCard } from "@/components/black-swan-opportunity-card"
 import { CryptoBuyWindowCard } from "@/components/crypto-buy-window-card"
+import { CryptoForecastCard } from "@/components/crypto-forecast-card"
 import { PanicWindowBanner } from "@/components/panic-window-banner"
 import { SmartMoneyTracker } from "@/components/smart-money-tracker"
 import {
@@ -370,6 +371,7 @@ export function CryptoDashboard({
           <CryptoRegimeScoreCard instId={instId} className="min-w-0 xl:col-span-2" />
           <CyclePositionCard className="min-w-0 xl:col-span-3" />
           <CryptoBuyWindowCard className="min-w-0 xl:col-span-3" />
+          <CryptoForecastCard instId={instId} className="min-w-0 sm:col-span-2 xl:col-span-4" />
         </div>
       )}
 

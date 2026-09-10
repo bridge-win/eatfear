@@ -1,7 +1,9 @@
 "use client"
 
+import { SignalBacktestCard } from "@/components/signal-backtest-card"
+
 import { useEffect, useMemo, useState } from "react"
-import { Bell, ExternalLink, Newspaper, Plus, Star, Trash2 } from "lucide-react"
+import { Bell, Newspaper, Plus, Star, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -214,14 +216,7 @@ export function WatchlistWorkspace() {
                 )}
 
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <a
-                    href={`/api/crypto/signal-backtest?ccy=${encodeURIComponent(item.symbol)}&signal=black-swan`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Backtest <ExternalLink className="h-3 w-3" />
-                  </a>
+                  <SignalBacktestCard ccy={item.symbol} className="basis-full" />
                   <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground">
                     <Bell className="h-3 w-3" />
                     Alert-ready

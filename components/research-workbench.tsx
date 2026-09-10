@@ -1,6 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+
+import { FactorMap } from "@/components/factor-map"
+import { ForecastDetail } from "@/components/forecast-detail"
 
 import { DashboardFrame } from "@/components/page-frame"
 import { Badge } from "@/components/ui/badge"
@@ -165,25 +168,41 @@ function CombosPanel() {
   )
 }
 
+const TABS = ["strategies", "combos", "forecast", "factors", "method"] as const
+type Tab = (typeof TABS)[number]
+
 export function ResearchWorkbench() {
+  const [tab, setTab] = useState<Tab>("strategies")
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("tab")
+    if (wanted && (TABS as readonly string[]).includes(wanted)) setTab(wanted as Tab)
+  }, [])
   return (
     <DashboardFrame>
       <div className="mb-4">
         <h1 className="text-xl font-semibold">研究工作台</h1>
         <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-          这一页不产生交易信号,它回答的是「我想用的信号,历史上兑现过没有」。
+          这一页不产生交易信号。它回答三个问题:我想用的信号历史上兑现过没有(证据库)、未来的合理区间有多宽(区间与检验)、这次波动是什么在推(传导图谱)。
           {evidence.summary.headline}。
           结论冻结自 {evidence.provenance.origin}({evidence.provenance.commit}),窗口
           {evidence.windows.strategies.train[0]}→{evidence.windows.strategies.train[1]} 选参、
           {evidence.windows.strategies.test[0]}→{evidence.windows.strategies.test[1]} 样本外。
         </p>
       </div>
-      <Tabs defaultValue="strategies">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>
           <TabsTrigger value="strategies">策略证据库</TabsTrigger>
           <TabsTrigger value="combos">组合研究</TabsTrigger>
+          <TabsTrigger value="forecast">未来区间与检验</TabsTrigger>
+          <TabsTrigger value="factors">价格传导图谱</TabsTrigger>
           <TabsTrigger value="method">方法与边界</TabsTrigger>
         </TabsList>
+        <TabsContent value="forecast" className="mt-4">
+          <ForecastDetail />
+        </TabsContent>
+        <TabsContent value="factors" className="mt-4">
+          <FactorMap />
+        </TabsContent>
         <TabsContent value="strategies" className="mt-4">
           <StrategyTable />
         </TabsContent>

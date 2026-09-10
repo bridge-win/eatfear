@@ -93,6 +93,11 @@ export async function GET(request: Request) {
     range: rangeId,
     updatedAt: Date.now(),
     methodology: "Free OKX daily candles; event if wick exhaustion plus 7-day return z-score reaches the threshold. No lookahead in event creation.",
+    caveats: [
+      "前瞻收益不计手续费、滑点与资金费率;这是事件统计,不是账户回测",
+      "事件密集时 30/90 日窗口大量重叠,命中率的有效样本远小于显示的事件数",
+      "阈值写死、无参数选择,因此不存在选参泄漏,但也未经参数扰动检验",
+    ],
     summary,
     recentOccurrences: occurrences.slice(-12).reverse(),
     upstream: {
