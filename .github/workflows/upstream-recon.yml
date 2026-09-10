@@ -1,0 +1,61 @@
+name: Upstream Endpoint Recon
+
+# The sandbox used to develop these fetchers cannot reach Eastmoney, chinamoney or
+# MOFCOM, so candidate endpoints for the remaining data gaps get validated here
+# instead: this hits each candidate and reports status, content type and the head
+# of the body, which is enough to tell a working JSON API from a redirect, an
+# empty result or an anti-bot page.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recon:
+    name: Probe candidate endpoints
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Probe
+        run: |
+          node -e '
+            const candidates = [
+              // RRR: exactly akshare'"'"'s parameter set, to find out why our copy returns nothing.
+              ["rrr-akshare-params", "https://datacenter-web.eastmoney.com/api/data/v1/get?columns=REPORT_DATE%2CPUBLISH_DATE%2CTRADE_DATE%2CINTEREST_RATE_BB%2CINTEREST_RATE_BA%2CCHANGE_RATE_B%2CINTEREST_RATE_SB%2CINTEREST_RATE_SA%2CCHANGE_RATE_S%2CNEXT_SH_RATE%2CNEXT_SZ_RATE%2CREMARK&pageNumber=1&pageSize=2000&sortColumns=PUBLISH_DATE%2CTRADE_DATE&sortTypes=-1%2C-1&source=WEB&client=WEB&reportName=RPT_ECONOMY_DEPOSIT_RESERVE&p=1&pageNo=1&pageNum=1"],
+              ["rrr-no-extras", "https://datacenter-web.eastmoney.com/api/data/v1/get?columns=REPORT_DATE%2CPUBLISH_DATE%2CTRADE_DATE%2CINTEREST_RATE_BB%2CINTEREST_RATE_BA%2CINTEREST_RATE_SB%2CINTEREST_RATE_SA&pageNumber=1&pageSize=50&sortColumns=PUBLISH_DATE%2CTRADE_DATE&sortTypes=-1%2C-1&source=WEB&client=WEB&reportName=RPT_ECONOMY_DEPOSIT_RESERVE"],
+              // CFETS RMB index: JSON sibling of the Excel export pedquant uses.
+              ["cfets-rmbidx-ags-fx", "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-fx/RmbIdxHis?lang=CN&startDate=2026-01-01&endDate=2026-09-10&pageNum=1&pageSize=50"],
+              ["cfets-rmbidx-ags-currency", "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-currency/RmbIdxHis?lang=CN&startDate=2026-01-01&endDate=2026-09-10&pageNum=1&pageSize=50"],
+              ["cfets-rmbidx-excel", "https://www.chinamoney.com.cn/dqs/rest/cm-u-bk-fx/RmbIdxHisExcel?lang=CN&startDate=2026-07-01&endDate=2026-09-10"],
+              // PBoC daily fixing, a keyless JSON already used by several projects.
+              ["cfets-ccpr-json", "https://iftp.chinamoney.com.cn/r/cms/www/chinamoney/data/fx/ccpr.json"],
+              // TSF stock (社融存量) has no known keyless endpoint; test the NBS mirror.
+              ["dbnomics-nbs-search", "https://api.db.nomics.world/v22/search?q=social%20financing&limit=5"],
+            ];
+            const headers = {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36",
+              "Accept": "application/json, text/plain, */*",
+              "Referer": "https://www.chinamoney.com.cn/",
+            };
+            (async () => {
+              const lines = [];
+              for (const [name, url] of candidates) {
+                try {
+                  const controller = new AbortController();
+                  const timer = setTimeout(() => controller.abort(), 15000);
+                  const response = await fetch(url, { headers, signal: controller.signal });
+                  clearTimeout(timer);
+                  const buffer = Buffer.from(await response.arrayBuffer());
+                  const head = buffer.toString("utf8", 0, 600).replace(/\s+/g, " ");
+                  lines.push(`### ${name} -> ${response.status} ${response.headers.get("content-type")} bytes=${buffer.length}`);
+                  lines.push(head);
+                } catch (error) {
+                  lines.push(`### ${name} -> FAILED ${error.message}`);
+                }
+              }
+              const body = lines.join("%0A").replace(/%(?!0A)/g, "%25");
+              console.log(`::notice title=upstream-recon::${body}`);
+            })();
+          '
