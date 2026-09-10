@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { fetchChinaSnapshotSeries } from "@/lib/data-sources/china-official-snapshot"
+import { fetchCfetsIndexSeries } from "@/lib/data-sources/cfets-rmb-index"
 import { fetchEastmoneySeries } from "@/lib/data-sources/eastmoney-china-macro"
 import { fetchFredSeries } from "@/lib/data-sources/fred"
 import { fetchMofcomTsfSeries } from "@/lib/data-sources/mofcom-tsf"
@@ -79,6 +80,9 @@ async function fetchByMeta(meta: MacroIndicatorMeta, range: TimeRangeOption): Pr
     }
     case "Eastmoney": {
       return fetchEastmoneySeries(symbol, range)
+    }
+    case "CFETS": {
+      return fetchCfetsIndexSeries(symbol, range)
     }
     case "MOFCOM": {
       return fetchMofcomTsfSeries(symbol, range)

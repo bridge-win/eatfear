@@ -216,13 +216,14 @@ export const EASTMONEY_REPORTS = {
   },
   DEPOSIT_RESERVE: {
     endpoint: "v1",
+    // Two pages of history; TRADE_DATE comes back as 2025年05月15日 (see parseRowDate).
     reportName: "RPT_ECONOMY_DEPOSIT_RESERVE",
     columns:
       "REPORT_DATE,PUBLISH_DATE,TRADE_DATE,INTEREST_RATE_BB,INTEREST_RATE_BA,CHANGE_RATE_B,INTEREST_RATE_SB,INTEREST_RATE_SA,CHANGE_RATE_S,NEXT_SH_RATE,NEXT_SZ_RATE,REMARK",
     dateField: "TRADE_DATE",
     sortColumns: "PUBLISH_DATE,TRADE_DATE",
     pageSize: 2000,
-    paginate: false,
+    paginate: true,
   },
   LPR: {
     endpoint: "v1",
@@ -304,9 +305,18 @@ function buildPageUrl(spec: EastmoneyReportSpec, page: number): string {
   return `${V1_BASE}?${params.toString()}`
 }
 
+/**
+ * Most reports date rows as `2025-05-15 00:00:00`, but a few (RRR's TRADE_DATE)
+ * use `2025年05月15日`. Accepting only the ISO shape silently dropped every row
+ * of those reports and produced an empty series, so handle both.
+ */
 function parseRowDate(raw: unknown): { timestamp: number; date: string } | null {
-  if (typeof raw !== "string" || raw.length < 10) return null
-  const date = raw.slice(0, 10)
+  if (typeof raw !== "string") return null
+  const chinese = /^(\d{4})年(\d{1,2})月(\d{1,2})日/.exec(raw)
+  const date = chinese
+    ? `${chinese[1]}-${chinese[2].padStart(2, "0")}-${chinese[3].padStart(2, "0")}`
+    : raw.slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
   const timestamp = new Date(`${date}T00:00:00Z`).getTime()
   return Number.isFinite(timestamp) ? { timestamp, date } : null
 }

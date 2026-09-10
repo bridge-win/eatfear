@@ -37,7 +37,7 @@ export const MACRO_PRIORITY_CATEGORIES: readonly MacroPriorityCategory[] = [
   {
     rank: 1,
     label: "1 利率 / 央行政策",
-    symbols: ["FRED:DFF", "FRED:DGS2", "FRED:DGS3MO", "FRED:T10Y2Y", "FRED:T10Y3M", "SNAP:PBOC_OMO_7D", "SNAP:PBOC_MLF_1Y", "EM:CN_LPR_1Y", "EM:CN_LPR_5Y"],
+    symbols: ["FRED:DFF", "FRED:DGS2", "FRED:DGS3MO", "FRED:T10Y2Y", "FRED:T10Y3M", "SNAP:PBOC_OMO_7D", "SNAP:PBOC_MLF_1Y", "EM:CN_LPR_1Y", "EM:CN_LPR_5Y", "EM:CN_RRR_LARGE", "EM:CN_RRR_SMALL"],
     meaning: "Fed funds and short-end Treasury rates show the policy-rate anchor and market-implied easing/tightening path.",
     impact: "Rates up usually compress valuations and liquidity; rates down usually support duration assets and equities.",
     sourceNote: "FRED for U.S. policy-rate proxies; China 7D reverse-repo (policy rate) and 1Y MLF step history from PBoC announcements (snapshot), LPR 1Y/5Y and RRR via Eastmoney datacenter.",
@@ -127,10 +127,10 @@ export const MACRO_PRIORITY_CATEGORIES: readonly MacroPriorityCategory[] = [
   {
     rank: 8,
     label: "8 汇率",
-    symbols: ["DX-Y.NYB", "CNY=X", "USDCNH=X", "SNAP:CFETS_INDEX", "SNAP:CFETS_BIS_BASKET", "SNAP:CFETS_SDR_BASKET", "FRED:DEXCHUS", "EURCNY=X", "CNYJPY=X", "EURUSD=X", "USDJPY=X", "GBPUSD=X", "AUDUSD=X", "USDKRW=X"],
+    symbols: ["DX-Y.NYB", "CNY=X", "USDCNH=X", "CFETS:CFETS", "CFETS:BIS", "CFETS:SDR", "FRED:DEXCHUS", "EURCNY=X", "CNYJPY=X", "EURUSD=X", "USDJPY=X", "GBPUSD=X", "AUDUSD=X", "USDKRW=X"],
     meaning: "DXY and key crosses show dollar liquidity, carry pressure and capital-flow stress.",
     impact: "A stronger USD usually pressures commodities, EM and Hong Kong/China risk assets; weaker USD helps.",
-    sourceNote: "Yahoo Finance FX chart data plus FRED H.10 fixing; CFETS / BIS / SDR basket RMB indices are a hand-refreshed snapshot of CFETS weekly releases (see lib/data/china-manual-snapshot.json).",
+    sourceNote: "Yahoo Finance FX chart data plus FRED H.10 fixing; CFETS / BIS / SDR basket RMB indices come from 中国外汇交易中心 directly (weekly, published Friday).",
   },
   {
     rank: 9,
@@ -2423,6 +2423,30 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
     audience: ["宏观", "中国"],
     description: "城镇调查失业率年末值（统计公报口径）。月度值需 NBS 月报；此处为年度锚点。",
   },
+  {
+    symbol: "EM:CN_RRR_LARGE",
+    providerSymbol: "EM:DEPOSIT_RESERVE:INTEREST_RATE_BA",
+    source: "Eastmoney",
+    name: "China RRR, Large Banks (大型机构存款准备金率)",
+    group: "Liquidity",
+    unit: "percent",
+    priority: 9.1,
+    frequency: "Event",
+    audience: ["宏观", "中国"],
+    description: "大型金融机构存款准备金率（调整后）。降准直接释放长期资金，是比降息更「数量型」的宽松工具；从 2011 年的 21.5% 一路降到今天，反映外汇占款投放退潮后货币投放方式的转变。",
+  },
+  {
+    symbol: "EM:CN_RRR_SMALL",
+    providerSymbol: "EM:DEPOSIT_RESERVE:INTEREST_RATE_SA",
+    source: "Eastmoney",
+    name: "China RRR, Small Banks (中小机构存款准备金率)",
+    group: "Liquidity",
+    unit: "percent",
+    priority: 9.11,
+    frequency: "Event",
+    audience: ["宏观", "中国"],
+    description: "中小型金融机构存款准备金率（调整后）。定向降准时与大型机构分化，反映对小微与县域信贷的倾斜。",
+  },
   // --- 社融 (PBoC via 商务部数据中心) ---
   {
     symbol: "MOFCOM:TSF_TOTAL",
@@ -2627,38 +2651,38 @@ const BASE_MACRO_INDICATORS: MacroIndicatorMeta[] = [
   },
   // --- CFETS 人民币汇率指数 (manual snapshot; weekly release Friday) ---
   {
-    symbol: "SNAP:CFETS_INDEX",
-    providerSymbol: "CN:cfets:cfets",
-    source: "NBS/PBoC/BIS Snapshot",
+    symbol: "CFETS:CFETS",
+    providerSymbol: "CFETS:cfets",
+    source: "CFETS",
     name: "CFETS RMB Index (CFETS人民币汇率指数)",
     group: "FX",
     unit: "index",
     priority: 8.45,
-    frequency: "Weekly (sparse snapshot)",
+    frequency: "Weekly (Friday)",
     audience: ["FX", "宏观", "中国", "人民币"],
     description: "人民币对 24 种货币的贸易加权指数（2014-12-31=100）。'参考一篮子'调节的直接标的：指数稳而美元/人民币在动，说明只是美元自己在动；指数与美元/人民币同向，才是人民币真正的强弱。",
   },
   {
-    symbol: "SNAP:CFETS_BIS_BASKET",
-    providerSymbol: "CN:cfets:bis_basket",
-    source: "NBS/PBoC/BIS Snapshot",
+    symbol: "CFETS:BIS",
+    providerSymbol: "CFETS:bis",
+    source: "CFETS",
     name: "RMB Index vs BIS Basket (BIS篮子人民币指数)",
     group: "FX",
     unit: "index",
     priority: 8.46,
-    frequency: "Weekly (sparse snapshot)",
+    frequency: "Weekly (Friday)",
     audience: ["FX", "宏观", "中国"],
     description: "参考 BIS 货币篮子权重计算的人民币指数（2014-12-31=100）。",
   },
   {
-    symbol: "SNAP:CFETS_SDR_BASKET",
-    providerSymbol: "CN:cfets:sdr_basket",
-    source: "NBS/PBoC/BIS Snapshot",
+    symbol: "CFETS:SDR",
+    providerSymbol: "CFETS:sdr",
+    source: "CFETS",
     name: "RMB Index vs SDR Basket (SDR篮子人民币指数)",
     group: "FX",
     unit: "index",
     priority: 8.47,
-    frequency: "Weekly (sparse snapshot)",
+    frequency: "Weekly (Friday)",
     audience: ["FX", "宏观", "中国"],
     description: "参考 SDR 篮子（美元/欧元/日元/英镑）权重计算的人民币指数（2014-12-31=100）。",
   },
@@ -2997,12 +3021,6 @@ export interface SkippedIndicator {
 
 export const SKIPPED_INDICATORS: readonly SkippedIndicator[] = [
   {
-    name: "存款准备金率 RRR",
-    reason:
-      "Eastmoney RPT_ECONOMY_DEPOSIT_RESERVE 实测返回空（端点参数或报表名已变）。政策利率已由 7 天逆回购 + LPR 覆盖；恢复前不上线，避免空卡片。",
-    url: "https://data.eastmoney.com/cjsj/ckzbj.html",
-  },
-  {
     name: "FDI 实际使用外资",
     reason: "Eastmoney RPT_ECONOMY_FDI 实测最后一期为 2023-05 后停更，展示会把三年前的值当成最新值。",
     url: "https://data.eastmoney.com/cjsj/fdi.html",
@@ -3024,12 +3042,6 @@ export const SKIPPED_INDICATORS: readonly SkippedIndicator[] = [
     reason:
       "商务部镜像不含政府债券列与存量口径；委托贷款、外币贷款两列实测为空。总量与人民币贷款、企业债券、股票融资、信托贷款、未贴现票据五个分项已接入并与公布总量结构自洽。",
     url: "http://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html",
-  },
-  {
-    name: "CFETS 人民币汇率指数 逐周完整历史 / 每日中间价",
-    reason:
-      "chinamoney.com.cn 历史页由前端 JS 拉取且有反爬；快照只收录能核到公开报道的周度点位（2024-06 起）。每日中间价可用 FRED DEXCHUS 与 Yahoo CNY=X 替代。",
-    url: "https://www.chinamoney.com.cn/chinese/bkrmbidx/",
   },
   {
     name: "MLF 操作量 / 余额、买断式逆回购余额",

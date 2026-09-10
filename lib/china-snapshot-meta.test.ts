@@ -11,7 +11,7 @@ test("snapshot date literals match the snapshot files", () => {
 })
 
 test("manual snapshot observations are sorted, finite and sourced", () => {
-  const groups = [manual.safe, manual.cfets, manual.rates] as Record<string, unknown>[]
+  const groups = [manual.safe, manual.rates] as Record<string, unknown>[]
   for (const group of groups) {
     for (const [key, rawSeries] of Object.entries(group)) {
       const series = rawSeries as {

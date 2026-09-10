@@ -37,7 +37,6 @@ interface ManualSnapshotFile {
   asOf: string
   origin: string
   safe: Record<string, SnapshotSeries>
-  cfets: Record<string, SnapshotSeries>
   rates: Record<string, SnapshotSeries>
 }
 
@@ -59,7 +58,7 @@ export const CHINA_SNAPSHOT_LAST_FULL_YEAR = SNAPSHOT.lastFullYear
 /**
  * Provider symbol format:
  *   `CN:annual:<key>` | `CN:mortgage_rate` | `CN:hpi:<CC>`          (house-derived official snapshot)
- *   `CN:safe:<key>`   | `CN:cfets:<key>`   | `CN:rates:<key>`       (manual snapshot: SAFE 结售汇, CFETS 指数, 政策利率)
+ *   `CN:safe:<key>`   | `CN:rates:<key>`                        (manual snapshot: SAFE 结售汇, 政策利率)
  */
 export function resolveSnapshotSeries(providerSymbol: string): SnapshotSeries | null {
   const parts = providerSymbol.split(":")
@@ -68,7 +67,6 @@ export function resolveSnapshotSeries(providerSymbol: string): SnapshotSeries | 
   if (parts[1] === "mortgage_rate") return SNAPSHOT.mortgage_rate
   if (parts[1] === "hpi" && parts[2]) return SNAPSHOT.hpi[parts[2]] ?? null
   if (parts[1] === "safe" && parts[2]) return MANUAL.safe[parts[2]] ?? null
-  if (parts[1] === "cfets" && parts[2]) return MANUAL.cfets[parts[2]] ?? null
   if (parts[1] === "rates" && parts[2]) return MANUAL.rates[parts[2]] ?? null
   return null
 }

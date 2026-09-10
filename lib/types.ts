@@ -85,6 +85,7 @@ export type MacroDataSource =
   | "FRED"
   | "Eastmoney"
   | "MOFCOM"
+  | "CFETS"
   | "NBS/PBoC/BIS Snapshot"
 
 export interface MacroIndicator {

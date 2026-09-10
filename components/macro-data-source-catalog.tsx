@@ -41,6 +41,13 @@ const SOURCE_ROWS: readonly SourceRow[] = [
     homepage: "https://data.eastmoney.com/cjsj/",
   },
   {
+    source: "CFETS",
+    label: { zh: "中国外汇交易中心（人民币汇率指数）", en: "CFETS (RMB exchange-rate indices)" },
+    cadence: { zh: "每周五发布 CFETS / BIS / SDR 三个篮子", en: "Weekly on Friday: CFETS / BIS / SDR baskets" },
+    access: { zh: "免费，无 key", en: "Free, no key" },
+    homepage: "https://www.chinamoney.com.cn/chinese/bkrmbidx/",
+  },
+  {
     source: "MOFCOM",
     label: { zh: "商务部数据中心（央行社融表镜像）", en: "MOFCOM data center (mirror of the PBoC TSF table)" },
     cadence: { zh: "月度，央行发布后同步；社融增量及 7 个分项", en: "Monthly, follows the PBoC release; TSF flow and 7 components" },
