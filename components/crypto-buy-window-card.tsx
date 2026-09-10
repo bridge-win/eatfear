@@ -1,5 +1,6 @@
 "use client"
 
+import { EvidenceBadge } from "@/components/research-evidence-badge"
 import { useMemo } from "react"
 import { Bitcoin, ShieldAlert } from "lucide-react"
 
@@ -206,6 +207,7 @@ export function CryptoBuyWindowCard({ className }: { className?: string }) {
               {locale === "zh" ? "综合分" : "Score"}: {payload.compositeScore}
             </span>
           )}
+          <EvidenceBadge signalIds={["valuation", "fearGreed", "meanReversion"]} />
           <InfoTooltip description={tooltipContent} />
         </div>
       </div>

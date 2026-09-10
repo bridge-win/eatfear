@@ -1,5 +1,6 @@
 "use client"
 
+import { EvidenceBadge } from "@/components/research-evidence-badge"
 import { useMemo } from "react"
 import { AlertTriangle, Flame, Sparkles, TrendingUp } from "lucide-react"
 
@@ -306,6 +307,7 @@ export function BlackSwanOpportunityCard({
             ? t("blackSwan.aria.value", { ccy, value: Math.round(payload.summary.opportunityScore) })
             : t("blackSwan.aria.idle", { ccy })
       }
+      evidence={<EvidenceBadge signalIds={["capitulation", "volumeSpike", "fearGreed"]} />}
       infoAriaLabel={t("blackSwan.hover.aria")}
       infoContent={<HoverContents payload={payload} loading={loading && !payload} error={error} updatedHint={updatedHint} />}
     />

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import { FactorMap } from "@/components/factor-map"
 import { ForecastDetail } from "@/components/forecast-detail"
+import { LiveBacktestPanel } from "@/components/live-backtest-panel"
 
 import { DashboardFrame } from "@/components/page-frame"
 import { Badge } from "@/components/ui/badge"
@@ -168,7 +169,7 @@ function CombosPanel() {
   )
 }
 
-const TABS = ["strategies", "combos", "forecast", "factors", "method"] as const
+const TABS = ["strategies", "combos", "live", "forecast", "factors", "method"] as const
 type Tab = (typeof TABS)[number]
 
 export function ResearchWorkbench() {
@@ -193,10 +194,14 @@ export function ResearchWorkbench() {
         <TabsList>
           <TabsTrigger value="strategies">策略证据库</TabsTrigger>
           <TabsTrigger value="combos">组合研究</TabsTrigger>
+          <TabsTrigger value="live">在线回测</TabsTrigger>
           <TabsTrigger value="forecast">未来区间与检验</TabsTrigger>
           <TabsTrigger value="factors">价格传导图谱</TabsTrigger>
           <TabsTrigger value="method">方法与边界</TabsTrigger>
         </TabsList>
+        <TabsContent value="live" className="mt-4">
+          <LiveBacktestPanel />
+        </TabsContent>
         <TabsContent value="forecast" className="mt-4">
           <ForecastDetail />
         </TabsContent>

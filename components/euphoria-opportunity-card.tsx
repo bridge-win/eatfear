@@ -1,5 +1,6 @@
 "use client"
 
+import { EvidenceBadge } from "@/components/research-evidence-badge"
 import { AlertTriangle, Flame, Sparkles } from "lucide-react"
 
 import { ScoreIndexCard } from "@/components/score-index-card"
@@ -188,6 +189,7 @@ export function EuphoriaOpportunityCard({
       signal={swr.error ? "Overheat score unavailable" : signal}
       toneClassName={payload ? bandStyles(payload.summary.band) : "text-muted-foreground"}
       valueAriaLabel={`${ccy} euphoria risk score`}
+      evidence={<EvidenceBadge signalIds={["fearGreed", "sentiment", "volumeSpike"]} />}
       infoAriaLabel="Explain euphoria risk score"
       infoContent={<HoverContents payload={payload} loading={swr.isLoading} error={swr.error ? String(swr.error.message ?? swr.error) : null} />}
       className={className}

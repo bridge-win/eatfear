@@ -1,5 +1,6 @@
 "use client"
 
+import { EvidenceBadge } from "@/components/research-evidence-badge"
 import { useMemo } from "react"
 
 import { ScoreIndexCard } from "@/components/score-index-card"
@@ -271,6 +272,7 @@ export function CryptoRegimeScoreCard({
       signal={signal}
       toneClassName={toneClass}
       valueAriaLabel={valueAriaLabel}
+      evidence={<EvidenceBadge signalIds={["regime", "volume", "trend"]} />}
       infoAriaLabel={t("regime.hover.aria")}
       infoContent={<RegimeInfoHover loading={loading && !payload} error={error} payload={payload} updatedHint={updatedHint} />}
     />

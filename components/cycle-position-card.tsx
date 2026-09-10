@@ -1,5 +1,6 @@
 "use client"
 
+import { EvidenceBadge } from "@/components/research-evidence-badge"
 import { useMemo } from "react"
 import { Info } from "lucide-react"
 
@@ -278,6 +279,7 @@ export function CyclePositionCard({ className }: { className?: string }) {
         <p className="min-w-0 truncate text-xs font-semibold text-foreground">
           {locale === "zh" ? "周期位置" : "Cycle Position"}
         </p>
+        <EvidenceBadge signalIds={["cyclePosition", "valuation"]} className="shrink-0" />
         <HoverCard openDelay={120} closeDelay={180}>
           <HoverCardTrigger asChild>
             <button

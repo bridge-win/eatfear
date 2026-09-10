@@ -31,6 +31,7 @@ const routeLoaders: Record<string, ModuleLoader> = {
   "crypto/regime-score": () => import("@/lib/api-routes/crypto/regime-score/route").then((module) => module as RouteModule),
   "crypto/signal-backtest": () => import("@/lib/api-routes/crypto/signal-backtest/route").then((module) => module as RouteModule),
   "crypto/forecast": () => import("@/lib/api-routes/crypto/forecast/route").then((module) => module as RouteModule),
+  "crypto/research-backtest": () => import("@/lib/api-routes/crypto/research-backtest/route").then((module) => module as RouteModule),
   "crypto/smart-money": () => import("@/lib/api-routes/crypto/smart-money/route").then((module) => module as RouteModule),
   "crypto/smart-money/discovery": () => import("@/lib/api-routes/crypto/smart-money/discovery/route").then((module) => module as RouteModule),
   "crypto/smart-money/feed": () => import("@/lib/api-routes/crypto/smart-money/feed/route").then((module) => module as RouteModule),

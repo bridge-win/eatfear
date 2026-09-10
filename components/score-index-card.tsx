@@ -23,6 +23,8 @@ export interface ScoreIndexCardProps {
   infoAriaLabel?: string
   /** Content rendered inside the info-icon hover panel */
   infoContent: ReactNode
+  /** Historical track record for the signal this card shows; rendered under the signal line. */
+  evidence?: ReactNode
   className?: string
 }
 
@@ -39,6 +41,7 @@ export function ScoreIndexCard({
   valueAriaLabel,
   infoAriaLabel,
   infoContent,
+  evidence,
   className,
 }: ScoreIndexCardProps) {
   return (
@@ -92,6 +95,8 @@ export function ScoreIndexCard({
           {signal}
         </p>
       )}
+
+      {evidence && <div className="mt-1">{evidence}</div>}
     </div>
   )
 }
