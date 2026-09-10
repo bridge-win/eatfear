@@ -569,7 +569,11 @@ export function AlignedHistoryCompare({
     }
 
     setRenderedPaneCount((previous) => {
-      const next = Math.min(Math.max(INITIAL_RENDERED_PANES, Number.isFinite(panesPerPage) ? panesPerPage : 20), groups.length)
+      // "全部" means every pane is mounted now; a page-sized selection still mounts
+      // its first pane and grows on scroll.
+      const next = Number.isFinite(panesPerPage)
+        ? Math.min(Math.max(INITIAL_RENDERED_PANES, panesPerPage), groups.length)
+        : groups.length
       return previous === next ? previous : next
     })
   }, [groups, panesPerPage])
