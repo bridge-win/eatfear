@@ -61,7 +61,7 @@ jobs:
                 }
               }
               // One annotation per candidate: a single combined message hits
-              // GitHub's length cap and silently drops the later probes.
+              // the GitHub length cap and silently drops the later probes.
               for (let index = 0; index < lines.length; index += 2) {
                 const message = `${lines[index]} ${lines[index + 1] ?? ""}`.slice(0, 900).replace(/%/g, "%25");
                 console.log(`::notice title=recon-${index / 2}::${message}`);
