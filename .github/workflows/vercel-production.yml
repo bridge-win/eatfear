@@ -99,11 +99,13 @@ jobs:
             if [ -n "$failed_url" ]; then
               # `vercel inspect --logs` only reports status, so read the build
               # events straight from the REST API.
-              dep_id="$(
-                curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
-                  "https://api.vercel.com/v13/deployments/${failed_url#https://}?teamId=$VERCEL_ORG_ID" \
-                  | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{const j=JSON.parse(d);console.log(j.id??"")}catch{console.log("")}})'
-              )"
+              curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
+                "https://api.vercel.com/v13/deployments/${failed_url#https://}?teamId=$VERCEL_ORG_ID" \
+                > vercel-dep.json 2>&1 || true
+              head -c 3000 vercel-dep.json \
+                | sed "s/${VERCEL_TOKEN}/[redacted]/g" \
+                | python3 -c 'import sys; print("::error title=vercel-dep-json::" + sys.stdin.read().replace("%","%25").replace("\r","").replace("\n","%0A"))'
+              dep_id="$(node -e 'const j=JSON.parse(require("node:fs").readFileSync("vercel-dep.json","utf8"));console.log(j.id??"")' 2>/dev/null || true)"
               if [ -n "$dep_id" ]; then
                 curl -sS -H "Authorization: Bearer $VERCEL_TOKEN" \
                   "https://api.vercel.com/v3/deployments/$dep_id/events?builds=1&limit=400&teamId=$VERCEL_ORG_ID" \
