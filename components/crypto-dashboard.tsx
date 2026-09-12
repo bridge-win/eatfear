@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 
 import { BlackSwanOpportunityCard } from "@/components/black-swan-opportunity-card"
 import { CryptoBuyWindowCard } from "@/components/crypto-buy-window-card"
+import { CryptoTradePlanPanel } from "@/components/crypto-trade-plan-panel"
 import { CryptoForecastCard } from "@/components/crypto-forecast-card"
 import { PanicWindowBanner } from "@/components/panic-window-banner"
 import { SmartMoneyTracker } from "@/components/smart-money-tracker"
@@ -112,7 +113,7 @@ function formatSignalScore(value: number | null | undefined): string {
 function QuantSignalRail({ ccy, signals }: { ccy: string; signals?: CryptoQuantSignals }) {
   const t = useT()
   return (
-    <section className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-5">
+    <section className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 xl:grid-cols-5">
       {QUANT_SIGNAL_KEYS.map((item) => {
         const value = signals?.[item.key] ?? null
         const danger = item.key === "cascadeScore" && signals?.cascadeInProgress
@@ -122,7 +123,7 @@ function QuantSignalRail({ ccy, signals }: { ccy: string; signals?: CryptoQuantS
             className="min-w-0 rounded-md border bg-background/70 px-2.5 py-2"
           >
             <div className="flex min-w-0 items-center justify-between gap-2">
-              <span className="truncate text-[11px] font-medium text-muted-foreground">
+              <span className="truncate text-xs font-medium text-muted-foreground">
                 {t(item.labelKey, { ccy })}
               </span>
               {danger && (
@@ -131,7 +132,7 @@ function QuantSignalRail({ ccy, signals }: { ccy: string; signals?: CryptoQuantS
                 </span>
               )}
             </div>
-            <div className="mt-1 text-xl font-semibold tabular-nums tracking-normal">
+            <div className="mt-0.5 text-base font-semibold tabular-nums tracking-normal">
               {formatSignalScore(value)}
             </div>
           </div>
@@ -328,15 +329,15 @@ export function CryptoDashboard({
   )
 
   return (
-    <DashboardFrame>
-      <header className="flex flex-wrap items-start justify-between gap-2 xl:flex-nowrap">
+    <DashboardFrame contentClassName="space-y-2" mainClassName="px-3 py-2 sm:px-4">
+      <header className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">{t("crypto.title")}</h1>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <h1 className="text-lg font-bold tracking-tight">{t("crypto.title")}</h1>
+          <p className="sr-only">
             {t("crypto.subtitle", { source: "OKX" })}
           </p>
         </div>
-        <div className="flex w-full max-w-full flex-wrap items-center justify-end gap-1.5 lg:w-auto xl:flex-nowrap">
+        <div className="flex w-full max-w-full flex-wrap items-center justify-start gap-1.5 lg:w-auto lg:justify-end">
           <SymbolSelector
             value={instId}
             options={symbolOptions}
@@ -362,37 +363,22 @@ export function CryptoDashboard({
         </div>
       </header>
 
+      <CryptoTradePlanPanel ccy={instId.split("-")[0] ?? "BTC"} />
+
       {canHydrateDashboard && <PanicWindowBanner />}
 
       {canHydrateDashboard && (
-        <div className="grid items-start gap-2 sm:grid-cols-2 xl:grid-cols-12">
-          <BlackSwanOpportunityCard instId={instId} className="min-w-0 xl:col-span-2" />
-          <EuphoriaOpportunityCard instId={instId} className="min-w-0 xl:col-span-2" />
-          <CryptoRegimeScoreCard instId={instId} className="min-w-0 xl:col-span-2" />
-          <CyclePositionCard className="min-w-0 xl:col-span-3" />
-          <CryptoBuyWindowCard className="min-w-0 xl:col-span-3" />
-          <CryptoForecastCard instId={instId} className="min-w-0 sm:col-span-2 xl:col-span-4" />
+        <div className="grid grid-cols-2 items-stretch gap-2 sm:grid-cols-3 xl:grid-cols-6">
+          <BlackSwanOpportunityCard instId={instId} className="min-w-0" />
+          <EuphoriaOpportunityCard instId={instId} className="min-w-0" />
+          <CryptoRegimeScoreCard instId={instId} className="min-w-0" />
+          <CyclePositionCard className="min-w-0" />
+          <CryptoBuyWindowCard className="min-w-0" />
+          <CryptoForecastCard instId={instId} className="min-w-0" />
         </div>
       )}
 
-      {canHydrateDashboard && optionsCurrency && <OptionsMaxPainCard currency={optionsCurrency} />}
-
-      {canHydrateDashboard && (
-        <MarketManipulationMonitor currency={instId.split("-")[0] ?? "BTC"} />
-      )}
-
       <QuantSignalRail ccy={instId.split("-")[0] ?? "BTC"} signals={cryptoHistory.payload?.signals} />
-
-      <OpportunityRadar
-        assetClass="crypto"
-        title={{ zh: "交易机会雷达", en: "Trading Opportunity Radar" }}
-        subtitle={{
-          zh: "把趋势、流动性、衍生品拥挤、恐慌反转和宏观确认合成可解释机会卡。",
-          en: "Synthesizes trend, liquidity, derivatives crowding, panic reversals, and macro confirmation into explainable setups.",
-        }}
-        opportunities={opportunities}
-        loading={cryptoHistory.loading}
-      />
 
       <Tabs
         value={tab}
@@ -434,6 +420,29 @@ export function CryptoDashboard({
           />
         </TabsContent>
       </Tabs>
+
+      <details className="rounded-lg border bg-card p-3">
+        <summary className="cursor-pointer text-sm font-medium">{t("crypto.tab.realtime")} · Options / Flow / Radar</summary>
+        <div className="mt-3 space-y-3">
+          {canHydrateDashboard && optionsCurrency && <OptionsMaxPainCard currency={optionsCurrency} />}
+
+          {canHydrateDashboard && (
+            <MarketManipulationMonitor currency={instId.split("-")[0] ?? "BTC"} />
+          )}
+
+          <OpportunityRadar
+            assetClass="crypto"
+            title={{ zh: "交易机会雷达", en: "Trading Opportunity Radar" }}
+            subtitle={{
+              zh: "把趋势、流动性、衍生品拥挤、恐慌反转和宏观确认合成可解释机会卡。",
+              en: "Synthesizes trend, liquidity, derivatives crowding, panic reversals, and macro confirmation into explainable setups.",
+            }}
+            opportunities={opportunities}
+            loading={cryptoHistory.loading}
+          />
+
+        </div>
+      </details>
     </DashboardFrame>
   )
 }

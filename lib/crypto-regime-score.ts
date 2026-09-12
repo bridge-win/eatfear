@@ -24,6 +24,7 @@ export interface RegimeFactorPayload {
 
 export interface RegimeScoreComputation {
   total: number
+  coverage: number
   rawWeighted: number
   signalBand: RegimeSignalBand
   signalLabelZh: string
@@ -63,8 +64,8 @@ export interface RawRegimeMetrics {
 }
 
 function signalFromTotal(total: number): { band: RegimeSignalBand; labelZh: string } {
-  if (total >= 75) return { band: "strong_bull", labelZh: "强多 · 可顺势加仓" }
-  if (total >= 60) return { band: "bull", labelZh: "偏多 · 回调买入" }
+  if (total >= 75) return { band: "strong_bull", labelZh: "强多背景 · 等待价格确认" }
+  if (total >= 60) return { band: "bull", labelZh: "偏多背景 · 等待价格确认" }
   if (total >= 45) return { band: "neutral", labelZh: "中性 · 观望" }
   if (total >= 30) return { band: "bear", labelZh: "偏空 · 降低仓位" }
   return { band: "strong_bear", labelZh: "强空 · 防守或等极端反转" }
@@ -78,7 +79,7 @@ function blendWeighted(entries: Array<{ score: number; weight: number }>): numbe
     num += e.score * e.weight
     den += e.weight
   }
-  if (den <= 0) return 48
+  if (den <= 0) return 50
   return clamp(num / den, 0, 100)
 }
 
@@ -147,8 +148,8 @@ function scoreLeverage(m: RawRegimeMetrics): RegimeFactorPayload {
 
   let fundingScore = 50
   if (absFunding !== null) {
-    fundingScore = linInv100(absFunding, 0.02, 0.22)
-    lines.push(`OKX ${asset} 永续 |费率| ${absFunding.toFixed(3)}%/期${absFunding > 0.15 ? " · 偏极端" : ""}`)
+    fundingScore = 50 - clamp((m.fundingRatePct ?? 0) / 0.05, -1, 1) * 25
+    lines.push(`OKX ${asset} 永续 有符号费率 ${(m.fundingRatePct ?? 0).toFixed(3)}%/期${absFunding > 0.15 ? " · 偏极端" : ""}`)
   } else lines.push("资金费率：数据暂缺")
 
   let oiMom = 0
@@ -160,10 +161,8 @@ function scoreLeverage(m: RawRegimeMetrics): RegimeFactorPayload {
 
   let oiScore = 50
   if (m.oiUsdSeries.length >= 2) {
-    if (oiMom >= -5 && oiMom <= 12) oiScore = linTo100(oiMom, -5, 12)
-    else if (oiMom > 12 && oiMom <= 22) oiScore = 85 - (oiMom - 12) * 2
-    else if (oiMom > 22) oiScore = clamp(65 - (oiMom - 22) * 1.5, 15, 65)
-    else oiScore = linTo100(oiMom, -25, -5)
+    const priceDirection = Math.sign(m.priceChange24hPct ?? 0)
+    oiScore = 50 + priceDirection * clamp(oiMom / 12, -1, 1) * 20
     lines.push(`OKX OI(USD Rubik·1h) · 窗口 Δ ${oiMom >= 0 ? "+" : ""}${oiMom.toFixed(1)}%`)
   } else lines.push("OI 历史：暂缺")
 
@@ -259,7 +258,7 @@ function scoreMarketStructure(m: RawRegimeMetrics): RegimeFactorPayload {
 
   let volScore = 50
   if (m.volumeSpikeRatio !== null) {
-    volScore = linTo100(m.volumeSpikeRatio, 0.65, 1.85)
+    volScore = 50 + Math.sign(m.priceChange24hPct ?? 0) * clamp(m.volumeSpikeRatio - 1, 0, 1) * 50
     lines.push(`OKX ${asset} 永续 4H · 量比 ${m.volumeSpikeRatio.toFixed(2)}`)
   } else lines.push("量比：—")
 
@@ -341,15 +340,15 @@ export function computeRegimeScore(m: RawRegimeMetrics): RegimeScoreComputation 
   let total = rawWeighted
 
   if (absFunding > 0.12 && oiMom > 14) {
-    total -= 10
+    total = 50 + (total - 50) * 0.8
     penaltiesZh.push("资金费率偏极端且 OI 快速抬升 → 杠杆拥挤，总分降权")
   }
   if (absFunding > 0.2) {
-    total -= 6
+    total = 50 + (total - 50) * 0.88
     penaltiesZh.push("资金费率极端 → 轧空/踩踏风险升维")
   }
   if (oiMom > 28) {
-    total -= 5
+    total = 50 + (total - 50) * 0.9
     penaltiesZh.push("OI 飙涨过快 → 清算与波动风险")
   }
 
@@ -363,11 +362,21 @@ export function computeRegimeScore(m: RawRegimeMetrics): RegimeScoreComputation 
     boostsZh.push("DefiLlama 稳定币扩张 + CoinGlass ETF 周势能转正 → 提高趋势置信度")
   }
 
-  total = clamp(total, 0, 100)
-  const { band, labelZh } = signalFromTotal(total)
+  const available = (values: Array<number | null>) => values.filter((v) => v !== null && Number.isFinite(v)).length / values.length
+  const coverage = (
+    REGIME_WEIGHTS.capitalFlows * available([m.stablecoinPct7d, m.etfAvgDailyUsdLast5, m.exchangeStablePct7d]) +
+    REGIME_WEIGHTS.leverage * available([m.fundingRatePct, m.oiUsdSeries.length >= 2 ? 1 : null, m.longShortRatio]) +
+    REGIME_WEIGHTS.onchainCycle * available([m.priceVsSma200GapPct, m.athDistancePct, m.exchangeBtcPct7d, m.hashrateRatioTail]) +
+    REGIME_WEIGHTS.marketStructure * available([m.takerNetRecent, m.orderBookImbalancePct, m.volumeSpikeRatio, m.priceChange24hPct]) +
+    REGIME_WEIGHTS.options * available([m.dvolClose, m.optionPutCallRatio7d])
+  ) * 100
+  total = clamp(50 + (total - 50) * coverage / 100, 0, 100)
+  if (coverage < 60) penaltiesZh.push("可用数据不足60%，暂停方向性结论")
+  const { band, labelZh } = coverage < 60 ? { band: "neutral" as const, labelZh: "数据不足 · 观望" } : signalFromTotal(total)
 
   return {
     total,
+    coverage,
     rawWeighted: clamp(rawWeighted, 0, 100),
     signalBand: band,
     signalLabelZh: labelZh,

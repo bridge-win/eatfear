@@ -54,7 +54,7 @@ export async function fetchOkxDailyCandleRows({
   for (let page = 0; page < OKX_MAX_PAGES; page += 1) {
     const params = new URLSearchParams({
       instId,
-      bar: "1D",
+      bar: "1Dutc",
       limit: String(OKX_PAGE_LIMIT),
     })
     if (after) params.set("after", after)
@@ -92,6 +92,7 @@ export async function fetchOkxDailyCandles({
 }): Promise<OkxDailyCandle[]> {
   const rows = await fetchOkxDailyCandleRows({ instId, daysWanted, revalidateSeconds })
   return rows
+    .filter((row) => row[8] === "1")
     .map((row) => {
       const timestamp = Number(row[0])
       const open = Number(row[1])

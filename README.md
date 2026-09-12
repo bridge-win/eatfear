@@ -2,6 +2,10 @@
 
 A multi-asset intelligence platform for monitoring crypto and equity markets, detecting extreme panic conditions, and identifying historically attractive entry zones through quantitative signals.
 
+## BTC review, signals and validation
+
+The `/crypto` page now separates two-day, two-week and two-month spot plans. See [the review and operating plan](docs/btc-review-2026-09-12.md), [the frozen framework](docs/btc-signal-framework.md), and [the cost-aware validation](public/research/btc-plan-validation.json). The initial grouped-weight models did **not** pass validation. They are research observations, not validated buy instructions. Historical static evidence predates the corrected execution ledger and is marked for re-audit.
+
 ## Core Features
 
 ### Crypto Dashboard

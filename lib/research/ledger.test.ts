@@ -102,3 +102,16 @@ test("golden numbers: TS ledger reconciles with the Python research engine", asy
   })
   assert.ok(Math.abs(result.equity[result.equity.length - 1] - golden.expected.final) < 1e-9)
 })
+
+
+test("entry at an up-gap cannot earn the gap; existing holdings do earn exit gaps", () => {
+  const bars: Bar[] = [
+    { time: 0, open: 100, high: 100, low: 100, close: 100 },
+    { time: 1, open: 200, high: 220, low: 200, close: 220 },
+    { time: 2, open: 242, high: 300, low: 242, close: 300 },
+  ]
+  const result = runLedger(bars, [1, 0, 0], { fee: 0 })
+  assert.ok(Math.abs(result.equity[1] - 1.1) < 1e-12)
+  assert.ok(Math.abs(result.equity[2] - 1.21) < 1e-12)
+  assert.equal(result.fills[1].price, 242)
+})

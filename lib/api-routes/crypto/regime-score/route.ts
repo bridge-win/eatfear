@@ -68,7 +68,7 @@ const parseTwoCol = (rows: string[][]) =>
   rows
     .map((row) => ({ t: Number(row[0]), v: Number(row[1]) }))
     .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.v))
-    .reverse()
+    .sort((a, b) => a.t - b.t)
 
 interface CoinGeckoCoinLite {
   market_data?: {
@@ -187,9 +187,9 @@ export async function GET(request: Request) {
         : ((Number(ticker.last) - Number(ticker.open24h)) / Number(ticker.open24h)) * 100
       : null
 
-  const imb = bookMetrics(bookRows[0]).imbalance
+  const imb = bookRows.length ? bookMetrics(bookRows[0]).imbalance : Number.NaN
 
-  const oiSeries = parseTwoCol(oiVolRows).map((p) => p.v)
+  const oiSeries = parseTwoCol(oiVolRows).filter((p) => p.t >= Date.now() - 24 * 3_600_000).map((p) => p.v)
   let longShortRatio: number | null = null
   const lsParsed = parseTwoCol(lsRows)
   const lastLs = lsParsed[lsParsed.length - 1]
@@ -209,11 +209,12 @@ export async function GET(request: Request) {
       sumNet += row.buy - row.sell
       sumVol += row.buy + row.sell
     }
-    const denom = sumVol > 0 ? sumVol / tParsed.length : 0
+    const denom = sumVol
     takerNetRecent = denom > 0 ? sumNet / denom : sumNet === 0 ? 0 : null
   }
 
   const candles = klineRows
+    .filter((row) => row[8] === "1")
     .map((row) => ({ vol: Number(row[5]), close: Number(row[4]) }))
     .filter((c) => Number.isFinite(c.vol))
     .reverse()
@@ -287,6 +288,7 @@ export async function GET(request: Request) {
     refreshSuggestionSec: 60,
     summary: {
       total: Math.round(scored.total * 10) / 10,
+      coverage: Math.round(scored.coverage),
       rawWeighted: Math.round(scored.rawWeighted * 10) / 10,
       band: scored.signalBand,
       signalZh: scored.signalLabelZh,

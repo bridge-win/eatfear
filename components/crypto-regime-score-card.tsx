@@ -22,7 +22,7 @@ const MODEL_INFO_DESCRIPTION_ZH = [
   "④ 市场结构（15%）：OKX Taker、盘口失衡、4H 量比、24h 涨跌。",
   "⑤ 期权风险（15%）：Deribit DVOL + 期权 7 日 Put/Call。",
   "",
-  "关键规则：Funding 极端、OI 暴拉时扣分；稳定币扩张且 ETF 周势能显著为正时可小幅加分。分数带：75–100 强多 … 0–30 强空。",
+  "关键规则：Funding 保留正负号，OI 与价格方向结合；稳定币扩张且 ETF 周势能显著为正时可小幅加分。分数带：75–100 强多 … 0–30 强空。",
   "",
   "面板约每 60 秒刷新。不构成投资建议。",
 ].join("\n")
@@ -38,14 +38,14 @@ const MODEL_INFO_DESCRIPTION_EN = [
   "④ Market structure (15%): OKX Taker, book imbalance, 4H volume ratio, 24h change.",
   "⑤ Options risk (15%): Deribit DVOL + 7-day options Put/Call.",
   "",
-  "Rules: extreme funding / OI spikes deduct; expanding stablecoins with strong ETF weekly momentum can add slightly. Bands: 75–100 strong bull … 0–30 strong bear.",
+  "Rules: funding retains its sign; OI is interpreted with price direction; expanding stablecoins with strong ETF weekly momentum can add slightly. Bands: 75–100 strong bull … 0–30 strong bear.",
   "",
   "Panel refreshes ~60s. Not investment advice.",
 ].join("\n")
 
 const BAND_LABEL: Record<RegimeSignalBand, { zh: string; en: string }> = {
-  strong_bull: { zh: "强多 · 可顺势加仓", en: "Strong Bull · Trend-follow OK" },
-  bull: { zh: "偏多 · 回调买入", en: "Bull · Buy dips" },
+  strong_bull: { zh: "强多背景 · 等待确认", en: "Bullish context · confirm price" },
+  bull: { zh: "偏多背景 · 等待确认", en: "Bullish context · confirm price" },
   neutral: { zh: "中性 · 观望", en: "Neutral · Wait" },
   bear: { zh: "偏空 · 降低仓位", en: "Bear · Reduce risk" },
   strong_bear: { zh: "强空 · 防守或等极端反转", en: "Strong Bear · Defensive" },
@@ -53,6 +53,7 @@ const BAND_LABEL: Record<RegimeSignalBand, { zh: string; en: string }> = {
 
 interface RegimeSummary {
   total: number
+  coverage?: number
   rawWeighted: number
   band: RegimeSignalBand
   signalZh: string
@@ -248,7 +249,7 @@ export function CryptoRegimeScoreCard({
         ? t("regime.aria.value", { ccy, value: Math.round(payload.summary.total) })
         : t("regime.aria.idle", { ccy })
 
-  const valueText = loading && !payload ? "…" : error ? "—" : payload ? Math.round(payload.summary.total) : "—"
+  const valueText = loading && !payload ? "…" : error ? "—" : payload && (payload.summary.coverage ?? 100) >= 60 ? Math.round(payload.summary.total) : "—"
   const toneClass = error
     ? "text-muted-foreground"
     : payload
@@ -260,7 +261,7 @@ export function CryptoRegimeScoreCard({
     : error
       ? error
       : payload
-        ? BAND_LABEL[payload.summary.band][locale]
+        ? (payload.summary.coverage ?? 100) < 60 ? (locale === "zh" ? "数据不足 · 观望" : "Insufficient data · wait") : BAND_LABEL[payload.summary.band][locale]
         : null
 
   return (

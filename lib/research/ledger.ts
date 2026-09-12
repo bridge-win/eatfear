@@ -71,6 +71,8 @@ export function runLedger(bars: Bar[], targets: number[], config: LedgerConfig):
   const initial = config.initialEquity ?? 1
 
   let position = 0
+  let cash = initial
+  let units = 0
   let equity = initial
   let totalFees = 0
   let turnover = 0
@@ -85,35 +87,26 @@ export function runLedger(bars: Bar[], targets: number[], config: LedgerConfig):
     const bar = bars[i]
     const prevEquity = equity
 
-    // Fill first: the target decided on bar i-1 becomes effective at this bar's open.
-    // Position is exposure per unit of equity, so the traded notional is |delta| * equity
-    // and the fee is charged on that notional, not on the raw price.
     const desired = i === 0 ? 0 : targets[i - 1]
     const delta = desired - position
-    let feePaid = 0
     if (Math.abs(delta) > EPS) {
       const adverse = delta > 0 ? Math.max(0, bar.high - bar.open) : Math.max(0, bar.open - bar.low)
       const direction = delta > 0 ? 1 : -1
       const price = bar.open * (1 + direction * slip) + direction * wick * adverse
-      // Filling away from the open is an immediate loss on the notional just transacted.
-      const slippageCost = Math.abs(delta) * prevEquity * Math.abs(price / bar.open - 1)
-      feePaid = Math.abs(delta) * prevEquity * fee + slippageCost
-      totalFees += feePaid
+      const equityAtFill = cash + units * price
+      const rawQuantity = desired * equityAtFill / price - units
+      // Solve the post-commission target exposure; retain actual units between fills.
+      const quantity = rawQuantity / (1 + desired * fee * Math.sign(rawQuantity))
+      const commission = Math.abs(quantity) * price * fee
+      const cost = commission + Math.abs(quantity) * Math.abs(price - bar.open)
+      cash -= quantity * price + commission
+      units += quantity
+      totalFees += cost
       turnover += Math.abs(delta)
       position = desired
-      fills.push({
-        time: bar.time,
-        delta,
-        price,
-        fee: feePaid,
-        positionAfter: position,
-        cashAfter: prevEquity - feePaid,
-        equityAfter: prevEquity - feePaid,
-      })
+      fills.push({ time: bar.time, delta, price, fee: cost, positionAfter: position, cashAfter: cash, equityAfter: cash + units * bar.open })
     }
-
-    const priceReturn = i === 0 ? 0 : bar.close / bars[i - 1].close - 1
-    equity = i === 0 ? initial : (prevEquity - feePaid) * (1 + position * priceReturn)
+    equity = cash + units * bar.close
 
     times.push(bar.time)
     equitySeries.push(equity)
@@ -160,7 +153,7 @@ export function summarize(result: LedgerResult, barsPerYear = 365): PerformanceS
     const changed = i === result.exposure.length || Math.sign(cur) !== Math.sign(prev)
     if (Math.abs(prev) > EPS && start === -1) start = i - 1
     if (changed && start !== -1) {
-      segments.push(eq[Math.min(i, eq.length - 1)] / eq[start] - 1)
+      segments.push(eq[Math.min(i, eq.length - 1)] / eq[Math.max(0, start - 1)] - 1)
       start = Math.abs(cur) > EPS ? i : -1
     }
   }

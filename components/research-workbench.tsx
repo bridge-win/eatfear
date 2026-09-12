@@ -180,6 +180,7 @@ export function ResearchWorkbench() {
   }, [])
   return (
     <DashboardFrame>
+      <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">历史静态报告早于 2026-09-12 成交账本修正，当前仅供审计；请用实时回测重新核对。新三周期模型尚未通过有效性验证。</p>
       <div className="mb-4">
         <h1 className="text-xl font-semibold">研究工作台</h1>
         <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">

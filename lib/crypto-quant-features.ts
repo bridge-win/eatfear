@@ -166,8 +166,8 @@ function rollingRsi(candles: QuantCandle[], period: number): RawPoint[] {
       continue
     }
 
-    const rs = averageLoss === 0 ? 100 : averageGain / averageLoss
-    points.push({ timestamp: current.timestamp, value: 100 - 100 / (1 + rs) })
+    const rsi = averageGain === 0 && averageLoss === 0 ? 50 : averageLoss === 0 ? 100 : 100 - 100 / (1 + averageGain / averageLoss)
+    points.push({ timestamp: current.timestamp, value: rsi })
   }
 
   return points
@@ -788,12 +788,17 @@ export function computeCompositeSignals(input: {
     const previousLiq = valueAt(input.liquidationZScore, timestamp - DAY_MS / input.barsPerDay, staleMs)
     const liqNow = valueAt(input.liquidationZScore, timestamp, staleMs)
     const liqDecay = previousLiq !== null && liqNow !== null && previousLiq > liqNow ? Math.min(100, (previousLiq - liqNow) * 25) : 0
-    const cvdTurn = Math.min(100, Math.abs(valueAt(cvdSlope, timestamp, staleMs) ?? 0) / Math.max(candle.quoteVolume, 1) * 10_000)
+    const flowNow = valueAt(cvdSlope, timestamp, staleMs)
+    const flowBefore = valueAt(cvdSlope, timestamp - DAY_MS / input.barsPerDay, staleMs)
+    const returnDirection = Math.sign(input.quant.returns[index]?.value ?? 0)
+    const flowTurnsAgainstMove = flowNow !== null && flowBefore !== null && returnDirection !== 0 && (flowNow - flowBefore) * returnDirection < 0
+    const cvdTurn = flowTurnsAgainstMove ? Math.min(100, Math.abs(flowNow! - flowBefore!) / Math.max(Math.abs(flowBefore!), 1) * 100) : 0
     const wick = candle.close >= candle.open
       ? ((Math.min(candle.open, candle.close) - candle.low) / Math.max(candle.high - candle.low, Number.EPSILON)) * 100
       : ((candle.high - Math.max(candle.open, candle.close)) / Math.max(candle.high - candle.low, Number.EPSILON)) * 100
     const vwapReclaim = Math.abs(input.quant.vwapDistancePct[index]?.value ?? 0) < 0.4 ? 100 : 0
-    const exhaustion = clamp(cvdTurn * 0.3 + liqDecay * 0.25 + (100 - flow) * 0.2 + wick * 0.15 + vwapReclaim * 0.1, 0, 100)
+    const flowKnown = valueAt(volumeDeltaZ, timestamp, staleMs) !== null
+    const exhaustion = clamp(cvdTurn * 0.3 + liqDecay * 0.25 + (flowKnown ? 100 - flow : 0) * 0.2 + wick * 0.15 + vwapReclaim * 0.1, 0, 100)
 
     crowdingScore.push({ timestamp, value: crowding })
     extensionScore.push({ timestamp, value: extension })

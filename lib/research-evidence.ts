@@ -104,39 +104,13 @@ export interface EvidenceBadge {
   strategies: StrategyEvidence[]
 }
 
-/**
- * A signal's badge reports what happened out-of-sample, not what the signal says now.
- * "Survived" means it was not falsified by the three robustness checks — which is far
- * weaker than "works", since no strategy reached the DSR ≥ 0.95 bar.
- */
+// Imported static results must be reconciled again after the execution ledger correction.
 export function badgeForSignal(signalId: string): EvidenceBadge {
   const matches = evidenceForSignal(signalId)
   if (matches.length === 0) {
     return { tone: "none", label: "无回测记录", detail: "该信号未纳入样本外对照,不要据其单独下注。", strategies: [] }
   }
-  const best = matches.reduce((a, b) => (b.oos.sharpe > a.oos.sharpe ? b : a))
-  const survived = matches.filter((s) => s.verdict.length === 1 && s.verdict[0] === "未被证伪")
-  const window = `${evidence.windows.strategies.test[0]}→${evidence.windows.strategies.test[1]}`
-  if (survived.length > 0) {
-    const s = survived[0]
-    return {
-      tone: "survived",
-      label: "未被证伪",
-      detail: `${s.name} 样本外 ${pct(s.oos.total)}(${window}),三项稳健性检验未证伪。注意:未被证伪 ≠ 有效,全部策略的 Deflated Sharpe 均未达 0.95。`,
-      strategies: matches,
-    }
-  }
-  const tone: EvidenceTone = best.oos.sharpe <= 0 ? "negative" : "failed"
-  return {
-    tone,
-    label: tone === "negative" ? "样本外为负" : "未通过稳健性检验",
-    detail: `同类最好的是 ${best.name},样本外 ${pct(best.oos.total)}(${window}),判定:${best.verdict.join("、")}。`,
-    strategies: matches,
-  }
-}
-
-function pct(v: number): string {
-  return `${v > 0 ? "+" : ""}${(v * 100).toFixed(1)}%`
+  return { tone: "none", label: "旧回测待复核", detail: "这些历史结果早于2026-09-12成交账本修正；尚未用修正账本重新核对，不能验证当前信号。新三周期结果见交易计划。", strategies: matches }
 }
 
 export function formatPct(v: number | null | undefined, digits = 1): string {

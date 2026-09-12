@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { alignPastOnly } from "@/lib/causal-series"
 
 import { fetchFearGreedHistory } from "@/lib/data-sources/alternative"
 import {
@@ -306,21 +307,7 @@ function compactTimeline(timeline: number[]): number[] {
  * updates onto a daily grid; series with gaps after this pass are excluded.
  */
 function alignSeries(points: RawPoint[], timeline: number[], maxStaleMs: number): (number | null)[] {
-  if (points.length === 0) return timeline.map(() => null)
-  const sorted = [...points].sort((a, b) => a.timestamp - b.timestamp)
-  const out: (number | null)[] = []
-  let cursor = 0
-  let lastValue: number | null = null
-  let lastTime = -Infinity
-  for (const t of timeline) {
-    while (cursor < sorted.length && sorted[cursor].timestamp <= t + maxStaleMs / 2) {
-      lastValue = sorted[cursor].value
-      lastTime = sorted[cursor].timestamp
-      cursor++
-    }
-    out.push(lastValue !== null && t - lastTime <= maxStaleMs ? lastValue : null)
-  }
-  return out
+  return alignPastOnly(points, timeline, maxStaleMs)
 }
 
 function hasCompleteCoverage(values: (number | null)[]): boolean {
@@ -585,6 +572,7 @@ async function okxCandles(
 ): Promise<OkxCandlePoint[]> {
   const rows = await okxCandleRows(instId, daysWanted, bar, pointLimit, window)
   return rows
+    .filter((row) => row[8] === "1")
     .map((row) => {
       const timestamp = Number(row[0])
       const open = Number(row[1])

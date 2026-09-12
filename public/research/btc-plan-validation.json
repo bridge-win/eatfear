@@ -1,0 +1,513 @@
+{
+  "schema": "btc-horizons-v1",
+  "generatedAt": "2026-09-12T05:55:19.019Z",
+  "policy": {
+    "entryScore": 25,
+    "exitScore": -15,
+    "minimumCoverage": 70,
+    "riskFraction": 0.005,
+    "positionCap": 0.25,
+    "rewardRisk": 2.5,
+    "fee": 0.001,
+    "slippage": 0.0005
+  },
+  "mode": "spot_long_cash",
+  "selection": "Weights frozen before test; no holdout optimization. Retrospective evaluation is not prospective validation.",
+  "results": [
+    {
+      "horizon": "2d",
+      "source": {
+        "horizon": "2d",
+        "market": "Binance BTCUSDT spot",
+        "interval": "1h",
+        "requestedStart": 1772739979956,
+        "asOf": 1789191979956,
+        "count": 4569,
+        "first": 1772740800000,
+        "last": 1789185600000,
+        "sha256": "5c4bbf452ab10aa9c33848aeaa9daf3ac8bc3c8adcc6663da69c4aab98fe0751",
+        "urls": [
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1772739979956&endTime=1789191979956&limit=1000",
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1776340800000&endTime=1789191979956&limit=1000",
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1779940800000&endTime=1789191979956&limit=1000",
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1783540800000&endTime=1789191979956&limit=1000",
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1h&startTime=1787140800000&endTime=1789191979956&limit=1000"
+        ]
+      },
+      "window": {
+        "first": 1772740800000,
+        "holdoutStart": 1782608400000,
+        "lastClose": 1789189200000,
+        "bars": 4569,
+        "gaps": 0
+      },
+      "weights": {
+        "trend": 35,
+        "structure": 25,
+        "flow": 40
+      },
+      "standard": {
+        "netReturn": -0.02439578507176443,
+        "maxDrawdown": -0.03141292097238302,
+        "trades": 27,
+        "winRate": 0.25925925925925924,
+        "profitFactor": 0.4700415179312027,
+        "exposure": 0.1974835886214442,
+        "fees": 0.013312228343029383,
+        "exitReasons": {
+          "signal_exit": 16,
+          "stop": 8,
+          "target": 3
+        }
+      },
+      "doubleCost": {
+        "netReturn": -0.041536033580977794,
+        "maxDrawdown": -0.04777758710219493,
+        "trades": 25,
+        "winRate": 0.16,
+        "profitFactor": 0.2706379377503363,
+        "exposure": 0.1936542669584245,
+        "fees": 0.024423321342080032,
+        "exitReasons": {
+          "signal_exit": 15,
+          "stop": 8,
+          "target": 2
+        }
+      },
+      "emaBaseline": {
+        "netReturn": -0.01658808542630874,
+        "maxDrawdown": -0.043621530748058523,
+        "trades": 59,
+        "winRate": 0.3050847457627119,
+        "profitFactor": 0.8407930306220327,
+        "exposure": 0.5601750547045952,
+        "fees": 0.02903482275727545,
+        "exitReasons": {
+          "signal_exit": 14,
+          "time_stop": 7,
+          "target": 11,
+          "stop": 27
+        }
+      },
+      "buyHoldFullExposure": 0.28007563008993963,
+      "forwardWindows": [
+        {
+          "start": 1782608400000,
+          "end": 1784800800000,
+          "netReturn": -0.01037698684431676,
+          "maxDrawdown": -0.017494954425262388,
+          "trades": 9,
+          "winRate": 0.2222222222222222,
+          "profitFactor": 0.42789169670856436,
+          "exposure": 0.24794745484400657,
+          "fees": 0.004484567571946527,
+          "exitReasons": {
+            "signal_exit": 6,
+            "stop": 3
+          }
+        },
+        {
+          "start": 1784800800000,
+          "end": 1786993200000,
+          "netReturn": -0.00808619119489462,
+          "maxDrawdown": -0.00808619119489462,
+          "trades": 7,
+          "winRate": 0.2857142857142857,
+          "profitFactor": 0.11151840713607723,
+          "exposure": 0.1297208538587849,
+          "fees": 0.0034793713985161604,
+          "exitReasons": {
+            "stop": 1,
+            "signal_exit": 6
+          }
+        },
+        {
+          "start": 1786993200000,
+          "end": 1789189200000,
+          "netReturn": -0.00612916693227139,
+          "maxDrawdown": -0.009898949315383598,
+          "trades": 11,
+          "winRate": 0.2727272727272727,
+          "profitFactor": 0.6814726981061416,
+          "exposure": 0.21475409836065573,
+          "fees": 0.005485208886528518,
+          "exitReasons": {
+            "target": 3,
+            "signal_exit": 4,
+            "stop": 4
+          }
+        }
+      ],
+      "verdict": "not_validated",
+      "issues": [
+        "nonpositive_after_cost_stress",
+        "inconsistent_forward_windows"
+      ],
+      "latest": {
+        "time": 1789185600000,
+        "price": 77222.75,
+        "atr": 414.6119657563125,
+        "rsi": 46.61001223403509,
+        "ema20": 77366.0702348202,
+        "ema50": 77579.3650096582,
+        "ema200": 78323.77077125029,
+        "macdHistogram": -24.17144964348605,
+        "vwap": 77655.0890256557,
+        "resistance": 79890,
+        "support": 76046.58,
+        "flowRatio": 0.04543887492667038,
+        "cvd": -1284050500.535815,
+        "bullishDivergence": false,
+        "bearishDivergence": false,
+        "trend": -0.3439231017140827,
+        "structure": -0.3128267353792267,
+        "flow": 0.3029258328444692,
+        "score": -7.740943630694794,
+        "coverage": 100,
+        "shock": false,
+        "continuous": true,
+        "setup": null,
+        "action": "watch",
+        "stale": false,
+        "blocked": false,
+        "stop": 76393.52606848738,
+        "target": 79295.80982878157,
+        "positionFraction": 0.25,
+        "timeStopHours": 48,
+        "reason": "await_confirmation"
+      }
+    },
+    {
+      "horizon": "2w",
+      "source": {
+        "horizon": "2w",
+        "market": "Binance BTCUSDT spot",
+        "interval": "4h",
+        "requestedStart": 1722519979956,
+        "asOf": 1789191979956,
+        "count": 4629,
+        "first": 1722528000000,
+        "last": 1789171200000,
+        "sha256": "649cef55f6370ffaa7d68cf2da4775900393360922350eb3537537b6f5ed6d4e",
+        "urls": [
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=1722519979956&endTime=1789191979956&limit=1000",
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=1736928000000&endTime=1789191979956&limit=1000",
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=1751328000000&endTime=1789191979956&limit=1000",
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=1765728000000&endTime=1789191979956&limit=1000",
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=4h&startTime=1780128000000&endTime=1789191979956&limit=1000"
+        ]
+      },
+      "window": {
+        "first": 1722528000000,
+        "holdoutStart": 1762516800000,
+        "lastClose": 1789185600000,
+        "bars": 4629,
+        "gaps": 0
+      },
+      "weights": {
+        "trend": 45,
+        "structure": 30,
+        "flow": 25
+      },
+      "standard": {
+        "netReturn": -0.01031180012004207,
+        "maxDrawdown": -0.044091117445447914,
+        "trades": 18,
+        "winRate": 0.3333333333333333,
+        "profitFactor": 0.7876214699744106,
+        "exposure": 0.2203023758099352,
+        "fees": 0.006261631132880602,
+        "exitReasons": {
+          "signal_exit": 11,
+          "target": 3,
+          "stop": 4
+        }
+      },
+      "doubleCost": {
+        "netReturn": -0.01821015959180583,
+        "maxDrawdown": -0.048559606384639964,
+        "trades": 18,
+        "winRate": 0.2777777777777778,
+        "profitFactor": 0.6611021309981364,
+        "exposure": 0.2203023758099352,
+        "fees": 0.012244047478879215,
+        "exitReasons": {
+          "signal_exit": 11,
+          "target": 3,
+          "stop": 4
+        }
+      },
+      "emaBaseline": {
+        "netReturn": 0.0016729343464825241,
+        "maxDrawdown": -0.036281212483683656,
+        "trades": 38,
+        "winRate": 0.34210526315789475,
+        "profitFactor": 1.0185868489880023,
+        "exposure": 0.46004319654427644,
+        "fees": 0.012584156119930828,
+        "exitReasons": {
+          "stop": 13,
+          "signal_exit": 16,
+          "target": 7,
+          "time_stop": 2
+        }
+      },
+      "buyHoldFullExposure": -0.2327937156527805,
+      "forwardWindows": [
+        {
+          "start": 1762516800000,
+          "end": 1771401600000,
+          "netReturn": 0.021006628129333738,
+          "maxDrawdown": -0.003407984818811327,
+          "trades": 3,
+          "winRate": 0.6666666666666666,
+          "profitFactor": 8.458285856948322,
+          "exposure": 0.06969205834683954,
+          "fees": 0.001259491481299425,
+          "exitReasons": {
+            "signal_exit": 1,
+            "target": 2
+          }
+        },
+        {
+          "start": 1771401600000,
+          "end": 1780286400000,
+          "netReturn": -0.0007314407371231679,
+          "maxDrawdown": -0.01456294340223463,
+          "trades": 6,
+          "winRate": 0.5,
+          "profitFactor": 0.9463125188420821,
+          "exposure": 0.4019448946515397,
+          "fees": 0.0017320692910418871,
+          "exitReasons": {
+            "signal_exit": 4,
+            "target": 1,
+            "stop": 1
+          }
+        },
+        {
+          "start": 1780286400000,
+          "end": 1789185600000,
+          "netReturn": -0.029964546031138628,
+          "maxDrawdown": -0.029964546031138628,
+          "trades": 9,
+          "winRate": 0.1111111111111111,
+          "profitFactor": 0.03944626569847345,
+          "exposure": 0.18932038834951456,
+          "fees": 0.0031694724759368928,
+          "exitReasons": {
+            "stop": 3,
+            "signal_exit": 6
+          }
+        }
+      ],
+      "verdict": "not_validated",
+      "issues": [
+        "fewer_than_20_holdout_trades",
+        "nonpositive_after_cost_stress",
+        "inconsistent_forward_windows"
+      ],
+      "latest": {
+        "time": 1789171200000,
+        "price": 77268.09,
+        "atr": 892.1276075738186,
+        "rsi": 41.32002025949237,
+        "ema20": 77747.76238242652,
+        "ema50": 78277.44431628156,
+        "ema200": 74850.59888565529,
+        "macdHistogram": 5.1719203319161124,
+        "vwap": 77939.00716647501,
+        "resistance": 79890,
+        "support": 76046.58,
+        "flowRatio": -0.009914321504732137,
+        "cvd": -34590280226.788734,
+        "bullishDivergence": false,
+        "bearishDivergence": false,
+        "trend": -0.10816328241201659,
+        "structure": -0.2256125112974388,
+        "flow": -0.06609547669821425,
+        "score": -13.288109964919267,
+        "coverage": 100,
+        "shock": false,
+        "continuous": true,
+        "setup": null,
+        "action": "watch",
+        "stale": false,
+        "blocked": false,
+        "stop": 75037.77098106545,
+        "target": 82843.88754733636,
+        "positionFraction": 0.17322205779537317,
+        "timeStopHours": 336,
+        "reason": "await_confirmation"
+      }
+    },
+    {
+      "horizon": "2m",
+      "source": {
+        "horizon": "2m",
+        "market": "Binance BTCUSDT spot",
+        "interval": "1d",
+        "requestedStart": 1609911979956,
+        "asOf": 1789191979956,
+        "count": 2074,
+        "first": 1609977600000,
+        "last": 1789084800000,
+        "sha256": "35c0822e173eb222dbddc4090e14b5fdc990ef2ad3440523dd44b808f31b8aaa",
+        "urls": [
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=1609911979956&endTime=1789191979956&limit=1000",
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=1696377600000&endTime=1789191979956&limit=1000",
+          "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=1782777600000&endTime=1789191979956&limit=1000"
+        ]
+      },
+      "window": {
+        "first": 1609977600000,
+        "holdoutStart": 1717459200000,
+        "lastClose": 1789171200000,
+        "bars": 2074,
+        "gaps": 0
+      },
+      "weights": {
+        "trend": 55,
+        "structure": 30,
+        "flow": 15
+      },
+      "standard": {
+        "netReturn": -0.004083702031470349,
+        "maxDrawdown": -0.016823911197619168,
+        "trades": 10,
+        "winRate": 0.2,
+        "profitFactor": 0.8167460454799182,
+        "exposure": 0.22048192771084338,
+        "fees": 0.0011020012425873717,
+        "exitReasons": {
+          "signal_exit": 5,
+          "target": 1,
+          "stop": 2,
+          "time_stop": 1,
+          "sample_end": 1
+        }
+      },
+      "doubleCost": {
+        "netReturn": -0.005598737611083648,
+        "maxDrawdown": -0.017625123104295093,
+        "trades": 10,
+        "winRate": 0.2,
+        "profitFactor": 0.7607368006092409,
+        "exposure": 0.22048192771084338,
+        "fees": 0.002188054286989111,
+        "exitReasons": {
+          "signal_exit": 5,
+          "target": 1,
+          "stop": 2,
+          "time_stop": 1,
+          "sample_end": 1
+        }
+      },
+      "emaBaseline": {
+        "netReturn": 0.004284569228087731,
+        "maxDrawdown": -0.02517717737531422,
+        "trades": 16,
+        "winRate": 0.375,
+        "profitFactor": 1.1192685629017758,
+        "exposure": 0.4831325301204819,
+        "fees": 0.0017181179405409191,
+        "exitReasons": {
+          "signal_exit": 6,
+          "stop": 4,
+          "target": 2,
+          "time_stop": 3,
+          "sample_end": 1
+        }
+      },
+      "buyHoldFullExposure": 0.11894336716203191,
+      "forwardWindows": [
+        {
+          "start": 1717459200000,
+          "end": 1741305600000,
+          "netReturn": -0.001086792479176868,
+          "maxDrawdown": -0.013247289485057157,
+          "trades": 5,
+          "winRate": 0.2,
+          "profitFactor": 0.9189011901265426,
+          "exposure": 0.22826086956521738,
+          "fees": 0.0004898558283075815,
+          "exitReasons": {
+            "signal_exit": 3,
+            "target": 1,
+            "stop": 1
+          }
+        },
+        {
+          "start": 1741305600000,
+          "end": 1765238400000,
+          "netReturn": 0.0005146336671739693,
+          "maxDrawdown": -0.008996578442803438,
+          "trades": 3,
+          "winRate": 0.3333333333333333,
+          "profitFactor": 1.0956851922243596,
+          "exposure": 0.2888086642599278,
+          "fees": 0.00040303353069701505,
+          "exitReasons": {
+            "signal_exit": 1,
+            "time_stop": 1,
+            "stop": 1
+          }
+        },
+        {
+          "start": 1765238400000,
+          "end": 1789171200000,
+          "netReturn": -0.0035129958758342017,
+          "maxDrawdown": -0.007080894847363073,
+          "trades": 2,
+          "winRate": 0,
+          "profitFactor": 0,
+          "exposure": 0.1444043321299639,
+          "fees": 0.00020966997918741637,
+          "exitReasons": {
+            "signal_exit": 1,
+            "sample_end": 1
+          }
+        }
+      ],
+      "verdict": "not_validated",
+      "issues": [
+        "fewer_than_20_holdout_trades",
+        "nonpositive_after_cost_stress",
+        "inconsistent_forward_windows"
+      ],
+      "latest": {
+        "time": 1789084800000,
+        "price": 77225.7,
+        "atr": 2338.723167944526,
+        "rsi": 54.890217438928715,
+        "ema20": 77019.03244928127,
+        "ema50": 72881.42325209288,
+        "ema200": 72934.5647557018,
+        "macdHistogram": -735.6979976171397,
+        "vwap": 78697.234522084,
+        "resistance": 82300,
+        "support": 75545.67,
+        "flowRatio": -0.06336918255899057,
+        "cvd": -70658946120.71066,
+        "bullishDivergence": false,
+        "bearishDivergence": false,
+        "trend": 0.7364966587994594,
+        "structure": -0.1887612705411376,
+        "flow": -0.42246121705993717,
+        "score": 28.50755986183708,
+        "coverage": 100,
+        "shock": false,
+        "continuous": true,
+        "setup": null,
+        "action": "watch",
+        "stale": false,
+        "blocked": false,
+        "stop": 70209.53049616642,
+        "target": 94766.12375958395,
+        "positionFraction": 0.0550340894399747,
+        "timeStopHours": 1440,
+        "reason": "await_confirmation"
+      }
+    }
+  ]
+}
