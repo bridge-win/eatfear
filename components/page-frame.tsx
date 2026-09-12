@@ -30,8 +30,8 @@ export function DashboardFrame({
 }: DashboardFrameProps) {
   return (
     <AppFrame>
-      <main className={cn("container mx-auto px-4 py-3", mainClassName)}>
-        <div className={cn("space-y-3", contentClassName)}>{children}</div>
+      <main className={cn("container mx-auto min-w-0 px-4 py-3", mainClassName)}>
+        <div className={cn("min-w-0 space-y-3", contentClassName)}>{children}</div>
       </main>
     </AppFrame>
   )

@@ -458,7 +458,7 @@ function GroupFilterPanel({
 }) {
   const enabledCount = catalog.filter((g) => active.has(g.key)).length
   return (
-    <aside className={cn("sticky top-14 z-10 max-h-[calc(100vh-4rem)] shrink-0 self-start overflow-y-auto rounded-md border border-border/60 bg-card/95 text-[11px] backdrop-blur", open ? "w-52" : "w-8")}>
+    <aside className={cn("sticky top-14 z-10 max-h-[calc(100vh-4rem)] shrink-0 self-start overflow-y-auto rounded-md border border-border/60 bg-card/95 text-[11px] backdrop-blur max-sm:absolute max-sm:left-0 max-sm:top-0 max-sm:shadow-lg", open ? "w-52 max-sm:w-[min(13rem,calc(100vw-3rem))]" : "w-8")}>
       <div className="flex items-center justify-between px-1.5 py-1">
         {open && <span className="font-medium">分组筛选 <span className="text-muted-foreground">{enabledCount}/{catalog.length}</span></span>}
         <button type="button" onClick={() => onOpenChange(!open)} className="rounded px-1 text-muted-foreground hover:text-foreground" aria-label={open ? "收起筛选" : "展开筛选"}>
@@ -532,7 +532,8 @@ export function AlignedHistoryCompare({
   const [enabledGroups, setEnabledGroups] = useState<Set<string> | null>(null)
   const [page, setPage] = useState(0)
   const [panesPerPage, setPanesPerPage] = useState<number>(20)   // Infinity = 显示全部
-  const [filterOpen, setFilterOpen] = useState(true)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const initializedFilterLayout = useRef(false)
   const groupCatalog = useMemo(
     () => (data ? orderGroupsByImportance(data.groups).map((g) => ({ key: g.key, label: g.label ?? g.key, count: g.series.filter((x) => x.data.length > 0).length, importance: groupImportance(g) })) : []),
     [data],
@@ -548,6 +549,11 @@ export function AlignedHistoryCompare({
   const totalSeriesCount = useMemo(() => allPanes.reduce((count, group) => count + group.specs.length, 0), [allPanes])
   useEffect(() => { setPage(0) }, [activeGroups, panesPerPage])
   const isCompact = cardWidth > 0 && cardWidth < COMPACT_WIDTH
+  useEffect(() => {
+    if (cardWidth === 0 || initializedFilterLayout.current) return
+    initializedFilterLayout.current = true
+    setFilterOpen(cardWidth >= 768)
+  }, [cardWidth])
   const seriesCount = useMemo(() => groups.reduce((count, group) => count + group.specs.length, 0), [groups])
   const renderedGroups = useMemo(
     () => groups.slice(0, renderedPaneCount),
@@ -960,7 +966,7 @@ export function AlignedHistoryCompare({
         ) : !data || seriesCount === 0 || timeline.length === 0 ? (
           <p className="py-12 text-center text-xs text-muted-foreground">{noDataLabel}</p>
         ) : (
-          <div className="flex gap-2">
+          <div className="relative flex min-w-0 gap-2">
           <GroupFilterPanel
             catalog={groupCatalog}
             active={activeGroups}
@@ -986,7 +992,7 @@ export function AlignedHistoryCompare({
                 )}
                 <div
                   data-history-pane-legend
-                  className="mb-px grid grid-cols-2 items-center gap-x-1.5 gap-y-px"
+                  className="mb-px grid grid-cols-1 items-center gap-x-1.5 gap-y-1 sm:grid-cols-2 sm:gap-y-px"
                 >
                   {group.specs.map((spec) => {
                     const summary = summaries.get(spec.key)
@@ -1050,7 +1056,7 @@ export function AlignedHistoryCompare({
                   data-pane={group.paneIndex}
                   className={cn(
                     "w-full",
-                    group.specs.length > 2 ? "h-[72px] sm:h-[96px]" : "h-[42px] sm:h-[62px]",
+                    group.specs.length > 2 ? "h-[96px] sm:h-[96px]" : "h-[62px] sm:h-[62px]",
                   )}
                 />
                 <div
