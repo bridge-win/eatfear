@@ -67,18 +67,19 @@ interface TimeRangeSelectProps {
   className?: string
 }
 
-export function TimeRangeSelect({ label, customLabel, value, onChange, options = defaultOptions, className }: TimeRangeSelectProps) {
+export function TimeRangeSelect({ label, customLabel, value, onChange, options = defaultOptions, className, compact = false }: TimeRangeSelectProps & { compact?: boolean }) {
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
-      <span className="shrink-0 text-[11px] text-muted-foreground">{label}</span>
+      {!compact && <span className="shrink-0 text-[11px] text-muted-foreground">{label}</span>}
       <select
         aria-label={label}
+        title={label}
         value={value}
         onChange={(event) => {
           const next = event.target.value
           if (next === "custom" || isTimeRangeId(next)) onChange(next)
         }}
-        className="h-8 min-w-[4.75rem] rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="h-7 min-w-[3.6rem] rounded-md border border-input bg-background px-1.5 text-xs font-medium text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
       >
         {options.map((id) => {
           const option = timeRangeOptions.find((entry) => entry.id === id)
@@ -98,12 +99,13 @@ interface CryptoIntervalSelectProps {
   className?: string
 }
 
-export function CryptoIntervalSelect({ label, value, onChange, className }: CryptoIntervalSelectProps) {
+export function CryptoIntervalSelect({ label, value, onChange, className, compact = false }: CryptoIntervalSelectProps & { compact?: boolean }) {
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
-      <span className="shrink-0 text-[11px] text-muted-foreground">{label}</span>
+      {!compact && <span className="shrink-0 text-[11px] text-muted-foreground">{label}</span>}
       <select
         aria-label={label}
+        title={label}
         value={value}
         onChange={(event) => {
           const next = event.target.value

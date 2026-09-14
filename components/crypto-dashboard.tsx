@@ -151,8 +151,10 @@ export function CryptoDashboard({
 }: CryptoDashboardProps = {}) {
   const [instId, setInstId] = usePersistentState<string>("crypto:inst-id", "BTC-USDT-SWAP", isInstrumentId)
   const [range, setRange] = usePersistentState("crypto:range", CRYPTO_DEFAULT_RANGE, isTimeRangeId)
+  // Key bumped when the default moved to 1d so a previously stored 4h/1h does not
+  // silently override it; the selector still lets the user change it afterwards.
   const [interval, setInterval] = usePersistentState<CryptoHistoryInterval>(
-    "crypto:history-interval",
+    "crypto:history-interval:v2",
     getDefaultCryptoIntervalForRange(CRYPTO_DEFAULT_RANGE),
     isCryptoHistoryInterval,
   )
@@ -337,7 +339,7 @@ export function CryptoDashboard({
             {t("crypto.subtitle", { source: "OKX" })}
           </p>
         </div>
-        <div className="flex w-full max-w-full flex-wrap items-center justify-start gap-1.5 lg:w-auto lg:justify-end">
+        <div className="flex w-full max-w-full flex-wrap items-center justify-start gap-1 lg:w-auto lg:justify-end">
           <SymbolSelector
             value={instId}
             options={symbolOptions}
@@ -349,8 +351,9 @@ export function CryptoDashboard({
             customLabel={t("timeRange.customOption")}
             value={customActive ? "custom" : range}
             onChange={handleRangeChange}
+            compact
           />
-          <CryptoIntervalSelect label={t("timeRange.intervalLabel")} value={interval} onChange={setInterval} />
+          <CryptoIntervalSelect label={t("timeRange.intervalLabel")} value={interval} onChange={setInterval} compact />
           <DateTimeRangePicker
             label={t("timeRange.windowLabel")}
             startLabel={t("timeRange.startLabel")}
@@ -358,6 +361,7 @@ export function CryptoDashboard({
             startValue={draftStart}
             endValue={draftEnd}
             onChange={handleCustomWindowChange}
+            dateOnly={interval === "1d" || interval === "1w"}
             className="basis-full sm:basis-auto"
           />
         </div>

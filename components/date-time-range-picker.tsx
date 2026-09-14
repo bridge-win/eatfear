@@ -19,6 +19,8 @@ interface DateTimeRangePickerProps {
   endValue: string
   onChange: (start: string, end: string) => void
   className?: string
+  /** Show and edit dates only (interval ≥ 1d); times are snapped to 00:00. */
+  dateOnly?: boolean
 }
 
 function parseLocalValue(value: string): Date | undefined {
@@ -44,8 +46,9 @@ function replaceTime(value: string, time: string): string {
   return date && /^\d{2}:\d{2}$/.test(time) ? `${date}T${time}` : value
 }
 
-function formatTriggerValue(value: string): string {
-  return value ? value.replace("T", " ") : "—"
+function formatTriggerValue(value: string, dateOnly = false): string {
+  if (!value) return "—"
+  return dateOnly ? value.slice(0, 10) : value.replace("T", " ")
 }
 
 function useTwoMonthCalendar(): boolean {
@@ -70,6 +73,7 @@ export function DateTimeRangePicker({
   endValue,
   onChange,
   className,
+  dateOnly = false,
 }: DateTimeRangePickerProps) {
   const { locale } = useI18n()
   const twoMonths = useTwoMonthCalendar()
@@ -124,14 +128,15 @@ export function DateTimeRangePicker({
           aria-label={label}
           aria-invalid={!valid}
           className={cn(
-            "h-8 w-full min-w-0 justify-start gap-1.5 px-2.5 text-[11px] font-normal tabular-nums sm:w-[21rem]",
+            "h-7 w-full min-w-0 justify-start gap-1 px-2 text-[11px] font-normal tabular-nums",
+            dateOnly ? "sm:w-[13.5rem]" : "sm:w-[21rem]",
             className,
           )}
         >
           <CalendarRange className="size-3.5 text-muted-foreground" />
-          <span suppressHydrationWarning className="min-w-0 truncate">{formatTriggerValue(startValue)}</span>
+          <span suppressHydrationWarning className="min-w-0 truncate">{formatTriggerValue(startValue, dateOnly)}</span>
           <ArrowRight className="size-3 text-muted-foreground" />
-          <span suppressHydrationWarning className="min-w-0 truncate">{formatTriggerValue(endValue)}</span>
+          <span suppressHydrationWarning className="min-w-0 truncate">{formatTriggerValue(endValue, dateOnly)}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent

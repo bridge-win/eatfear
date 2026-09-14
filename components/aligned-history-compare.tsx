@@ -1073,14 +1073,14 @@ export function AlignedHistoryCompare({
                         key={spec.key}
                         data-history-series-key={spec.key}
                         data-history-series-order={spec.order}
-                        className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-0.5"
+                        className="flex min-w-0 items-center gap-0.5 sm:gap-1"
                       >
                         <button
                           type="button"
                           onClick={() => toggle(spec.key)}
                           aria-pressed={!isHidden}
                           className={cn(
-                            "inline-grid h-3.5 min-w-0 grid-cols-[1.35rem_auto_minmax(0,1fr)_4.1rem_2.8rem] items-center gap-0.5 text-left tabular-nums transition-opacity hover:text-foreground sm:grid-cols-[1.55rem_auto_minmax(0,1fr)_4.5rem_3.2rem] sm:gap-1",
+                            "inline-grid h-3.5 min-w-0 flex-1 grid-cols-[1.35rem_auto_minmax(0,1fr)_auto_4.1rem_2.8rem] items-center gap-0.5 text-left tabular-nums transition-opacity hover:text-foreground sm:grid-cols-[1.55rem_auto_minmax(0,1fr)_auto_4.5rem_3.2rem] sm:gap-1",
                             isHidden ? "opacity-35" : "opacity-100",
                           )}
                         >
@@ -1094,6 +1094,19 @@ export function AlignedHistoryCompare({
                           <span className="min-w-0 truncate text-[9px] font-medium leading-none sm:text-[10px]" title={spec.label}>
                             {spec.label}
                           </span>
+                          <span className="inline-flex h-3 w-3 items-center justify-center">
+                            {spec.info && (
+                              <InfoPopover
+                                ariaLabel={spec.info.title ?? spec.label}
+                                title={spec.info.title ?? spec.label}
+                                description={spec.info.description}
+                                source={spec.info.source}
+                                className="h-3 w-3"
+                                iconClassName="h-2.5 w-2.5"
+                                triggerAs="span"
+                              />
+                            )}
+                          </span>
                           <span className="w-[4.1rem] overflow-hidden truncate text-right text-[8px] font-semibold leading-none sm:w-[4.5rem] sm:text-[10px]">
                             {liveValue !== undefined ? formatRaw(liveValue, spec.unit) : "—"}
                           </span>
@@ -1101,16 +1114,6 @@ export function AlignedHistoryCompare({
                             {livePct !== undefined ? formatPct(livePct) : ""}
                           </span>
                         </button>
-                        {spec.info && (
-                          <InfoPopover
-                            ariaLabel={spec.info.title ?? spec.label}
-                            title={spec.info.title ?? spec.label}
-                            description={spec.info.description}
-                            source={spec.info.source}
-                            className="h-3 w-3"
-                            iconClassName="h-2.5 w-2.5"
-                          />
-                        )}
                       </div>
                     )
                   })}
