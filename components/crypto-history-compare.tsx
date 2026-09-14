@@ -278,6 +278,8 @@ export function CryptoHistoryCompare({
     <AlignedHistoryCompare
       data={data}
       referenceKey="btcPrice"
+      defaultPinned={["liquidationStress", "liquidationFlow", "openInterestChange", "openInterestCrowding", "fundingExtremes", "fundingRates", "orderFlow", "volumeActivity", "priceAnchors"]}
+      pinStorageKey="crypto:history-pinned-groups:v1"
       title={t("compare.title")}
       infoDescription={t("compare.info")}
       infoSource="OKX · OKX computed manipulation observables · blockchain.info · DefiLlama · alternative.me · Deribit · Yahoo Finance · TradingView Lightweight Charts"
