@@ -29,6 +29,8 @@ export type CryptoIndicatorGroup =
   | "macroEquities"
   | "macroRates"
   | "commodities"
+  | "cycleValuation"
+  | "etfFlows"
   | "manipulation"
   | "customSignals"
   | "strategyCore"
@@ -73,6 +75,7 @@ export interface CryptoIndicatorConfig {
 export const DEFAULT_CRYPTO_HISTORY_REFRESH_MS = 300_000
 
 const CRYPTO_RELEVANCE_SCORES: Record<string, number> = {
+  mayerMultiple: 90, puellMultiple: 86, ahr999: 92, etfNetFlow: 93,
   dev: 100,
   atr60: 100,
   vel5: 100,
@@ -168,21 +171,21 @@ const CRYPTO_RELEVANCE_SCORES: Record<string, number> = {
   btcDrawdown: 90,
   btcVolumeUsd: 89,
   btcVolumeZ: 88,
-  stablecoinMcap: 86,
+  stablecoinMcap: 88,
   oi: 85,
   oiChangePct: 84,
   oiReturnZ: 83,
   funding: 82,
   basis: 95,
   dvol: 79,
-  fng: 78,
+  fng: 84,
   ethPrice: 75,
   solPrice: 73,
   defiTvl: 72,
-  activeAddrs: 70,
+  activeAddrs: 76,
   nTxs: 69,
   txFeesUsd: 68,
-  hashRate: 66,
+  hashRate: 74,
   difficulty: 65,
   miningComprehensiveCost: 64,
   miningElectricityCost: 63,
@@ -206,11 +209,11 @@ const CRYPTO_RELEVANCE_SCORES: Record<string, number> = {
   manipLiquidationIntensityZ: 80,
   manipWickAsymmetryPct: 79,
   manipVolumeImpactZ: 78,
-  nasdaq: 54,
-  sp500: 53,
-  dxy: 52,
-  vix: 51,
-  us10y: 50,
+  nasdaq: 85,
+  sp500: 82,
+  dxy: 84,
+  vix: 82,
+  us10y: 80,
   us2y: 49,
   upperWick: 48,
   lowerWick: 48,
@@ -219,7 +222,7 @@ const CRYPTO_RELEVANCE_SCORES: Record<string, number> = {
   signalRiskScore: 47,
   signalDirection: 47,
   russell: 46,
-  gold: 45,
+  gold: 70,
   bnbPrice: 44,
   xrpPrice: 43,
   dogePrice: 42,
@@ -389,6 +392,10 @@ export const CRYPTO_INDICATOR_CONFIG: readonly CryptoIndicatorConfig[] = [
   { key: "activeAddrs", enabled: true, order: 210, refreshMs: 300_000, i18nKey: "compare.s.activeAddrs", infoI18nKey: "compare.info.activeAddrs", source: "blockchain.info", color: "rgb(99 102 241)", unit: "count" },
   { key: "nTxs", enabled: true, order: 220, refreshMs: 300_000, i18nKey: "compare.s.nTxs", infoI18nKey: "compare.info.nTxs", source: "blockchain.info", color: "rgb(59 130 246)", unit: "count" },
   { key: "txFeesUsd", enabled: true, order: 230, refreshMs: 300_000, i18nKey: "compare.s.txFeesUsd", infoI18nKey: "compare.info.txFeesUsd", source: "blockchain.info", color: "rgb(220 38 38)", unit: "usd" },
+  { key: "mayerMultiple", enabled: true, order: 205, refreshMs: 3_600_000, i18nKey: "compare.s.mayerMultiple", infoI18nKey: "compare.info.mayerMultiple", source: "blockchain.info / computed", color: "rgb(244 114 182)", unit: "raw" },
+  { key: "puellMultiple", enabled: true, order: 206, refreshMs: 3_600_000, i18nKey: "compare.s.puellMultiple", infoI18nKey: "compare.info.puellMultiple", source: "blockchain.info / computed", color: "rgb(251 146 60)", unit: "raw" },
+  { key: "ahr999", enabled: true, order: 207, refreshMs: 3_600_000, i18nKey: "compare.s.ahr999", infoI18nKey: "compare.info.ahr999", source: "blockchain.info / computed", color: "rgb(192 132 252)", unit: "raw" },
+  { key: "etfNetFlow", enabled: true, order: 208, refreshMs: 3_600_000, i18nKey: "compare.s.etfNetFlow", infoI18nKey: "compare.info.etfNetFlow", source: "CoinGlass ETF flow-history", color: "rgb(56 189 248)", unit: "usd" },
   { key: "hashRate", enabled: true, order: 240, refreshMs: 300_000, i18nKey: "compare.s.hashRate", infoI18nKey: "compare.info.hashRate", source: "blockchain.info", color: "rgb(20 184 166)", unit: "raw" },
   { key: "difficulty", enabled: true, order: 250, refreshMs: 300_000, i18nKey: "compare.s.difficulty", infoI18nKey: "compare.info.difficulty", source: "blockchain.info", color: "rgb(168 85 247)", unit: "raw" },
   { key: "miningComprehensiveCost", enabled: true, order: 260, refreshMs: 300_000, i18nKey: "compare.s.miningComprehensiveCost", infoI18nKey: "compare.info.miningComprehensiveCost", source: "mempool.space / blockchain.info", color: "rgb(217 119 6)", unit: "usd" },
@@ -470,6 +477,8 @@ const SCIENTIFIC_GROUP_KEYS: readonly [CryptoIndicatorGroup, readonly string[]][
   ["macroEquities", ["nasdaq", "sp500", "russell", "vix", "nikkei", "hangseng"]],
   ["macroRates", ["dxy", "us10y", "us2y"]],
   ["commodities", ["gold", "silver", "oil", "copper", "natgas"]],
+  ["cycleValuation", ["mayerMultiple", "puellMultiple", "ahr999"]],
+  ["etfFlows", ["etfNetFlow"]],
   ["manipulation", ["manipLeveragePressure", "manipPriceOiDivergence", "manipFundingSqueezeZ", "manipBasisDislocationZ", "manipTakerImbalancePct", "manipCvdPriceDivergence", "manipLiquidationImbalancePct", "manipLiquidationIntensityZ", "manipWickAsymmetryPct", "manipVolumeImpactZ"]],
   ["customSignals", ["signalBuyScore", "signalSellScore", "signalRiskScore", "signalDirection"]],
 ]

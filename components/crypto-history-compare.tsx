@@ -277,6 +277,7 @@ export function CryptoHistoryCompare({
   return (
     <AlignedHistoryCompare
       data={data}
+      referenceKey="btcPrice"
       title={t("compare.title")}
       infoDescription={t("compare.info")}
       infoSource="OKX · OKX computed manipulation observables · blockchain.info · DefiLlama · alternative.me · Deribit · Yahoo Finance · TradingView Lightweight Charts"

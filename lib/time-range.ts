@@ -145,23 +145,20 @@ export const getCryptoHistoryInterval = (
   return cryptoHistoryIntervalOptions.find((option) => option.id === id) ?? cryptoHistoryIntervalOptions[5]
 }
 
+/**
+ * Default candle interval when a preset range is chosen. Daily bars are the default for
+ * every range where they yield a readable series; 1d/5d presets fall back to intraday
+ * because a 1-day interval would leave one to five points. The user can override in the
+ * interval selector at any time.
+ */
 export const getDefaultCryptoIntervalForRange = (id: TimeRangeId): CryptoHistoryInterval => {
   switch (id) {
     case "1d":
       return "5m"
     case "5d":
-      return "15m"
-    case "1mo":
       return "1h"
-    case "3mo":
-    case "6mo":
-      return "4h"
-    case "1y":
-    case "5y":
+    default:
       return "1d"
-    case "10y":
-    case "max":
-      return "1w"
   }
 }
 

@@ -24,3 +24,28 @@ test("ordering does not mutate the input", () => {
   orderGroupsByImportance(groups)
   assert.equal(JSON.stringify(groups), before)
 })
+
+import { diffCorrelation, orderGroupsByScore } from "./history-order.ts"
+
+test("diffCorrelation uses changes, so a smoothed copy of price does not score 1", () => {
+  const price = Array.from({ length: 60 }, (_, i) => ({ time: i, value: 100 + Math.sin(i / 3) * 10 + i * 0.2 }))
+  const ema = price.map((p, i, arr) => ({ time: i, value: arr.slice(Math.max(0, i - 9), i + 1).reduce((a, x) => a + x.value, 0) / Math.min(10, i + 1) }))
+  const inverse = price.map((p) => ({ time: p.time, value: -p.value }))
+  const ref = { key: "ref", data: price }
+  const rEma = diffCorrelation({ key: "ema", data: ema }, ref)!
+  const rInv = diffCorrelation({ key: "inv", data: inverse }, ref)!
+  assert.ok(rEma < 0.95, `smoothed series should not be ~1 in diffs, got ${rEma}`)
+  assert.ok(Math.abs(rInv + 1) < 1e-9, "exact inverse must be -1")
+  assert.equal(diffCorrelation({ key: "short", data: price.slice(0, 5) }, ref), null, "too few points → null")
+})
+
+test("orderGroupsByScore ranks by |score| when asked, falling back to importance", () => {
+  const pt = (v: number[]) => v.map((value, time) => ({ time, value }))
+  const groups = [
+    { key: "a", series: [{ key: "x", importance: 99, data: pt([1, 2, 3, 4, 5]) }] },
+    { key: "b", series: [{ key: "y", importance: 10, data: pt([5, 4, 3, 2, 1]) }, { key: "z", importance: 20, data: pt([1, 1, 1, 1, 1]) }] },
+  ]
+  const byAbs = orderGroupsByScore(groups, (s) => (s.key === "y" ? 0.9 : s.key === "x" ? 0.3 : null))
+  assert.deepEqual(byAbs.map((g) => g.key), ["b", "a"])
+  assert.deepEqual(byAbs[0].series.map((s) => s.key), ["y", "z"], "null score sorts last")
+})

@@ -330,7 +330,7 @@ export function CryptoDashboard({
 
   return (
     <DashboardFrame contentClassName="space-y-2" mainClassName="px-3 py-2 sm:px-4">
-      <header className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2">
+      <header className="sticky top-14 z-30 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card/95 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-card/85">
         <div>
           <h1 className="text-lg font-bold tracking-tight">{t("crypto.title")}</h1>
           <p className="sr-only">

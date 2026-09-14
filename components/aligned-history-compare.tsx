@@ -21,7 +21,7 @@ import { RefreshCw } from "lucide-react"
 
 import { InfoPopover } from "@/components/info-popover"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { groupImportance, orderGroupsByImportance } from "@/lib/history-order"
+import { diffCorrelation, groupImportance, orderGroupsByImportance, orderGroupsByScore } from "@/lib/history-order"
 import { cn } from "@/lib/utils"
 
 export type AlignedHistoryUnit = "usd" | "cny" | "pct" | "ratio" | "raw" | "count"
@@ -122,6 +122,8 @@ export interface AlignedHistoryCompareProps {
   seriesCountLabel: string
   expectedSeriesCount?: number
   maxSeriesPerPane?: number
+  /** Series key used as the correlation reference for 相关性 ordering (e.g. btcPrice). */
+  referenceKey?: string
   className?: string
 }
 
@@ -280,9 +282,9 @@ function getTimelineForGroups(baseTimeline: number[] | undefined, groups: Series
   return Array.from(timeline).sort((a, b) => a - b)
 }
 
-function getGroups(data: AlignedHistoryData, maxSeriesPerPane: number, enabledGroups?: Set<string>): SeriesGroup[] {
+function getGroups(orderedGroups: AlignedHistoryGroup[], maxSeriesPerPane: number, enabledGroups?: Set<string>): SeriesGroup[] {
   const groups: SeriesGroup[] = []
-  for (const group of orderGroupsByImportance(data.groups)) {
+  for (const group of orderedGroups) {
     if (enabledGroups && !enabledGroups.has(group.key)) continue
     const specs = group.series.filter((series) => series.data.length > 0)
     for (let index = 0; index < specs.length; index += maxSeriesPerPane) {
@@ -445,42 +447,76 @@ function HistoryPaneLoading({
   )
 }
 
+type CatalogGroup = { key: string; label: string; count: number; importance: number; corr: number | null; series: { key: string; label: string; importance: number; corr: number | null }[] }
+
 function GroupFilterPanel({
-  catalog, active, onToggle, onAll, onNone, open, onOpenChange,
+  catalog, active, hidden, expanded, sortMode, hasCorr, onToggleGroup, onToggleSeries, onToggleExpand, onAll, onNone, onSortMode, open, onOpenChange,
 }: {
-  catalog: { key: string; label: string; count: number; importance: number }[]
+  catalog: CatalogGroup[]
   active: Set<string>
-  onToggle: (key: string) => void
+  hidden: Set<string>
+  expanded: Set<string>
+  sortMode: "corr" | "importance"
+  hasCorr: boolean
+  onToggleGroup: (key: string) => void
+  onToggleSeries: (key: string) => void
+  onToggleExpand: (key: string) => void
   onAll: () => void
   onNone: () => void
+  onSortMode: (m: "corr" | "importance") => void
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
   const enabledCount = catalog.filter((g) => active.has(g.key)).length
+  const fmtCorr = (c: number | null) => (c === null ? "—" : `ρ${c >= 0 ? "+" : "−"}${Math.abs(c).toFixed(2)}`)
   return (
-    <aside className={cn("sticky top-14 z-10 max-h-[calc(100vh-4rem)] shrink-0 self-start overflow-y-auto rounded-md border border-border/60 bg-card/95 text-[11px] backdrop-blur max-sm:absolute max-sm:left-0 max-sm:top-0 max-sm:shadow-lg", open ? "w-52 max-sm:w-[min(13rem,calc(100vw-3rem))]" : "w-8")}>
+    <aside className={cn("sticky top-32 z-10 max-h-[calc(100vh-8.5rem)] shrink-0 self-start overflow-y-auto rounded-md border border-border/60 bg-card/95 text-[11px] backdrop-blur", open ? "w-60" : "w-8")}>
       <div className="flex items-center justify-between px-1.5 py-1">
         {open && <span className="font-medium">分组筛选 <span className="text-muted-foreground">{enabledCount}/{catalog.length}</span></span>}
-        <button type="button" onClick={() => onOpenChange(!open)} className="rounded px-1 text-muted-foreground hover:text-foreground" aria-label={open ? "收起筛选" : "展开筛选"}>
-          {open ? "«" : "»"}
-        </button>
+        <button type="button" onClick={() => onOpenChange(!open)} className="rounded px-1 text-muted-foreground hover:text-foreground" aria-label={open ? "收起筛选" : "展开筛选"}>{open ? "«" : "»"}</button>
       </div>
       {open && (
         <>
-          <div className="flex gap-1 px-1.5 pb-1">
+          <div className="flex flex-wrap items-center gap-1 px-1.5 pb-1">
             <button type="button" onClick={onAll} className="rounded border border-border px-1.5 py-0.5 hover:text-foreground">全选</button>
             <button type="button" onClick={onNone} className="rounded border border-border px-1.5 py-0.5 hover:text-foreground">清空</button>
+            <span className="ml-auto text-muted-foreground">排序</span>
+            <select value={sortMode} onChange={(e) => onSortMode(e.target.value as "corr" | "importance")} className="rounded border border-border bg-transparent px-1 py-0.5">
+              <option value="corr" disabled={!hasCorr}>与参考相关性</option>
+              <option value="importance">设计重要度</option>
+            </select>
           </div>
           <div className="border-t border-border/60">
-            {catalog.map((g) => (
-              <label key={g.key} className="flex cursor-pointer items-center gap-1.5 px-1.5 py-1 hover:bg-muted/40">
-                <input type="checkbox" checked={active.has(g.key)} onChange={() => onToggle(g.key)} className="accent-primary" />
-                <span className="min-w-0 flex-1 truncate" title={g.label}>{g.label}</span>
-                <span className="tabular-nums text-muted-foreground" title="曲线数 · 最高重要度">{g.count}<span className="opacity-60"> · R{Math.round(g.importance)}</span></span>
-              </label>
-            ))}
+            {catalog.map((g) => {
+              const isOpen = expanded.has(g.key)
+              const visibleInGroup = g.series.filter((x) => !hidden.has(x.key)).length
+              return (
+                <div key={g.key} className="border-b border-border/40 last:border-0">
+                  <div className="flex items-center gap-1 px-1.5 py-1 hover:bg-muted/40">
+                    <input type="checkbox" checked={active.has(g.key)} onChange={() => onToggleGroup(g.key)} className="accent-primary" aria-label={`显示 ${g.label}`} />
+                    <button type="button" onClick={() => onToggleExpand(g.key)} className="min-w-0 flex-1 truncate text-left" title={g.label}>
+                      <span className="mr-1 inline-block w-3 text-muted-foreground">{isOpen ? "▾" : "▸"}</span>{g.label}
+                    </button>
+                    <span className="tabular-nums text-muted-foreground" title="可见/总数 · 排序依据">{visibleInGroup}/{g.count}<span className="opacity-60"> · {sortMode === "corr" ? fmtCorr(g.corr) : `R${Math.round(g.importance)}`}</span></span>
+                  </div>
+                  {isOpen && (
+                    <div className="border-t border-border/30 bg-background/40 pb-1">
+                      {g.series.map((x) => (
+                        <label key={x.key} className="flex cursor-pointer items-center gap-1.5 py-0.5 pl-6 pr-1.5 hover:bg-muted/40">
+                          <input type="checkbox" checked={active.has(g.key) && !hidden.has(x.key)} disabled={!active.has(g.key)} onChange={() => onToggleSeries(x.key)} className="accent-primary" />
+                          <span className="min-w-0 flex-1 truncate" title={x.label}>{x.label}</span>
+                          <span className="tabular-nums text-muted-foreground">{sortMode === "corr" ? fmtCorr(x.corr) : `R${Math.round(x.importance)}`}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
-          <p className="px-1.5 py-1 text-[10px] leading-snug text-muted-foreground">组按最高重要度排序;组内曲线也按重要度排。</p>
+          <p className="px-1.5 py-1 text-[10px] leading-snug text-muted-foreground">
+            {sortMode === "corr" ? "ρ = 该曲线变动与参考价格变动在当前窗口内的相关系数,按 |ρ| 排序。ρ 是共动不是因果。" : "按设计重要度 R 排序(手工权重,非实测)。"}
+          </p>
         </>
       )}
     </aside>
@@ -517,6 +553,7 @@ export function AlignedHistoryCompare({
   seriesCountLabel,
   expectedSeriesCount,
   maxSeriesPerPane = MAX_SERIES_PER_PANE,
+  referenceKey,
   className,
 }: AlignedHistoryCompareProps) {
   const cardRef = useRef<HTMLDivElement | null>(null)
@@ -533,13 +570,32 @@ export function AlignedHistoryCompare({
   const [page, setPage] = useState(0)
   const [panesPerPage, setPanesPerPage] = useState<number>(20)   // Infinity = 显示全部
   const [filterOpen, setFilterOpen] = useState(false)
+  const [sortMode, setSortMode] = useState<"corr" | "importance">("corr")
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const correlationByKey = useMemo(() => {
+    const out = new Map<string, number | null>()
+    if (!data || !referenceKey) return out
+    const ref = data.groups.flatMap((g) => g.series).find((x) => x.key === referenceKey)
+    if (!ref) return out
+    for (const g of data.groups) for (const x of g.series) out.set(x.key, x.key === referenceKey ? 1 : diffCorrelation(x, ref))
+    return out
+  }, [data, referenceKey])
+  const absCorr = (key: string) => { const v = correlationByKey.get(key); return v === null || v === undefined ? null : Math.abs(v) }
+  const orderGroups = (groups: AlignedHistoryGroup[]) => (sortMode === "corr" && correlationByKey.size ? orderGroupsByScore(groups, (x) => absCorr(x.key)) : orderGroupsByImportance(groups))
   const initializedFilterLayout = useRef(false)
   const groupCatalog = useMemo(
-    () => (data ? orderGroupsByImportance(data.groups).map((g) => ({ key: g.key, label: g.label ?? g.key, count: g.series.filter((x) => x.data.length > 0).length, importance: groupImportance(g) })) : []),
-    [data],
+    () => (data ? orderGroups(data.groups).map((g) => ({
+      key: g.key, label: g.label ?? g.key,
+      count: g.series.filter((x) => x.data.length > 0).length, importance: groupImportance(g),
+      corr: g.series.reduce<number | null>((m, x) => { const c = absCorr(x.key); return c === null ? m : m === null ? c : Math.max(m, c) }, null),
+      series: g.series.filter((x) => x.data.length > 0).map((x) => ({ key: x.key, label: x.label, importance: x.importance ?? 0, corr: correlationByKey.get(x.key) ?? null })),
+    })) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, sortMode, correlationByKey],
   )
   const activeGroups = useMemo(() => enabledGroups ?? new Set(groupCatalog.map((g) => g.key)), [enabledGroups, groupCatalog])
-  const allPanes = useMemo(() => (data ? getGroups(data, maxSeriesPerPane, activeGroups) : []), [data, maxSeriesPerPane, activeGroups])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const allPanes = useMemo(() => (data ? getGroups(orderGroups(data.groups), maxSeriesPerPane, activeGroups) : []), [data, maxSeriesPerPane, activeGroups, sortMode, correlationByKey])
   const pageCount = Number.isFinite(panesPerPage) ? Math.max(1, Math.ceil(allPanes.length / panesPerPage)) : 1
   const safePage = Math.min(page, pageCount - 1)
   const groups = useMemo(
@@ -970,9 +1026,16 @@ export function AlignedHistoryCompare({
           <GroupFilterPanel
             catalog={groupCatalog}
             active={activeGroups}
-            onToggle={(key) => setEnabledGroups((prev) => { const next = new Set(prev ?? groupCatalog.map((g) => g.key)); if (next.has(key)) next.delete(key); else next.add(key); return next })}
-            onAll={() => setEnabledGroups(null)}
+            hidden={hidden}
+            expanded={expandedGroups}
+            sortMode={sortMode}
+            hasCorr={correlationByKey.size > 0}
+            onToggleGroup={(key) => setEnabledGroups((prev) => { const next = new Set(prev ?? groupCatalog.map((g) => g.key)); if (next.has(key)) next.delete(key); else next.add(key); return next })}
+            onToggleSeries={(key) => setHidden((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next })}
+            onToggleExpand={(key) => setExpandedGroups((prev) => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next })}
+            onAll={() => { setEnabledGroups(null); setHidden(new Set()) }}
             onNone={() => setEnabledGroups(new Set())}
+            onSortMode={setSortMode}
             open={filterOpen}
             onOpenChange={setFilterOpen}
           />

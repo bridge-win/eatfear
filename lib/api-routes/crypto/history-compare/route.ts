@@ -9,6 +9,7 @@ import {
 import { fetchStablecoinMarketCap, fetchDefiTvl } from "@/lib/data-sources/defillama"
 import { fetchMempoolHashrateHistory } from "@/lib/data-sources/mempool"
 import { fetchYahooSeries } from "@/lib/data-sources/yahoo"
+import { fetchBitcoinEtfFlowHistory } from "@/lib/data-sources/coinglass"
 import { fetchJson } from "@/lib/data-sources/_fetch"
 import {
   computeMiningCostFromHashrateHps,
@@ -944,6 +945,40 @@ async function yahooPoints(symbol: string, range: TimeRangeOption): Promise<RawP
   return (res?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value }))
 }
 
+/**
+ * Price-derived cycle valuation on a daily series.
+ * Mayer = price / SMA200. Puell = daily miner USD revenue / its 365-day mean.
+ * AHR999 = (price / 200-day geometric mean) × (price / 10^(5.84·log10(ageDays) − 17.01)).
+ * AHR999's fitted curve was regressed on Bitcoin's full history, so it carries
+ * look-ahead by construction; it is shown as a widely-used reference, not a signal.
+ */
+function computeCycleValuation(priceDaily: RawPoint[], minerRevenueDaily: RawPoint[]): { mayer: RawPoint[]; puell: RawPoint[]; ahr999: RawPoint[] } {
+  const px = [...priceDaily].filter((p) => p.value !== null && p.value > 0).sort((a, b) => a.timestamp - b.timestamp)
+  const mayer: RawPoint[] = []; const ahr999: RawPoint[] = []
+  const GENESIS = Date.UTC(2009, 0, 3)
+  let sum = 0; let logSum = 0
+  for (let i = 0; i < px.length; i++) {
+    const v = px[i].value as number
+    sum += v; logSum += Math.log(v)
+    if (i >= 200) { sum -= px[i - 200].value as number; logSum -= Math.log(px[i - 200].value as number) }
+    if (i >= 199) {
+      const sma = sum / 200; const gmean = Math.exp(logSum / 200)
+      const ageDays = (px[i].timestamp - GENESIS) / 86_400_000
+      const fitted = 10 ** (5.84 * Math.log10(ageDays) - 17.01)
+      mayer.push({ timestamp: px[i].timestamp, value: v / sma })
+      ahr999.push({ timestamp: px[i].timestamp, value: (v / gmean) * (v / fitted) })
+    }
+  }
+  const rev = [...minerRevenueDaily].filter((p) => p.value !== null && p.value > 0).sort((a, b) => a.timestamp - b.timestamp)
+  const puell: RawPoint[] = []; let rsum = 0
+  for (let i = 0; i < rev.length; i++) {
+    rsum += rev[i].value as number
+    if (i >= 365) rsum -= rev[i - 365].value as number
+    if (i >= 364) puell.push({ timestamp: rev[i].timestamp, value: (rev[i].value as number) / (rsum / 365) })
+  }
+  return { mayer, puell, ahr999 }
+}
+
 async function blockchainSeries(chart: string, timespan: string): Promise<RawPoint[]> {
   const rows = await fetchBlockchainInfoSeries(chart, timespan)
   return rows.map((p) => ({ timestamp: p.timestamp, value: p.value }))
@@ -1288,6 +1323,7 @@ export async function GET(request: Request) {
   const isBtc = ccy === "BTC"
   const instId = `${ccy}-USDT-SWAP`
   const blockchainSpan = getBlockchainTimespan(range.id)
+
   /* Total days requested from OKX endpoints. The per-call helpers paginate
      internally (begin/end for Rubik stats, after for candles/funding) up to
      OKX_MAX_PAGES, so this is no longer bounded by any single-request cap. */
@@ -1319,6 +1355,20 @@ export async function GET(request: Request) {
     indicatorLimit === null ? offsetIndicators : offsetIndicators.slice(0, indicatorLimit)
   const requestedKeys = new Set(requestedIndicators.map((indicator) => indicator.key))
   const requestedWithSignals = new Set<string>(requestedKeys)
+  // Cycle valuation needs 200/365-day moving averages regardless of the selected window,
+  // so it pulls a fixed 3-year daily span instead of the window-scaled blockchainSpan.
+  const wantsCycle = ["mayerMultiple", "puellMultiple", "ahr999"].some((k) => requestedWithSignals.has(k))
+  const [cyclePriceDaily, minerRevenueDaily, etfFlowRows] = await Promise.all([
+    wantsCycle ? blockchainSeries("market-price", "3years").catch(() => [] as RawPoint[]) : ([] as RawPoint[]),
+    requestedWithSignals.has("puellMultiple") ? blockchainSeries("miners-revenue", "3years").catch(() => [] as RawPoint[]) : ([] as RawPoint[]),
+    requestedWithSignals.has("etfNetFlow") && process.env.COINGLASS_API_KEY
+      ? fetchBitcoinEtfFlowHistory(process.env.COINGLASS_API_KEY, revalidate).catch(() => ({ error: "etf_fetch_error" }))
+      : null,
+  ])
+  const cycle = computeCycleValuation(cyclePriceDaily, minerRevenueDaily)
+  const etfNetFlow: RawPoint[] = etfFlowRows && "sortedDaysAsc" in etfFlowRows
+    ? etfFlowRows.sortedDaysAsc.map((d) => ({ timestamp: Number(d.timestamp), value: Number(d.flow_usd ?? 0) })).filter((x) => Number.isFinite(x.timestamp) && x.timestamp > 0)
+    : []
   if (hasRequestedKey(requestedWithSignals, COMPOSITE_SIGNAL_KEYS)) {
     for (const key of [...BTC_PRICE_KEYS, ...OI_KEYS, ...FUNDING_KEYS, ...LIQ_KEYS, ...SMART_MONEY_KEYS, ...ORDERBOOK_KEYS]) {
       requestedWithSignals.add(key)
@@ -1795,6 +1845,10 @@ export async function GET(request: Request) {
     ["natgas", natgas],
     ["nikkei", nikkei],
     ["hangseng", hangseng],
+    ["mayerMultiple", cycle.mayer],
+    ["puellMultiple", cycle.puell],
+    ["ahr999", cycle.ahr999],
+    ["etfNetFlow", etfNetFlow],
   ])
 
   const selectedCrossSectionPriceKey = CROSS_SECTION_PRICE_KEY_BY_CCY[ccy]
