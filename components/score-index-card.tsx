@@ -5,6 +5,7 @@ import { Info } from "lucide-react"
 
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { cn } from "@/lib/utils"
+import { TONE_BAR, TONE_TEXT, type Tone } from "@/lib/indicator-tone"
 
 export interface ScoreIndexCardProps {
   /** Top-left card title (e.g. "BTC Multi-TF Score" / "Fear & Greed") */
@@ -17,6 +18,8 @@ export interface ScoreIndexCardProps {
   signal?: ReactNode
   /** Tailwind text-color class for the value & signal */
   toneClassName?: string
+  /** Attention tone; colours the value and draws a top bar. Overrides toneClassName for the value. */
+  tone?: Tone
   /** Aria label for the value */
   valueAriaLabel?: string
   /** Aria label for the info-icon trigger */
@@ -38,6 +41,7 @@ export function ScoreIndexCard({
   valueSuffix,
   signal,
   toneClassName,
+  tone,
   valueAriaLabel,
   infoAriaLabel,
   infoContent,
@@ -48,6 +52,7 @@ export function ScoreIndexCard({
     <div
       className={cn(
         "min-w-0 shrink-0 rounded-md border bg-card/95 px-2 py-1.5 text-left shadow-sm backdrop-blur-sm",
+        tone && ["border-t-2", TONE_BAR[tone]],
         className,
       )}
     >
@@ -81,7 +86,7 @@ export function ScoreIndexCard({
         aria-label={valueAriaLabel}
         className={cn(
           "mt-0.5 text-xl font-bold tabular-nums leading-none md:text-2xl",
-          toneClassName ?? "text-foreground",
+          tone ? TONE_TEXT[tone] : (toneClassName ?? "text-foreground"),
         )}
       >
         {value}

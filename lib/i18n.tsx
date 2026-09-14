@@ -1258,6 +1258,8 @@ const DICT: Dict = {
   "compare.group.macroEquities": { zh: "宏观风险资产", en: "Macro Risk Assets" },
   "compare.group.macroRates": { zh: "美元与利率", en: "USD & Rates" },
   "compare.group.commodities": { zh: "大宗商品", en: "Commodities" },
+  "compare.group.cycleValuation": { zh: "周期估值", en: "Cycle Valuation" },
+  "compare.group.etfFlows": { zh: "ETF 资金流", en: "ETF Flows" },
   "compare.group.manipulation": { zh: "异常与操纵观测", en: "Anomaly & Manipulation Observables" },
   "compare.group.customSignals": { zh: "自定义信号", en: "Custom Signals" },
   "compare.group.secondary": { zh: "辅助背景", en: "Secondary Context" },

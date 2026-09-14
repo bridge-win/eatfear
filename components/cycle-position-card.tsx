@@ -1,6 +1,7 @@
 "use client"
 
 import { EvidenceBadge } from "@/components/research-evidence-badge"
+import { TONE_BADGE, zoneTone } from "@/lib/indicator-tone"
 import { useMemo } from "react"
 import { Info } from "lucide-react"
 
@@ -161,7 +162,7 @@ function HoverContents({
               {m.value !== null ? `${m.value.toFixed(3)}×` : "—"}
               {m.sma200 !== null ? ` · SMA${m.smaLen} $${m.sma200.toLocaleString()}` : ""}
             </span>
-            <span className={cn("rounded border px-1.5 py-0.5 text-[9.5px] font-medium", zoneBadgeClass(m.score))}>
+            <span className={cn("rounded border px-1.5 py-0.5 text-[9.5px] font-medium", TONE_BADGE[zoneTone(m.score)])}>
               {locale === "zh" ? m.zoneZh : m.zoneEn}
             </span>
           </div>
@@ -183,7 +184,7 @@ function HoverContents({
             <span className="tabular-nums text-muted-foreground">
               {h.ma10Eh !== null ? `MA10 ${h.ma10Eh} · MA30 ${h.ma30Eh} · MA60 ${h.ma60Eh} EH/s` : "—"}
             </span>
-            <span className={cn("rounded border px-1.5 py-0.5 text-[9.5px] font-medium", zoneBadgeClass(h.score))}>
+            <span className={cn("rounded border px-1.5 py-0.5 text-[9.5px] font-medium", TONE_BADGE[zoneTone(h.score)])}>
               {locale === "zh" ? h.statusZh : h.statusEn}
             </span>
           </div>
@@ -205,7 +206,7 @@ function HoverContents({
             <span className="tabular-nums text-muted-foreground">
               {p.value !== null ? `${p.value.toFixed(3)}` : "—"}
             </span>
-            <span className={cn("rounded border px-1.5 py-0.5 text-[9.5px] font-medium", zoneBadgeClass(p.score))}>
+            <span className={cn("rounded border px-1.5 py-0.5 text-[9.5px] font-medium", TONE_BADGE[zoneTone(p.score)])}>
               {locale === "zh" ? p.zoneZh : p.zoneEn}
             </span>
           </div>

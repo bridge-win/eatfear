@@ -1,5 +1,7 @@
 "use client"
 
+import { TONE_TEXT, signedTone } from "@/lib/indicator-tone"
+
 import { useEffect, useState } from "react"
 import useSWR from "swr"
 import { useI18n } from "@/lib/i18n"
@@ -54,7 +56,7 @@ export function CryptoTradePlanPanel({ ccy }: { ccy: string }) {
           const evidence = validation.results.find((r) => r.horizon === horizon)
           return <article key={horizon} className={`min-w-0 space-y-2 p-3 ${mobileHorizon === horizon ? "block" : "hidden lg:block"}`}>
             <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold">{names[horizon]}</h3><span className="text-xs text-muted-foreground">{cfg.interval.toUpperCase()} · {zh ? "现货" : "spot"}</span></div>
-            <div className="flex items-baseline justify-between gap-2"><strong className="text-sm text-foreground">{status}</strong><span className="font-mono text-sm tabular-nums">{f ? `${f.score >= 0 ? "+" : ""}${f.score.toFixed(0)}` : "—"}<span className="text-xs text-muted-foreground"> / 100</span></span></div>
+            <div className="flex items-baseline justify-between gap-2"><strong className="text-sm text-foreground">{status}</strong><span className={`font-mono text-sm tabular-nums ${f ? TONE_TEXT[signedTone(f.score)] : ""}`}>{f ? `${f.score >= 0 ? "+" : ""}${f.score.toFixed(0)}` : "—"}<span className="text-xs text-muted-foreground"> / 100</span></span></div>
             <div className="grid grid-cols-3 gap-2 text-xs">
               <div><span className="text-muted-foreground">{zh ? "收盘价" : "Close"}</span><p className="mt-0.5 font-mono text-sm">${money(f?.price)}</p></div>
               <div><span className="text-muted-foreground">{zh ? "支撑 / 跌破关注" : "Support"}</span><p className="mt-0.5 font-mono text-sm">${money(f?.support)}</p></div>

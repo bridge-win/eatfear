@@ -456,7 +456,7 @@ function HistoryPaneLoading({
 type CatalogGroup = { key: string; label: string; count: number; importance: number; corr: number | null; series: { key: string; label: string; importance: number; corr: number | null }[] }
 
 function GroupFilterPanel({
-  catalog, active, hidden, expanded, sortMode, hasCorr, pinned, onToggleGroup, onToggleSeries, onToggleExpand, onAll, onNone, onSortMode, onPin, onMove, onLocate, open, onOpenChange,
+  catalog, active, hidden, expanded, sortMode, hasCorr, pinned, width, onResize, onToggleGroup, onToggleSeries, onToggleExpand, onAll, onNone, onSortMode, onPin, onMove, onLocate, open, onOpenChange,
 }: {
   catalog: CatalogGroup[]
   active: Set<string>
@@ -471,6 +471,8 @@ function GroupFilterPanel({
   onNone: () => void
   onSortMode: (m: "corr" | "importance") => void
   pinned: string[]
+  width: number
+  onResize: (w: number) => void
   onPin: (key: string) => void
   onMove: (key: string, dir: -1 | 1) => void
   onLocate: (key: string) => void
@@ -480,7 +482,26 @@ function GroupFilterPanel({
   const enabledCount = catalog.filter((g) => active.has(g.key)).length
   const fmtCorr = (c: number | null) => (c === null ? "—" : `ρ${c >= 0 ? "+" : "−"}${Math.abs(c).toFixed(2)}`)
   return (
-    <aside className={cn("sticky top-32 z-10 max-h-[calc(100vh-8.5rem)] shrink-0 self-start overflow-y-auto rounded-md border border-border/60 bg-card/95 text-[11px] backdrop-blur", open ? "w-60" : "w-8")}>
+    <aside
+      className={cn("relative sticky top-32 z-10 max-h-[calc(100vh-8.5rem)] shrink-0 self-start overflow-y-auto rounded-md border border-border/60 bg-card/95 text-[11px] backdrop-blur")}
+      style={{ width: open ? width : 32 }}
+    >
+      {open && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="拖动调整筛选面板宽度"
+          title="拖动调整宽度"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            const startX = e.clientX, startW = width
+            const move = (ev: PointerEvent) => onResize(Math.min(560, Math.max(220, startW + ev.clientX - startX)))
+            const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up) }
+            window.addEventListener("pointermove", move); window.addEventListener("pointerup", up)
+          }}
+          className="absolute inset-y-0 right-0 z-20 w-1.5 cursor-col-resize hover:bg-primary/40 active:bg-primary/60"
+        />
+      )}
       <div className="flex items-center justify-between px-1.5 py-1">
         {open && <span className="font-medium">分组筛选 <span className="text-muted-foreground">{enabledCount}/{catalog.length}</span></span>}
         <button type="button" onClick={() => onOpenChange(!open)} className="rounded px-1 text-muted-foreground hover:text-foreground" aria-label={open ? "收起筛选" : "展开筛选"}>{open ? "«" : "»"}</button>
@@ -507,11 +528,11 @@ function GroupFilterPanel({
                     <input type="checkbox" checked={active.has(g.key)} onChange={() => onToggleGroup(g.key)} className="accent-primary" aria-label={`显示 ${g.label}`} />
                     <button type="button" onClick={() => onToggleExpand(g.key)} className="w-3 shrink-0 text-muted-foreground" aria-label={isOpen ? "收起" : "展开"}>{isOpen ? "▾" : "▸"}</button>
                     <button type="button" onClick={() => onLocate(g.key)} className="min-w-0 flex-1 truncate text-left hover:underline" title={`定位到「${g.label}」的图表`}>{g.label}</button>
-                    <span className="tabular-nums text-muted-foreground" title="可见/总数 · 排序依据">{visibleInGroup}/{g.count}<span className="opacity-60"> · {sortMode === "corr" ? fmtCorr(g.corr) : `R${Math.round(g.importance)}`}</span></span>
-                    <span className="flex shrink-0 items-center gap-0.5 opacity-40 group-hover/row:opacity-100">
-                      {isPinned && <button type="button" onClick={() => onMove(g.key, -1)} className="rounded px-0.5 hover:text-foreground" aria-label="上移" title="上移">↑</button>}
-                      {isPinned && <button type="button" onClick={() => onMove(g.key, 1)} className="rounded px-0.5 hover:text-foreground" aria-label="下移" title="下移">↓</button>}
-                      <button type="button" onClick={() => onPin(g.key)} className={cn("rounded px-0.5 hover:text-foreground", isPinned && "text-primary opacity-100")} aria-label={isPinned ? "取消置顶" : "置顶"} title={isPinned ? "取消置顶" : "置顶"}>{isPinned ? "📌" : "📍"}</button>
+                    <span className="shrink-0 whitespace-nowrap text-[10px] tabular-nums text-muted-foreground" title="可见/总数 · 排序依据">{visibleInGroup}/{g.count}<span className="opacity-60"> {sortMode === "corr" ? fmtCorr(g.corr) : `R${Math.round(g.importance)}`}</span></span>
+                    <span className="flex shrink-0 items-center gap-px text-[11px] leading-none">
+                      <button type="button" disabled={!isPinned} onClick={() => onMove(g.key, -1)} className="w-3.5 rounded text-muted-foreground hover:text-foreground disabled:invisible" aria-label="上移" title="上移">↑</button>
+                      <button type="button" disabled={!isPinned} onClick={() => onMove(g.key, 1)} className="w-3.5 rounded text-muted-foreground hover:text-foreground disabled:invisible" aria-label="下移" title="下移">↓</button>
+                      <button type="button" onClick={() => onPin(g.key)} className={cn("w-4 rounded text-muted-foreground hover:text-foreground", isPinned && "text-primary")} aria-label={isPinned ? "取消置顶" : "置顶"} title={isPinned ? "取消置顶" : "置顶"}>{isPinned ? "📌" : "📍"}</button>
                     </span>
                   </div>
                   {isOpen && (
@@ -596,6 +617,13 @@ export function AlignedHistoryCompare({
   })
   useEffect(() => { if (pinStorageKey && typeof window !== "undefined") { try { window.localStorage.setItem(pinStorageKey, JSON.stringify(pinned)) } catch {} } }, [pinned, pinStorageKey])
   const [scrollTarget, setScrollTarget] = useState<string | null>(null)
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return 300
+    const raw = window.localStorage.getItem("history-compare:filter-width")
+    const n = raw ? Number(raw) : NaN
+    return Number.isFinite(n) ? Math.min(560, Math.max(220, n)) : 300
+  })
+  useEffect(() => { try { window.localStorage.setItem("history-compare:filter-width", String(panelWidth)) } catch {} }, [panelWidth])
   const applyPins = (groups: AlignedHistoryGroup[]) => {
     const byKey = new Map(groups.map((g) => [g.key, g]))
     const head = pinned.map((k) => byKey.get(k)).filter((g): g is AlignedHistoryGroup => Boolean(g))
@@ -1085,6 +1113,8 @@ export function AlignedHistoryCompare({
             onNone={() => setEnabledGroups(new Set())}
             onSortMode={setSortMode}
             pinned={pinned}
+            width={panelWidth}
+            onResize={setPanelWidth}
             onPin={(key) => setPinned((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))}
             onMove={(key, dir) => setPinned((prev) => { const i = prev.indexOf(key); const j = i + dir; if (i < 0 || j < 0 || j >= prev.length) return prev; const next = [...prev]; ;[next[i], next[j]] = [next[j], next[i]]; return next })}
             onLocate={scrollToGroup}

@@ -6,6 +6,8 @@ import { BlackSwanOpportunityCard } from "@/components/black-swan-opportunity-ca
 import { CryptoBuyWindowCard } from "@/components/crypto-buy-window-card"
 import { CryptoTradePlanPanel } from "@/components/crypto-trade-plan-panel"
 import { CryptoForecastCard } from "@/components/crypto-forecast-card"
+import { TONE_TEXT, regimeTone, stressTone, type Tone } from "@/lib/indicator-tone"
+import { cn } from "@/lib/utils"
 import { PanicWindowBanner } from "@/components/panic-window-banner"
 import { SmartMoneyTracker } from "@/components/smart-money-tracker"
 import {
@@ -117,6 +119,7 @@ function QuantSignalRail({ ccy, signals }: { ccy: string; signals?: CryptoQuantS
       {QUANT_SIGNAL_KEYS.map((item) => {
         const value = signals?.[item.key] ?? null
         const danger = item.key === "cascadeScore" && signals?.cascadeInProgress
+        const tone: Tone = danger ? "alert" : item.key === "trendScore" ? regimeTone(value) : stressTone(value)
         return (
           <div
             key={item.key}
@@ -132,7 +135,7 @@ function QuantSignalRail({ ccy, signals }: { ccy: string; signals?: CryptoQuantS
                 </span>
               )}
             </div>
-            <div className="mt-0.5 text-base font-semibold tabular-nums tracking-normal">
+            <div className={cn("mt-0.5 flex items-baseline gap-1.5 text-base font-semibold tabular-nums tracking-normal", TONE_TEXT[tone])}>
               {formatSignalScore(value)}
             </div>
           </div>
