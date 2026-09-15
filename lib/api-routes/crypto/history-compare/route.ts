@@ -11,6 +11,7 @@ import { fetchMempoolHashrateHistory } from "@/lib/data-sources/mempool"
 import { fetchYahooSeries } from "@/lib/data-sources/yahoo"
 import { fetchBitcoinEtfFlowHistory, fetchCoinglassLiquidationHistory } from "@/lib/data-sources/coinglass"
 import { fetchBinanceFundingHistory, fetchBinanceFuturesKlines, type BinanceInterval } from "@/lib/data-sources/binance-futures"
+import { fetchCoinalyzeLiquidations, fetchCoinalyzeOpenInterest, toCoinalyzeInterval } from "@/lib/data-sources/coinalyze"
 import { fetchJson } from "@/lib/data-sources/_fetch"
 import {
   computeMiningCostFromHashrateHps,
@@ -819,20 +820,35 @@ async function takerNetLong(
 async function liquidationLong(
   ccy: string, instId: string, daysWanted: number, window?: FetchWindow,
 ): Promise<{ long: RawPoint[]; short: RawPoint[]; count: RawPoint[] }> {
-  const key = process.env.COINGLASS_API_KEY
   const okx = okxLiquidationDaily(instId, daysWanted, window)
-  if (!key) return okx
   const endMs = window?.endMs ?? Date.now()
-  const startMs = window?.startMs ?? endMs - daysWanted * DAY_MS
-  const bars = await fetchCoinglassLiquidationHistory(key, ccy, "1d", startMs - 30 * DAY_MS, endMs, 3600)
+  const startMs = (window?.startMs ?? endMs - daysWanted * DAY_MS) - 30 * DAY_MS
+  let bars: { timestamp: number; longUsd: number; shortUsd: number }[] = []
+  const cg = process.env.COINGLASS_API_KEY
+  if (cg) bars = await fetchCoinglassLiquidationHistory(cg, ccy, "1d", startMs, endMs, 3600).catch(() => [])
+  const ca = process.env.COINALYZE_API_KEY
+  if (bars.length === 0 && ca) bars = await fetchCoinalyzeLiquidations(ca, ccy, "daily", startMs, endMs, 3600).catch(() => [])
   if (bars.length === 0) return okx
-  // Coinglass has no event count; keep OKX's (short) count series for that one field.
+  // Neither aggregator publishes an event count; keep OKX's (short) count series for that field.
   const okxRes = await okx
   return {
     long: bars.map((b) => ({ timestamp: b.timestamp, value: b.longUsd })),
     short: bars.map((b) => ({ timestamp: b.timestamp, value: b.shortUsd })),
     count: okxRes.count,
   }
+}
+
+async function oiHistoryLong(
+  ccy: string, instId: string, daysWanted: number, intervalId: string, requestedPeriod: OkxDerivativeHistoryPeriod | null, window?: FetchWindow,
+): Promise<RawPoint[]> {
+  const ca = process.env.COINALYZE_API_KEY
+  if (ca) {
+    const endMs = window?.endMs ?? Date.now()
+    const startMs = (window?.startMs ?? endMs - daysWanted * DAY_MS) - 90 * DAY_MS   // percentile/z-score lookback
+    const rows = await fetchCoinalyzeOpenInterest(ca, ccy, toCoinalyzeInterval(intervalId), startMs, endMs, 3600).catch(() => [])
+    if (rows.length > 0) return rows
+  }
+  return okxOiHistory(instId, daysWanted, requestedPeriod, window)
 }
 
 async function okxFundingHistory(instId: string, daysWanted: number, window?: FetchWindow): Promise<RawPoint[]> {
@@ -1531,7 +1547,7 @@ export async function GET(request: Request) {
     requestedWithSignals.has("bnbPrice") ? okxDailyKlines("BNB-USDT", okxDays, fetchWindow) : [],
     requestedWithSignals.has("dogePrice") ? okxDailyKlines("DOGE-USDT", okxDays, fetchWindow) : [],
     hasRequestedKey(requestedWithSignals, OI_KEYS) && okxInstrumentHistoryCoversRange
-      ? okxOiHistory(instId, okxDays, supportedRubikPeriod, fetchWindow)
+      ? oiHistoryLong(ccy, instId, okxDays, selection.interval.id, supportedRubikPeriod, fetchWindow)
       : [],
     hasRequestedKey(requestedWithSignals, FUNDING_KEYS) ? fundingHistoryLong(ccy, instId, okxDays, fetchWindow) : [],
     hasRequestedKey(requestedWithSignals, LONG_SHORT_KEYS) && okxMarketLongShortCoversRange
