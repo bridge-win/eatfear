@@ -9,7 +9,8 @@ import {
 import { fetchStablecoinMarketCap, fetchDefiTvl } from "@/lib/data-sources/defillama"
 import { fetchMempoolHashrateHistory } from "@/lib/data-sources/mempool"
 import { fetchYahooSeries } from "@/lib/data-sources/yahoo"
-import { fetchBitcoinEtfFlowHistory } from "@/lib/data-sources/coinglass"
+import { fetchBitcoinEtfFlowHistory, fetchCoinglassLiquidationHistory } from "@/lib/data-sources/coinglass"
+import { fetchBinanceFundingHistory, fetchBinanceFuturesKlines, type BinanceInterval } from "@/lib/data-sources/binance-futures"
 import { fetchJson } from "@/lib/data-sources/_fetch"
 import {
   computeMiningCostFromHashrateHps,
@@ -772,6 +773,68 @@ async function okxTakerNet(
 
 /* Funding rate updates every 8h (3 per day), so total records needed scales
    with days. Paginate with after=oldestTs to walk backwards. */
+/* ---------------------------------------------------------------------------
+   Long-history sources. OKX keeps ~90 days of liquidations and shallow rubik
+   stats, so for windows longer than that we take the whole series from one
+   long-history source rather than stitching exchanges mid-series. Fallback to
+   the OKX feed when the long source is unavailable, so the chart never regresses.
+   --------------------------------------------------------------------------- */
+
+async function fundingHistoryLong(ccy: string, instId: string, daysWanted: number, window?: FetchWindow): Promise<RawPoint[]> {
+  const endMs = window?.endMs ?? Date.now()
+  const startMs = (window?.startMs ?? endMs - daysWanted * DAY_MS) - 90 * DAY_MS   // percentile/z-score lookback
+  try {
+    const rows = await fetchBinanceFundingHistory(`${ccy}USDT`, startMs, endMs, 3600)
+    if (rows.length > 0) return rows.map((r) => ({ timestamp: r.timestamp, value: r.rate * 100 }))   // same % unit as the OKX path
+  } catch {}
+  return okxFundingHistory(instId, daysWanted, window)
+}
+
+const BINANCE_INTERVALS = new Set<string>(["5m", "15m", "30m", "1h", "4h", "1d", "1w"])
+
+async function takerNetLong(
+  ccy: string, daysWanted: number, interval: string, requestedPeriod: OkxDerivativeHistoryPeriod | null, window?: FetchWindow,
+): Promise<{ buy: RawPoint[]; sell: RawPoint[]; net: RawPoint[]; cumulativeNet: RawPoint[] }> {
+  if (BINANCE_INTERVALS.has(interval)) {
+    const endMs = window?.endMs ?? Date.now()
+    const startMs = window?.startMs ?? endMs - daysWanted * DAY_MS
+    try {
+      const k = await fetchBinanceFuturesKlines(`${ccy}USDT`, interval as BinanceInterval, startMs, endMs, 3600)
+      if (k.length > 0) {
+        const buy: RawPoint[] = [], sell: RawPoint[] = [], net: RawPoint[] = [], cumulativeNet: RawPoint[] = []
+        let cum = 0
+        for (const c of k) {
+          const b = c.takerBuyQuote, sl = Math.max(0, c.quoteVolume - c.takerBuyQuote)
+          cum += b - sl
+          buy.push({ timestamp: c.openTime, value: b }); sell.push({ timestamp: c.openTime, value: sl })
+          net.push({ timestamp: c.openTime, value: b - sl }); cumulativeNet.push({ timestamp: c.openTime, value: cum })
+        }
+        return { buy, sell, net, cumulativeNet }
+      }
+    } catch {}
+  }
+  return okxTakerNet(ccy, daysWanted, requestedPeriod, window)
+}
+
+async function liquidationLong(
+  ccy: string, instId: string, daysWanted: number, window?: FetchWindow,
+): Promise<{ long: RawPoint[]; short: RawPoint[]; count: RawPoint[] }> {
+  const key = process.env.COINGLASS_API_KEY
+  const okx = okxLiquidationDaily(instId, daysWanted, window)
+  if (!key) return okx
+  const endMs = window?.endMs ?? Date.now()
+  const startMs = window?.startMs ?? endMs - daysWanted * DAY_MS
+  const bars = await fetchCoinglassLiquidationHistory(key, ccy, "1d", startMs - 30 * DAY_MS, endMs, 3600)
+  if (bars.length === 0) return okx
+  // Coinglass has no event count; keep OKX's (short) count series for that one field.
+  const okxRes = await okx
+  return {
+    long: bars.map((b) => ({ timestamp: b.timestamp, value: b.longUsd })),
+    short: bars.map((b) => ({ timestamp: b.timestamp, value: b.shortUsd })),
+    count: okxRes.count,
+  }
+}
+
 async function okxFundingHistory(instId: string, daysWanted: number, window?: FetchWindow): Promise<RawPoint[]> {
   const desired = Math.max(180, Math.ceil(daysWanted) * 3 + 24)
   const collected = new Map<number, number>()
@@ -1470,7 +1533,7 @@ export async function GET(request: Request) {
     hasRequestedKey(requestedWithSignals, OI_KEYS) && okxInstrumentHistoryCoversRange
       ? okxOiHistory(instId, okxDays, supportedRubikPeriod, fetchWindow)
       : [],
-    hasRequestedKey(requestedWithSignals, FUNDING_KEYS) ? okxFundingHistory(instId, okxDays, fetchWindow) : [],
+    hasRequestedKey(requestedWithSignals, FUNDING_KEYS) ? fundingHistoryLong(ccy, instId, okxDays, fetchWindow) : [],
     hasRequestedKey(requestedWithSignals, LONG_SHORT_KEYS) && okxMarketLongShortCoversRange
       ? okxLongShort(ccy, okxDays, supportedRubikPeriod, fetchWindow)
       : [],
@@ -1481,10 +1544,10 @@ export async function GET(request: Request) {
       ? okxTopTraderPosition(instId, okxDays, supportedRubikPeriod, fetchWindow)
       : { account: [], position: [] },
     hasRequestedKey(requestedWithSignals, SMART_MONEY_KEYS)
-      ? okxTakerNet(ccy, okxDays, supportedRubikPeriod, fetchWindow)
+      ? takerNetLong(ccy, okxDays, selection.interval.id, supportedRubikPeriod, fetchWindow)
       : { buy: [], sell: [], net: [], cumulativeNet: [] },
     hasRequestedKey(requestedWithSignals, LIQ_KEYS)
-      ? okxLiquidationDaily(instId, okxDays, fetchWindow)
+      ? liquidationLong(ccy, instId, okxDays, fetchWindow)
       : { long: [], short: [], count: [] },
     requestedWithSignals.has("fng")
       ? fetchFearGreedHistory(range, revalidate).then((r) =>

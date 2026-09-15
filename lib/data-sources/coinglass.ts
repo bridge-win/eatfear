@@ -115,3 +115,34 @@ export async function fetchExchangeBalanceWeightedPct7d(
   if (!res.ok) return null
   return weightedAvgPercent7d(res.data ?? [])
 }
+
+
+export interface LiquidationBar { timestamp: number; longUsd: number; shortUsd: number }
+
+/**
+ * Cross-exchange aggregated liquidation history for a coin. Daily bars are available
+ * on the base plans; sub-daily depth depends on the plan. Returns [] on any error so
+ * callers can fall back to the exchange feed.
+ */
+export async function fetchCoinglassLiquidationHistory(
+  apiKey: string,
+  symbol: string,
+  interval: "1h" | "4h" | "1d",
+  startMs: number,
+  endMs: number,
+  revalidateSeconds = 3600,
+): Promise<LiquidationBar[]> {
+  const params = new URLSearchParams({ symbol, interval, start_time: String(startMs), end_time: String(endMs), limit: "4500" })
+  const res = await cgGet<{ code?: string; data?: { time?: number; t?: number; long_liquidation_usd?: number; short_liquidation_usd?: number; longLiquidationUsd?: number; shortLiquidationUsd?: number }[] }>(
+    `/api/futures/liquidation/aggregated-history?${params.toString()}`, apiKey, revalidateSeconds,
+  ).catch(() => null)
+  const rows = res && res.ok && Array.isArray(res.data.data) ? res.data.data : []
+  return rows
+    .map((r: { time?: number; t?: number; long_liquidation_usd?: number; short_liquidation_usd?: number; longLiquidationUsd?: number; shortLiquidationUsd?: number }) => ({
+      timestamp: Number(r.time ?? r.t ?? 0),
+      longUsd: Number(r.long_liquidation_usd ?? r.longLiquidationUsd ?? 0),
+      shortUsd: Number(r.short_liquidation_usd ?? r.shortLiquidationUsd ?? 0),
+    }))
+    .filter((r: LiquidationBar) => Number.isFinite(r.timestamp) && r.timestamp > 0)
+    .sort((a: LiquidationBar, b: LiquidationBar) => a.timestamp - b.timestamp)
+}
