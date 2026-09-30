@@ -129,6 +129,7 @@ export interface AlignedHistoryCompareProps {
   defaultPinned?: string[]
   /** localStorage key for the user's pinned order. */
   pinStorageKey?: string
+  showFilterPanel?: boolean
   className?: string
 }
 
@@ -592,6 +593,7 @@ export function AlignedHistoryCompare({
   referenceKey,
   defaultPinned,
   pinStorageKey,
+  showFilterPanel = true,
   className,
 }: AlignedHistoryCompareProps) {
   const cardRef = useRef<HTMLDivElement | null>(null)
@@ -1099,7 +1101,7 @@ export function AlignedHistoryCompare({
           <p className="py-12 text-center text-xs text-muted-foreground">{noDataLabel}</p>
         ) : (
           <div className="relative flex min-w-0 gap-2">
-          <GroupFilterPanel
+          {showFilterPanel && <GroupFilterPanel
             catalog={groupCatalog}
             active={activeGroups}
             hidden={hidden}
@@ -1120,7 +1122,7 @@ export function AlignedHistoryCompare({
             onLocate={scrollToGroup}
             open={filterOpen}
             onOpenChange={setFilterOpen}
-          />
+          />}
           <div className="min-w-0 flex-1">
           <Pager page={safePage} pageCount={pageCount} panesPerPage={panesPerPage} onPage={setPage} onPanesPerPage={setPanesPerPage} paneCount={allPanes.length} />
           <div ref={gridRef} className="relative flex flex-col gap-px sm:gap-0.5">

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { alignPastOnly } from "@/lib/causal-series"
 
 import { fetchFearGreedHistory } from "@/lib/data-sources/alternative"
+import { fetchCoinGeckoCirculatingSupplyHistory } from "@/lib/data-sources/coingecko-history"
 import {
   fetchBlockchainInfoSeries,
   fetchBtcUsdDailyFromBlockchain,
@@ -1337,6 +1338,7 @@ const SELECTED_INSTRUMENT_LABEL_KEYS = new Set<string>([
   ...COMPOSITE_SIGNAL_KEYS,
   ...INDEX_PRICE_KEYS,
   ...ATR_TF_KEYS,
+  "circulatingSupply",
 ])
 
 const CROSS_SECTION_PRICE_KEY_BY_CCY: Readonly<Record<string, string>> = {
@@ -1429,7 +1431,23 @@ export async function GET(request: Request) {
   const indicatorLimit = getPositiveInteger(url.searchParams.get("limit"))
   const indicatorOffset = getNonNegativeInteger(url.searchParams.get("offset"))
   const configuredIndicators = getEnabledCryptoIndicators()
-  const offsetIndicators = configuredIndicators.slice(indicatorOffset)
+  const requestedKeyOrder = Array.from(
+    new Set(
+      (url.searchParams.get("keys") ?? "")
+        .split(",")
+        .map((key) => key.trim())
+        .filter(Boolean)
+        .slice(0, 160),
+    ),
+  )
+  const configuredByKey = new Map(configuredIndicators.map((indicator) => [indicator.key, indicator]))
+  const selectedIndicators = requestedKeyOrder.length > 0
+    ? requestedKeyOrder.flatMap((key) => {
+        const indicator = configuredByKey.get(key)
+        return indicator ? [indicator] : []
+      })
+    : configuredIndicators
+  const offsetIndicators = selectedIndicators.slice(indicatorOffset)
   const requestedIndicators =
     indicatorLimit === null ? offsetIndicators : offsetIndicators.slice(0, indicatorLimit)
   const requestedKeys = new Set(requestedIndicators.map((indicator) => indicator.key))
@@ -1484,6 +1502,7 @@ export async function GET(request: Request) {
     fng,
     stablecoin,
     defiTvl,
+    circulatingSupply,
     mempoolHashRate,
     hashRate,
     difficulty,
@@ -1579,6 +1598,14 @@ export async function GET(request: Request) {
       ? fetchDefiTvl(range, revalidate).then((r) =>
           (r?.history ?? []).map((p) => ({ timestamp: p.timestamp, value: p.value })),
         ).catch(() => [])
+      : [],
+    requestedWithSignals.has("circulatingSupply")
+      ? fetchCoinGeckoCirculatingSupplyHistory({
+          symbol: ccy,
+          startMs: selection.startMs,
+          endMs: selection.endMs,
+          revalidate: 3600,
+        }).catch(() => [])
       : [],
     hasRequestedKey(requestedWithSignals, MINING_COST_KEYS) ? fetchMempoolHashrateHistory(revalidate) : [],
     requestedWithSignals.has("hashRate") || hasRequestedKey(requestedWithSignals, MINING_COST_KEYS)
@@ -1834,6 +1861,7 @@ export async function GET(request: Request) {
     ["signalDirection", signalScores.direction],
     ["stablecoinMcap", stablecoin],
     ["defiTvl", defiTvl],
+    ["circulatingSupply", circulatingSupply],
     ["oi", oi],
     ["oiChangePct", oiChangePct],
     ["oiChange5m", derivativeFeatures.oiChange5m],

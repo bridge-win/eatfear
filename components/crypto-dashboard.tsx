@@ -419,6 +419,7 @@ export function CryptoDashboard({
         <TabsContent value="history" className="mt-3">
           <CryptoHistoryCompare
             instId={instId}
+            availableAssets={instruments.map((instrument) => instrument.base)}
             range={range}
             selection={historySelection}
             payload={cryptoHistory.payload}
