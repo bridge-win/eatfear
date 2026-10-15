@@ -1,1 +1,341 @@
-{"collectedAt":null,"startYear":2015,"records":[],"errors":["Historical collector has not run yet"],"documents":0}
+{
+  "collectedAt": "2026-10-15T05:39:06.527Z",
+  "startYear": 2015,
+  "records": [
+    {
+      "date": "2024-02-29",
+      "issuance": 5600,
+      "refinance": 1594,
+      "newDebt": 4006,
+      "balance": null,
+      "rate": 2.57,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202403/t20240328_3931768.htm",
+      "publishedAt": "2024-03-28",
+      "fetchedAt": "2026-10-15T05:39:06.526Z"
+    },
+    {
+      "date": "2024-03-31",
+      "issuance": 6295,
+      "refinance": 3631,
+      "newDebt": 2664,
+      "balance": 416940,
+      "rate": 2.46,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202404/t20240430_3933918.htm",
+      "publishedAt": "2024-04-30",
+      "fetchedAt": "2026-10-15T05:39:06.260Z"
+    },
+    {
+      "date": "2024-04-30",
+      "issuance": 3439,
+      "refinance": 2154,
+      "newDebt": 1285,
+      "balance": 417489,
+      "rate": 2.41,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202405/t20240531_3936271.htm",
+      "publishedAt": "2024-05-31",
+      "fetchedAt": "2026-10-15T05:39:06.018Z"
+    },
+    {
+      "date": "2024-05-31",
+      "issuance": 9036,
+      "refinance": 4217,
+      "newDebt": 4819,
+      "balance": 423838,
+      "rate": 2.45,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202406/t20240627_3938206.htm",
+      "publishedAt": "2024-06-27",
+      "fetchedAt": "2026-10-15T05:39:05.723Z"
+    },
+    {
+      "date": "2024-06-30",
+      "issuance": 6714,
+      "refinance": 2983,
+      "newDebt": 3731,
+      "balance": 426098,
+      "rate": 2.34,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202407/t20240731_3940804.htm",
+      "publishedAt": "2024-07-31",
+      "fetchedAt": "2026-10-15T05:39:05.218Z"
+    },
+    {
+      "date": "2024-07-31",
+      "issuance": 7108,
+      "refinance": 3908,
+      "newDebt": 3200,
+      "balance": 428009,
+      "rate": 2.24,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202408/t20240830_3942885.htm",
+      "publishedAt": "2024-08-30",
+      "fetchedAt": "2026-10-15T05:39:05.516Z"
+    },
+    {
+      "date": "2024-08-31",
+      "issuance": 12091,
+      "refinance": 2617,
+      "newDebt": 9474,
+      "balance": 436297,
+      "rate": 2.24,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202409/t20240930_3944792.htm",
+      "publishedAt": "2024-09-30",
+      "fetchedAt": "2026-10-15T05:39:02.820Z"
+    },
+    {
+      "date": "2024-09-30",
+      "issuance": 12893,
+      "refinance": 1522,
+      "newDebt": 11371,
+      "balance": 447403,
+      "rate": 2.15,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202410/t20241029_3946473.htm",
+      "publishedAt": "2024-10-29",
+      "fetchedAt": "2026-10-15T05:39:02.527Z"
+    },
+    {
+      "date": "2024-10-31",
+      "issuance": 6861,
+      "refinance": 3476,
+      "newDebt": 3385,
+      "balance": 453160,
+      "rate": 2.24,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202411/t20241129_3948536.htm",
+      "publishedAt": "2024-11-29",
+      "fetchedAt": "2026-10-15T05:39:02.018Z"
+    },
+    {
+      "date": "2024-11-30",
+      "issuance": 13141,
+      "refinance": 12090,
+      "newDebt": 1051,
+      "balance": 464974,
+      "rate": 2.23,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202412/t20241227_3950717.htm",
+      "publishedAt": "2024-12-27",
+      "fetchedAt": "2026-10-15T05:39:02.128Z"
+    },
+    {
+      "date": "2024-12-31",
+      "issuance": 10913,
+      "refinance": 10460,
+      "newDebt": 453,
+      "balance": 475371,
+      "rate": 2.13,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202501/t20250124_3955049.htm",
+      "publishedAt": "2025-01-24",
+      "fetchedAt": "2026-10-15T05:39:01.629Z"
+    },
+    {
+      "date": "2025-01-31",
+      "issuance": 5575,
+      "refinance": 2522,
+      "newDebt": 3053,
+      "balance": 480131,
+      "rate": 1.87,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202503/t20250328_3960903.htm",
+      "publishedAt": "2025-03-28",
+      "fetchedAt": "2026-10-15T05:39:01.630Z"
+    },
+    {
+      "date": "2025-02-28",
+      "issuance": 13057,
+      "refinance": 8091,
+      "newDebt": 4966,
+      "balance": null,
+      "rate": 1.93,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202503/t20250328_3960904.htm",
+      "publishedAt": "2025-03-28",
+      "fetchedAt": "2026-10-15T05:39:00.287Z"
+    },
+    {
+      "date": "2025-03-31",
+      "issuance": 9788,
+      "refinance": 5413,
+      "newDebt": 4375,
+      "balance": 501650,
+      "rate": 2.09,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202504/t20250428_3962945.htm",
+      "publishedAt": "2025-04-28",
+      "fetchedAt": "2026-10-15T05:39:00.387Z"
+    },
+    {
+      "date": "2025-04-30",
+      "issuance": 6933,
+      "refinance": 4399,
+      "newDebt": 2534,
+      "balance": 506931,
+      "rate": 1.92,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202505/t20250528_3964717.htm",
+      "publishedAt": "2025-05-28",
+      "fetchedAt": "2026-10-15T05:38:58.442Z"
+    },
+    {
+      "date": "2025-05-31",
+      "issuance": 7795,
+      "refinance": 2876,
+      "newDebt": 4919,
+      "balance": 512475,
+      "rate": 1.87,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202506/t20250627_3966682.htm",
+      "publishedAt": "2025-06-27",
+      "fetchedAt": "2026-10-15T05:38:56.591Z"
+    },
+    {
+      "date": "2025-06-30",
+      "issuance": 11753,
+      "refinance": 5472,
+      "newDebt": 6281,
+      "balance": 519503,
+      "rate": 1.8,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202507/t20250730_3968958.htm",
+      "publishedAt": "2025-07-30",
+      "fetchedAt": "2026-10-15T05:38:57.884Z"
+    },
+    {
+      "date": "2025-07-31",
+      "issuance": 12135,
+      "refinance": 5103,
+      "newDebt": 7032,
+      "balance": 527627,
+      "rate": 1.85,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202508/t20250828_3970990.htm",
+      "publishedAt": "2025-08-28",
+      "fetchedAt": "2026-10-15T05:38:56.203Z"
+    },
+    {
+      "date": "2025-08-31",
+      "issuance": 9801,
+      "refinance": 4086,
+      "newDebt": 5715,
+      "balance": 532484,
+      "rate": 2.04,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202509/t20250929_3973481.htm",
+      "publishedAt": "2025-09-29",
+      "fetchedAt": "2026-10-15T05:38:54.584Z"
+    },
+    {
+      "date": "2025-09-30",
+      "issuance": 8619,
+      "refinance": 3878,
+      "newDebt": 4741,
+      "balance": 536995,
+      "rate": 2.18,
+      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202510/t20251024_3974884.htm",
+      "publishedAt": "2025-10-24",
+      "fetchedAt": "2026-10-15T05:38:52.213Z"
+    },
+    {
+      "date": "2025-10-31",
+      "issuance": 5680,
+      "refinance": 2548,
+      "newDebt": 3132,
+      "balance": 540106,
+      "rate": 2.12,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202511/t20251128_3977820.htm",
+      "publishedAt": "2025-11-28",
+      "fetchedAt": "2026-10-15T05:38:45.117Z"
+    },
+    {
+      "date": "2025-11-30",
+      "issuance": 9127,
+      "refinance": 3789,
+      "newDebt": 5338,
+      "balance": 546597,
+      "rate": 2.08,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202512/t20251230_3980857.htm",
+      "publishedAt": "2025-12-30",
+      "fetchedAt": "2026-10-15T05:38:44.583Z"
+    },
+    {
+      "date": "2025-12-31",
+      "issuance": 2837,
+      "refinance": 1105,
+      "newDebt": 1732,
+      "balance": 548231,
+      "rate": 2.05,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202601/t20260130_3983021.htm",
+      "publishedAt": "2026-01-30",
+      "fetchedAt": "2026-10-15T05:38:44.033Z"
+    },
+    {
+      "date": "2026-01-31",
+      "issuance": 8634,
+      "refinance": 4349,
+      "newDebt": 4285,
+      "balance": 555774,
+      "rate": 2.19,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202603/t20260309_3984956.htm",
+      "publishedAt": "2026-03-09",
+      "fetchedAt": "2026-10-15T05:38:43.072Z"
+    },
+    {
+      "date": "2026-02-28",
+      "issuance": 11582,
+      "refinance": 5521,
+      "newDebt": 6061,
+      "balance": 565936,
+      "rate": 2.18,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202604/t20260410_3987362.htm",
+      "publishedAt": "2026-04-10",
+      "fetchedAt": "2026-10-15T05:38:42.389Z"
+    },
+    {
+      "date": "2026-03-31",
+      "issuance": 10843,
+      "refinance": 6990,
+      "newDebt": 3853,
+      "balance": null,
+      "rate": 2.14,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202605/t20260508_3989284.htm",
+      "publishedAt": "2026-05-08",
+      "fetchedAt": "2026-10-15T05:38:41.855Z"
+    },
+    {
+      "date": "2026-05-31",
+      "issuance": 8047,
+      "refinance": 6185,
+      "newDebt": 1862,
+      "balance": 581453,
+      "rate": 1.96,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202606/t20260624_3992154.htm",
+      "publishedAt": "2026-06-24",
+      "fetchedAt": "2026-10-15T05:38:41.302Z"
+    },
+    {
+      "date": "2026-06-30",
+      "issuance": 11487,
+      "refinance": 5359,
+      "newDebt": 6128,
+      "balance": 587706,
+      "rate": 1.98,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202607/t20260727_3994357.htm",
+      "publishedAt": "2026-07-27",
+      "fetchedAt": "2026-10-15T05:38:40.417Z"
+    },
+    {
+      "date": "2026-07-31",
+      "issuance": 7383,
+      "refinance": 3342,
+      "newDebt": 4041,
+      "balance": 592411,
+      "rate": 1.97,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260909_3997013.htm",
+      "publishedAt": "2026-09-09",
+      "fetchedAt": "2026-10-15T05:38:39.928Z"
+    },
+    {
+      "date": "2026-08-31",
+      "issuance": 11945,
+      "refinance": 5505,
+      "newDebt": 6440,
+      "balance": 598955,
+      "rate": 1.83,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
+      "publishedAt": "2026-09-24",
+      "fetchedAt": "2026-10-15T05:38:40.341Z"
+    }
+  ],
+  "errors": [
+    "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/index_2.htm: Error: MOF HTTP 502",
+    "https://zwgls.mof.gov.cn/tjsj/202606/t20260611_3991502.htm: Error: MOF HTTP 502"
+  ],
+  "documents": 41
+}

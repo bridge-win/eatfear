@@ -1,0 +1,20 @@
+{
+  "testedAt": "2026-10-15T05:40:28.688Z",
+  "checks": [
+    "no page overflow at 1440px",
+    "real historical CSV export >24 observations",
+    "no page overflow at 768px",
+    "no page overflow at 390px",
+    "no page overflow at 320px",
+    "no page overflow at 390px",
+    "no page overflow at 320px",
+    "no page overflow at 390px",
+    "unknown identifiers rejected; no arbitrary upstream proxy",
+    "five panels navigate; search, ranges, themes, scenarios work"
+  ],
+  "runtimeErrors": [],
+  "policies": {
+    "status": "ok",
+    "liveCount": 20
+  }
+}

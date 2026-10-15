@@ -1,0 +1,666 @@
+{
+  "checkedAt": "2026-10-15T05:39:11.328Z",
+  "environment": "GitHub Actions or operator runtime; source availability is location-dependent",
+  "results": [
+    {
+      "id": "lg_issuance",
+      "name": "地方债当月发行",
+      "provider": "mof",
+      "status": "partial",
+      "points": 30,
+      "first": "2024-02-29",
+      "last": "2026-08-31",
+      "latest": 11945,
+      "milliseconds": 1330,
+      "warning": "本次官网检查失败，保留已归档历史；历史采集存在2个缺口，完整性未确认",
+      "complete": false,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
+      "fetchedAt": "2026-10-15T05:38:40.341Z",
+      "windows": {
+        "1": {
+          "first": "2025-08-31",
+          "count": 12
+        },
+        "5": {
+          "first": "2024-02-29",
+          "count": 30
+        },
+        "10": {
+          "first": "2024-02-29",
+          "count": 30
+        },
+        "max": {
+          "first": "2024-02-29",
+          "count": 30
+        }
+      }
+    },
+    {
+      "id": "lg_refinance",
+      "name": "地方再融资债当月发行",
+      "provider": "mof",
+      "status": "partial",
+      "points": 30,
+      "first": "2024-02-29",
+      "last": "2026-08-31",
+      "latest": 5505,
+      "milliseconds": 1283,
+      "warning": "本次官网检查失败，保留已归档历史；历史采集存在2个缺口，完整性未确认",
+      "complete": false,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
+      "fetchedAt": "2026-10-15T05:38:40.341Z",
+      "windows": {
+        "1": {
+          "first": "2025-08-31",
+          "count": 12
+        },
+        "5": {
+          "first": "2024-02-29",
+          "count": 30
+        },
+        "10": {
+          "first": "2024-02-29",
+          "count": 30
+        },
+        "max": {
+          "first": "2024-02-29",
+          "count": 30
+        }
+      }
+    },
+    {
+      "id": "lg_balance",
+      "name": "地方政府债务余额",
+      "provider": "mof",
+      "status": "partial",
+      "points": 27,
+      "first": "2024-03-31",
+      "last": "2026-08-31",
+      "latest": 598955,
+      "milliseconds": 1283,
+      "warning": "本次官网检查失败，保留已归档历史；历史采集存在2个缺口，完整性未确认",
+      "complete": false,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
+      "fetchedAt": "2026-10-15T05:38:40.341Z",
+      "windows": {
+        "1": {
+          "first": "2025-08-31",
+          "count": 11
+        },
+        "5": {
+          "first": "2024-03-31",
+          "count": 27
+        },
+        "10": {
+          "first": "2024-03-31",
+          "count": 27
+        },
+        "max": {
+          "first": "2024-03-31",
+          "count": 27
+        }
+      }
+    },
+    {
+      "id": "lg_rate",
+      "name": "地方债当月平均发行利率",
+      "provider": "mof",
+      "status": "partial",
+      "points": 30,
+      "first": "2024-02-29",
+      "last": "2026-08-31",
+      "latest": 1.83,
+      "milliseconds": 1283,
+      "warning": "本次官网检查失败，保留已归档历史；历史采集存在2个缺口，完整性未确认",
+      "complete": false,
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
+      "fetchedAt": "2026-10-15T05:38:40.341Z",
+      "windows": {
+        "1": {
+          "first": "2025-08-31",
+          "count": 12
+        },
+        "5": {
+          "first": "2024-02-29",
+          "count": 30
+        },
+        "10": {
+          "first": "2024-02-29",
+          "count": 30
+        },
+        "max": {
+          "first": "2024-02-29",
+          "count": 30
+        }
+      }
+    },
+    {
+      "id": "pmi",
+      "name": "制造业 PMI",
+      "provider": "eastmoney",
+      "status": "ok",
+      "points": 225,
+      "first": "2008-01-01",
+      "last": "2026-09-01",
+      "latest": 50.1,
+      "milliseconds": 1184,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.eastmoney.com/cjsj/pmi.html",
+      "fetchedAt": "2026-10-15T05:39:07.891Z",
+      "windows": {
+        "1": {
+          "first": "2025-09-01",
+          "count": 13
+        },
+        "5": {
+          "first": "2021-09-01",
+          "count": 61
+        },
+        "10": {
+          "first": "2016-09-01",
+          "count": 121
+        },
+        "max": {
+          "first": "2008-01-01",
+          "count": 225
+        }
+      }
+    },
+    {
+      "id": "nonpmi",
+      "name": "非制造业商务活动",
+      "provider": "eastmoney",
+      "status": "ok",
+      "points": 225,
+      "first": "2008-01-01",
+      "last": "2026-09-01",
+      "latest": 50.2,
+      "milliseconds": 1183,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.eastmoney.com/cjsj/",
+      "fetchedAt": "2026-10-15T05:39:07.891Z",
+      "windows": {
+        "1": {
+          "first": "2025-09-01",
+          "count": 13
+        },
+        "5": {
+          "first": "2021-09-01",
+          "count": 61
+        },
+        "10": {
+          "first": "2016-09-01",
+          "count": 121
+        },
+        "max": {
+          "first": "2008-01-01",
+          "count": 225
+        }
+      }
+    },
+    {
+      "id": "retail",
+      "name": "社会消费品零售同比",
+      "provider": "eastmoney",
+      "status": "ok",
+      "points": 194,
+      "first": "2008-01-01",
+      "last": "2026-08-01",
+      "latest": 0.4,
+      "milliseconds": 1566,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.eastmoney.com/cjsj/",
+      "fetchedAt": "2026-10-15T05:39:08.275Z",
+      "windows": {
+        "1": {
+          "first": "2025-08-01",
+          "count": 11
+        },
+        "5": {
+          "first": "2021-08-01",
+          "count": 51
+        },
+        "10": {
+          "first": "2016-08-01",
+          "count": 101
+        },
+        "max": {
+          "first": "2008-01-01",
+          "count": 194
+        }
+      }
+    },
+    {
+      "id": "industrial",
+      "name": "工业增加值同比",
+      "provider": "eastmoney",
+      "status": "ok",
+      "points": 193,
+      "first": "2008-02-01",
+      "last": "2026-08-01",
+      "latest": 5.2,
+      "milliseconds": 893,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.eastmoney.com/cjsj/",
+      "fetchedAt": "2026-10-15T05:39:07.603Z",
+      "windows": {
+        "1": {
+          "first": "2025-08-01",
+          "count": 11
+        },
+        "5": {
+          "first": "2021-08-01",
+          "count": 51
+        },
+        "10": {
+          "first": "2016-08-01",
+          "count": 101
+        },
+        "max": {
+          "first": "2008-02-01",
+          "count": 193
+        }
+      }
+    },
+    {
+      "id": "cpi",
+      "name": "CPI 同比",
+      "provider": "eastmoney",
+      "status": "ok",
+      "points": 225,
+      "first": "2008-01-01",
+      "last": "2026-09-01",
+      "latest": 0.9,
+      "milliseconds": 1093,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.eastmoney.com/cjsj/cpi.html",
+      "fetchedAt": "2026-10-15T05:39:07.804Z",
+      "windows": {
+        "1": {
+          "first": "2025-09-01",
+          "count": 13
+        },
+        "5": {
+          "first": "2021-09-01",
+          "count": 61
+        },
+        "10": {
+          "first": "2016-09-01",
+          "count": 121
+        },
+        "max": {
+          "first": "2008-01-01",
+          "count": 225
+        }
+      }
+    },
+    {
+      "id": "ppi",
+      "name": "PPI 同比",
+      "provider": "eastmoney",
+      "status": "ok",
+      "points": 249,
+      "first": "2006-01-01",
+      "last": "2026-09-01",
+      "latest": 5,
+      "milliseconds": 1239,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.eastmoney.com/cjsj/ppi.html",
+      "fetchedAt": "2026-10-15T05:39:07.952Z",
+      "windows": {
+        "1": {
+          "first": "2025-09-01",
+          "count": 13
+        },
+        "5": {
+          "first": "2021-09-01",
+          "count": 61
+        },
+        "10": {
+          "first": "2016-09-01",
+          "count": 121
+        },
+        "max": {
+          "first": "2006-01-01",
+          "count": 249
+        }
+      }
+    },
+    {
+      "id": "m2",
+      "name": "M2 同比",
+      "provider": "eastmoney",
+      "status": "ok",
+      "points": 225,
+      "first": "2008-01-01",
+      "last": "2026-09-01",
+      "latest": 7.2,
+      "milliseconds": 4613,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.eastmoney.com/cjsj/",
+      "fetchedAt": "2026-10-15T05:39:11.327Z",
+      "windows": {
+        "1": {
+          "first": "2025-09-01",
+          "count": 13
+        },
+        "5": {
+          "first": "2021-09-01",
+          "count": 61
+        },
+        "10": {
+          "first": "2016-09-01",
+          "count": 121
+        },
+        "max": {
+          "first": "2008-01-01",
+          "count": 225
+        }
+      }
+    },
+    {
+      "id": "loans",
+      "name": "新增人民币贷款",
+      "provider": "eastmoney",
+      "status": "ok",
+      "points": 225,
+      "first": "2008-01-01",
+      "last": "2026-09-01",
+      "latest": 12734,
+      "milliseconds": 1149,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.eastmoney.com/cjsj/",
+      "fetchedAt": "2026-10-15T05:39:07.863Z",
+      "windows": {
+        "1": {
+          "first": "2025-09-01",
+          "count": 13
+        },
+        "5": {
+          "first": "2021-09-01",
+          "count": 61
+        },
+        "10": {
+          "first": "2016-09-01",
+          "count": 121
+        },
+        "max": {
+          "first": "2008-01-01",
+          "count": 225
+        }
+      }
+    },
+    {
+      "id": "fiscal",
+      "name": "财政收入累计同比",
+      "provider": "eastmoney",
+      "status": "ok",
+      "points": 216,
+      "first": "2008-01-01",
+      "last": "2026-08-01",
+      "latest": 5.7,
+      "milliseconds": 891,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.eastmoney.com/cjsj/",
+      "fetchedAt": "2026-10-15T05:39:07.607Z",
+      "windows": {
+        "1": {
+          "first": "2025-08-01",
+          "count": 12
+        },
+        "5": {
+          "first": "2021-08-01",
+          "count": 56
+        },
+        "10": {
+          "first": "2016-08-01",
+          "count": 113
+        },
+        "max": {
+          "first": "2008-01-01",
+          "count": 216
+        }
+      }
+    },
+    {
+      "id": "cn10y",
+      "name": "中国10年国债收益率",
+      "provider": "eastmoney",
+      "status": "ok",
+      "points": 6188,
+      "first": "2002-01-04",
+      "last": "2026-10-14",
+      "latest": 1.6516,
+      "milliseconds": 3174,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.eastmoney.com/cjsj/zmgzsyl.html",
+      "fetchedAt": "2026-10-15T05:39:09.891Z",
+      "windows": {
+        "1": {
+          "first": "2025-10-14",
+          "count": 249
+        },
+        "5": {
+          "first": "2021-10-14",
+          "count": 1248
+        },
+        "10": {
+          "first": "2016-10-14",
+          "count": 2500
+        },
+        "max": {
+          "first": "2002-01-04",
+          "count": 6188
+        }
+      }
+    },
+    {
+      "id": "cn2y",
+      "name": "中国2年国债收益率",
+      "provider": "eastmoney",
+      "status": "ok",
+      "points": 6188,
+      "first": "2002-01-04",
+      "last": "2026-10-14",
+      "latest": 1.3896,
+      "milliseconds": 3182,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.eastmoney.com/cjsj/zmgzsyl.html",
+      "fetchedAt": "2026-10-15T05:39:09.891Z",
+      "windows": {
+        "1": {
+          "first": "2025-10-14",
+          "count": 249
+        },
+        "5": {
+          "first": "2021-10-14",
+          "count": 1248
+        },
+        "10": {
+          "first": "2016-10-14",
+          "count": 2500
+        },
+        "max": {
+          "first": "2002-01-04",
+          "count": 6188
+        }
+      }
+    },
+    {
+      "id": "lpr",
+      "name": "1年期 LPR",
+      "provider": "eastmoney",
+      "status": "ok",
+      "points": 1538,
+      "first": "2013-10-25",
+      "last": "2026-09-20",
+      "latest": 3,
+      "milliseconds": 2099,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.eastmoney.com/cjsj/",
+      "fetchedAt": "2026-10-15T05:39:08.818Z",
+      "windows": {
+        "1": {
+          "first": "2025-09-22",
+          "count": 13
+        },
+        "5": {
+          "first": "2021-09-22",
+          "count": 61
+        },
+        "10": {
+          "first": "2016-09-20",
+          "count": 812
+        },
+        "max": {
+          "first": "2013-10-25",
+          "count": 1538
+        }
+      }
+    },
+    {
+      "id": "equity",
+      "name": "沪深300价格指数",
+      "provider": "yahoo",
+      "status": "ok",
+      "points": 1,
+      "first": "2026-10-15",
+      "last": "2026-10-15",
+      "latest": 4125.79931640625,
+      "milliseconds": 474,
+      "warning": "日终/延迟价格行情，不含分红；授权及可用性以数据源规则为准。",
+      "complete": true,
+      "sourceUrl": "https://finance.yahoo.com/quote/000300.SS/",
+      "fetchedAt": "2026-10-15T05:39:07.192Z",
+      "windows": {
+        "1": {
+          "first": "2026-10-15",
+          "count": 1
+        },
+        "5": {
+          "first": "2026-10-15",
+          "count": 1
+        },
+        "10": {
+          "first": "2026-10-15",
+          "count": 1
+        },
+        "max": {
+          "first": "2026-10-15",
+          "count": 1
+        }
+      }
+    },
+    {
+      "id": "debt",
+      "name": "IMF一般政府债务 / GDP",
+      "provider": "imf",
+      "status": "unavailable",
+      "points": 0,
+      "first": null,
+      "last": null,
+      "latest": null,
+      "milliseconds": 475,
+      "warning": "上游 HTTP 403",
+      "complete": false,
+      "sourceUrl": "https://www.imf.org/external/datamapper/profile/CHN",
+      "fetchedAt": null,
+      "windows": {
+        "1": {
+          "first": null,
+          "count": 0
+        },
+        "5": {
+          "first": null,
+          "count": 0
+        },
+        "10": {
+          "first": null,
+          "count": 0
+        },
+        "max": {
+          "first": null,
+          "count": 0
+        }
+      }
+    },
+    {
+      "id": "gdp",
+      "name": "实际 GDP 年度增长",
+      "provider": "worldbank",
+      "status": "ok",
+      "points": 65,
+      "first": "1961-12-31",
+      "last": "2025-12-31",
+      "latest": 4.95994886240992,
+      "milliseconds": 660,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.worldbank.org/indicator/NY.GDP.MKTP.KD.ZG?locations=CN",
+      "fetchedAt": "2026-10-15T05:39:07.380Z",
+      "windows": {
+        "1": {
+          "first": "2024-12-31",
+          "count": 2
+        },
+        "5": {
+          "first": "2020-12-31",
+          "count": 6
+        },
+        "10": {
+          "first": "2015-12-31",
+          "count": 11
+        },
+        "max": {
+          "first": "1961-12-31",
+          "count": 65
+        }
+      }
+    },
+    {
+      "id": "govcons",
+      "name": "政府最终消费 / GDP",
+      "provider": "worldbank",
+      "status": "ok",
+      "points": 65,
+      "first": "1960-12-31",
+      "last": "2024-12-31",
+      "latest": 16.7084895385701,
+      "milliseconds": 640,
+      "warning": null,
+      "complete": true,
+      "sourceUrl": "https://data.worldbank.org/indicator/NE.CON.GOVT.ZS?locations=CN",
+      "fetchedAt": "2026-10-15T05:39:07.361Z",
+      "windows": {
+        "1": {
+          "first": "2023-12-31",
+          "count": 2
+        },
+        "5": {
+          "first": "2019-12-31",
+          "count": 6
+        },
+        "10": {
+          "first": "2014-12-31",
+          "count": 11
+        },
+        "max": {
+          "first": "1960-12-31",
+          "count": 65
+        }
+      }
+    }
+  ]
+}
