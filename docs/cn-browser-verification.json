@@ -1,5 +1,5 @@
 {
-  "testedAt": "2026-10-15T08:59:43.947Z",
+  "testedAt": "2026-10-15T09:06:00.731Z",
   "checks": [
     "no page overflow at 1440px",
     "real historical CSV export >24 observations",
@@ -10,7 +10,8 @@
     "no page overflow at 320px",
     "no page overflow at 390px",
     "unknown identifiers rejected; no arbitrary upstream proxy",
-    "five panels navigate; search, ranges, themes, scenarios work"
+    "five panels navigate; search, ranges, themes, scenarios work",
+    "main navigation and command palette open /cn without a duplicate header"
   ],
   "runtimeErrors": [],
   "policies": {
