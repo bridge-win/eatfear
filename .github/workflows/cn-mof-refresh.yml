@@ -1,0 +1,25 @@
+name: Refresh official local debt history
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --experimental-strip-types scripts/collect-cn-mof.ts
+      - run: node --experimental-strip-types --test lib/cn/metrics.test.ts
+      - name: Commit only the official data archive
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/cn/mof-history.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'data(cn): refresh auditable MOF monthly history'
+            git push origin HEAD:${{ github.ref_name }}
+          fi

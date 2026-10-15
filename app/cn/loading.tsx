@@ -1,0 +1,1 @@
+export default function Loading() { return <main lang="zh-CN" style={{ minHeight: "100vh", background: "#0b1118", color: "#8b9caa", display: "grid", placeItems: "center" }}><div role="status"><h1 style={{ color: "#46d3bd", fontSize: 26 }}>eatfear / 中国观察台</h1><p>正在打开研究工作台…</p></div></main> }

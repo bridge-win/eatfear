@@ -1,0 +1,2 @@
+"use client"
+export default function ErrorPage({ reset }: { error: Error; reset: () => void }) { return <main lang="zh-CN" style={{ minHeight: "80vh", display: "grid", placeItems: "center", padding: 24 }}><section><h1>研究工作台暂时无法加载</h1><p>数据没有被替换为模拟值。请重试，或返回其他页面。</p><button onClick={reset} style={{ padding: "10px 18px", border: "1px solid currentColor", borderRadius: 8, marginTop: 15 }}>重新加载</button><a href="/macro" style={{ marginLeft: 20 }}>全球宏观</a></section></main> }

@@ -1,0 +1,58 @@
+name: China observatory validation
+on:
+  push:
+    branches: [main, 'feat/cn-observatory']
+    paths: ['app/cn/**', 'app/api/cn/**', 'components/cn/**', 'lib/cn/**', 'public/cn/**', 'scripts/*cn*', 'tsconfig.cn.json', '.github/workflows/cn-validation.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: cn-validation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Collect official historical disclosures on implementation branch
+        if: github.ref_name == 'feat/cn-observatory'
+        run: node --experimental-strip-types scripts/collect-cn-mof.ts
+      - run: corepack enable && pnpm install --frozen-lockfile
+      - run: node --experimental-strip-types --test lib/cn/metrics.test.ts
+      - run: pnpm exec tsc -p tsconfig.cn.json --noEmit
+      - run: pnpm build
+      - name: Live provider diagnostics
+        continue-on-error: true
+        run: node --experimental-strip-types scripts/check-cn-sources.ts
+      - name: Install test browser
+        run: |
+          npm install --prefix /tmp/cn-browser playwright@1.56.1
+          node /tmp/cn-browser/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Browser and API smoke tests
+        run: |
+          PORT=3111 pnpm start > /tmp/cn-next.log 2>&1 &
+          for i in $(seq 1 60); do curl -fsS http://localhost:3111/cn >/dev/null && break; sleep 2; done
+          NODE_PATH=/tmp/cn-browser/node_modules node scripts/cn-browser-smoke.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cn-observatory-verification
+          path: |
+            artifacts/cn/
+            docs/cn-provider-verification.json
+            /tmp/cn-next.log
+      - name: Preserve verified data and diagnostics on implementation branch
+        if: success() && github.ref_name == 'feat/cn-observatory'
+        run: |
+          cp artifacts/cn/browser-report.json docs/cn-browser-verification.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/cn/mof-history.json docs/cn-provider-verification.json docs/cn-browser-verification.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'test(cn): record verified official history and browser diagnostics'
+            git push origin HEAD:${{ github.ref_name }}
+          fi
