@@ -21,13 +21,13 @@ jobs:
       - name: Collect official historical disclosures on implementation branch
         if: github.ref_name == 'feat/cn-observatory'
         run: node --experimental-strip-types scripts/collect-cn-mof.ts
+      - name: Live provider diagnostics
+        continue-on-error: true
+        run: node --experimental-strip-types scripts/check-cn-sources.ts
       - run: corepack enable && pnpm install --frozen-lockfile
       - run: node --experimental-strip-types --test lib/cn/metrics.test.ts
       - run: pnpm exec tsc -p tsconfig.cn.json --noEmit
       - run: pnpm build
-      - name: Live provider diagnostics
-        continue-on-error: true
-        run: node --experimental-strip-types scripts/check-cn-sources.ts
       - name: Install test browser
         run: |
           npm install --prefix /tmp/cn-browser playwright@1.56.1
@@ -44,6 +44,7 @@ jobs:
           path: |
             artifacts/cn/
             docs/cn-provider-verification.json
+            public/cn/mof-history.json
             /tmp/cn-next.log
       - name: Preserve verified data and diagnostics on implementation branch
         if: success() && github.ref_name == 'feat/cn-observatory'
