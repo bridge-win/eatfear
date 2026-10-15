@@ -1,5 +1,5 @@
 {
-  "collectedAt": "2026-10-15T05:55:05.419Z",
+  "collectedAt": "2026-10-15T08:58:12.830Z",
   "startYear": 2015,
   "records": [
     {
@@ -11,7 +11,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201801/t20180117_2797514.htm",
       "publishedAt": "2018-01-17",
-      "fetchedAt": "2026-10-15T05:55:05.356Z"
+      "fetchedAt": "2026-10-15T08:58:12.830Z"
     },
     {
       "date": "2018-03-31",
@@ -22,7 +22,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201804/t20180413_2867535.htm",
       "publishedAt": "2018-04-13",
-      "fetchedAt": "2026-10-15T05:55:05.419Z"
+      "fetchedAt": "2026-10-15T08:58:11.601Z"
     },
     {
       "date": "2018-04-30",
@@ -33,7 +33,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201805/t20180516_2898680.htm",
       "publishedAt": "2018-05-16",
-      "fetchedAt": "2026-10-15T05:55:04.809Z"
+      "fetchedAt": "2026-10-15T08:58:11.412Z"
     },
     {
       "date": "2018-05-31",
@@ -44,7 +44,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201806/t20180613_2928002.htm",
       "publishedAt": "2018-06-14",
-      "fetchedAt": "2026-10-15T05:55:04.313Z"
+      "fetchedAt": "2026-10-15T08:58:09.423Z"
     },
     {
       "date": "2018-06-30",
@@ -55,7 +55,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201807/t20180718_2967220.htm",
       "publishedAt": "2018-07-18",
-      "fetchedAt": "2026-10-15T05:55:03.718Z"
+      "fetchedAt": "2026-10-15T08:58:08.904Z"
     },
     {
       "date": "2018-07-31",
@@ -66,7 +66,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201808/t20180817_2989843.htm",
       "publishedAt": "2018-08-17",
-      "fetchedAt": "2026-10-15T05:55:04.086Z"
+      "fetchedAt": "2026-10-15T08:58:08.507Z"
     },
     {
       "date": "2018-08-31",
@@ -77,7 +77,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201809/t20180921_3024772.htm",
       "publishedAt": "2018-09-21",
-      "fetchedAt": "2026-10-15T05:55:02.922Z"
+      "fetchedAt": "2026-10-15T08:58:10.941Z"
     },
     {
       "date": "2018-09-30",
@@ -88,7 +88,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201810/t20181017_3048969.htm",
       "publishedAt": "2018-10-17",
-      "fetchedAt": "2026-10-15T05:55:03.268Z"
+      "fetchedAt": "2026-10-15T08:58:05.625Z"
     },
     {
       "date": "2018-10-31",
@@ -99,7 +99,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201811/t20181122_3073280.htm",
       "publishedAt": "2018-11-22",
-      "fetchedAt": "2026-10-15T05:55:02.205Z"
+      "fetchedAt": "2026-10-15T08:58:03.605Z"
     },
     {
       "date": "2018-11-30",
@@ -110,7 +110,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201812/t20181219_3099424.htm",
       "publishedAt": "2018-12-20",
-      "fetchedAt": "2026-10-15T05:55:01.494Z"
+      "fetchedAt": "2026-10-15T08:58:03.144Z"
     },
     {
       "date": "2019-01-31",
@@ -121,7 +121,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201902/t20190222_3176703.htm",
       "publishedAt": "2019-02-22",
-      "fetchedAt": "2026-10-15T05:55:00.899Z"
+      "fetchedAt": "2026-10-15T08:58:02.891Z"
     },
     {
       "date": "2019-02-28",
@@ -132,7 +132,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201903/t20190320_3199825.htm",
       "publishedAt": "2019-03-20",
-      "fetchedAt": "2026-10-15T05:55:00.452Z"
+      "fetchedAt": "2026-10-15T08:58:02.298Z"
     },
     {
       "date": "2019-03-31",
@@ -143,7 +143,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201904/t20190417_3227000.htm",
       "publishedAt": "2019-04-18",
-      "fetchedAt": "2026-10-15T05:55:02.212Z"
+      "fetchedAt": "2026-10-15T08:58:01.851Z"
     },
     {
       "date": "2019-04-30",
@@ -154,7 +154,7 @@
       "rate": null,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201905/t20190516_3259191.htm",
       "publishedAt": "2019-05-17",
-      "fetchedAt": "2026-10-15T05:54:57.431Z"
+      "fetchedAt": "2026-10-15T08:58:00.779Z"
     },
     {
       "date": "2019-05-31",
@@ -165,7 +165,7 @@
       "rate": 3.73,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201906/t20190617_3279074.htm",
       "publishedAt": "2019-06-17",
-      "fetchedAt": "2026-10-15T05:54:58.107Z"
+      "fetchedAt": "2026-10-15T08:58:02.591Z"
     },
     {
       "date": "2019-06-30",
@@ -176,7 +176,7 @@
       "rate": 3.55,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201907/t20190718_3302838.htm",
       "publishedAt": "2019-07-19",
-      "fetchedAt": "2026-10-15T05:54:56.793Z"
+      "fetchedAt": "2026-10-15T08:57:59.547Z"
     },
     {
       "date": "2019-07-31",
@@ -187,7 +187,7 @@
       "rate": 3.46,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201908/t20190822_3371343.htm",
       "publishedAt": "2019-08-22",
-      "fetchedAt": "2026-10-15T05:54:56.194Z"
+      "fetchedAt": "2026-10-15T08:57:56.550Z"
     },
     {
       "date": "2019-08-31",
@@ -198,7 +198,7 @@
       "rate": 3.38,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201909/t20190916_3386707.htm",
       "publishedAt": "2019-09-18",
-      "fetchedAt": "2026-10-15T05:54:53.581Z"
+      "fetchedAt": "2026-10-15T08:57:55.995Z"
     },
     {
       "date": "2019-09-30",
@@ -209,7 +209,7 @@
       "rate": 3.52,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201910/t20191024_3408894.htm",
       "publishedAt": "2019-10-24",
-      "fetchedAt": "2026-10-15T05:54:55.640Z"
+      "fetchedAt": "2026-10-15T08:57:55.034Z"
     },
     {
       "date": "2019-10-31",
@@ -220,7 +220,7 @@
       "rate": 3.69,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201911/t20191127_3430508.htm",
       "publishedAt": "2019-11-27",
-      "fetchedAt": "2026-10-15T05:54:50.764Z"
+      "fetchedAt": "2026-10-15T08:58:00.022Z"
     },
     {
       "date": "2019-11-30",
@@ -231,7 +231,7 @@
       "rate": 3.66,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/201912/t20191225_3450093.htm",
       "publishedAt": "2019-12-26",
-      "fetchedAt": "2026-10-15T05:54:49.559Z"
+      "fetchedAt": "2026-10-15T08:57:54.345Z"
     },
     {
       "date": "2019-12-31",
@@ -242,7 +242,7 @@
       "rate": 3.71,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202001/t20200121_3462828.htm",
       "publishedAt": "2020-01-22",
-      "fetchedAt": "2026-10-15T05:54:49.111Z"
+      "fetchedAt": "2026-10-15T08:57:53.817Z"
     },
     {
       "date": "2020-01-31",
@@ -253,7 +253,7 @@
       "rate": 3.5,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202002/t20200221_3472494.htm",
       "publishedAt": "2020-02-21",
-      "fetchedAt": "2026-10-15T05:54:50.218Z"
+      "fetchedAt": "2026-10-15T08:57:51.136Z"
     },
     {
       "date": "2020-02-29",
@@ -264,7 +264,7 @@
       "rate": 3.34,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202003/t20200303_3477036.htm",
       "publishedAt": "2020-03-03",
-      "fetchedAt": "2026-10-15T05:54:47.887Z"
+      "fetchedAt": "2026-10-15T08:57:49.227Z"
     },
     {
       "date": "2020-03-31",
@@ -275,7 +275,7 @@
       "rate": 3.19,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202004/t20200407_3494386.htm",
       "publishedAt": "2020-04-07",
-      "fetchedAt": "2026-10-15T05:54:47.198Z"
+      "fetchedAt": "2026-10-15T08:57:53.756Z"
     },
     {
       "date": "2020-04-30",
@@ -286,7 +286,7 @@
       "rate": 2.91,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202005/t20200511_3511647.htm",
       "publishedAt": "2020-05-11",
-      "fetchedAt": "2026-10-15T05:54:46.521Z"
+      "fetchedAt": "2026-10-15T08:57:47.201Z"
     },
     {
       "date": "2020-05-31",
@@ -297,7 +297,7 @@
       "rate": 3.21,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202006/t20200604_3526283.htm",
       "publishedAt": "2020-06-04",
-      "fetchedAt": "2026-10-15T05:54:48.665Z"
+      "fetchedAt": "2026-10-15T08:57:48.330Z"
     },
     {
       "date": "2020-06-30",
@@ -308,7 +308,7 @@
       "rate": 3.23,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202007/t20200708_3545777.htm",
       "publishedAt": "2020-07-08",
-      "fetchedAt": "2026-10-15T05:54:45.726Z"
+      "fetchedAt": "2026-10-15T08:57:46.056Z"
     },
     {
       "date": "2020-07-31",
@@ -319,7 +319,7 @@
       "rate": 3.4,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202008/t20200820_3572031.htm",
       "publishedAt": "2020-08-20",
-      "fetchedAt": "2026-10-15T05:54:45.277Z"
+      "fetchedAt": "2026-10-15T08:57:45.798Z"
     },
     {
       "date": "2020-08-31",
@@ -330,7 +330,7 @@
       "rate": 3.53,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202009/t20200924_3594157.htm",
       "publishedAt": "2020-09-24",
-      "fetchedAt": "2026-10-15T05:54:44.095Z"
+      "fetchedAt": "2026-10-15T08:57:45.336Z"
     },
     {
       "date": "2020-09-30",
@@ -341,7 +341,7 @@
       "rate": 3.64,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202010/t20201021_3607825.htm",
       "publishedAt": "2020-10-21",
-      "fetchedAt": "2026-10-15T05:54:43.384Z"
+      "fetchedAt": "2026-10-15T08:57:45.205Z"
     },
     {
       "date": "2020-10-31",
@@ -352,7 +352,7 @@
       "rate": 3.67,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202011/t20201116_3623743.htm",
       "publishedAt": "2020-11-17",
-      "fetchedAt": "2026-10-15T05:54:42.829Z"
+      "fetchedAt": "2026-10-15T08:57:44.310Z"
     },
     {
       "date": "2020-11-30",
@@ -363,7 +363,7 @@
       "rate": 3.58,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202012/t20201223_3636580.htm",
       "publishedAt": "2020-12-24",
-      "fetchedAt": "2026-10-15T05:54:42.380Z"
+      "fetchedAt": "2026-10-15T08:57:44.362Z"
     },
     {
       "date": "2020-12-31",
@@ -374,7 +374,7 @@
       "rate": 3.46,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202101/t20210125_3649040.htm",
       "publishedAt": "2021-01-26",
-      "fetchedAt": "2026-10-15T05:54:45.971Z"
+      "fetchedAt": "2026-10-15T08:57:43.586Z"
     },
     {
       "date": "2021-01-31",
@@ -385,7 +385,7 @@
       "rate": 3.37,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202102/t20210225_3662222.htm",
       "publishedAt": "2021-02-25",
-      "fetchedAt": "2026-10-15T05:54:41.589Z"
+      "fetchedAt": "2026-10-15T08:57:41.483Z"
     },
     {
       "date": "2021-02-28",
@@ -396,7 +396,7 @@
       "rate": 3.45,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202103/t20210330_3678715.htm",
       "publishedAt": "2021-03-31",
-      "fetchedAt": "2026-10-15T05:54:41.020Z"
+      "fetchedAt": "2026-10-15T08:57:43.797Z"
     },
     {
       "date": "2021-03-31",
@@ -407,7 +407,7 @@
       "rate": 3.44,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202104/t20210420_3688898.htm",
       "publishedAt": "2021-04-20",
-      "fetchedAt": "2026-10-15T05:54:41.157Z"
+      "fetchedAt": "2026-10-15T08:57:40.789Z"
     },
     {
       "date": "2021-04-30",
@@ -418,7 +418,7 @@
       "rate": 3.48,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202105/t20210525_3707994.htm",
       "publishedAt": "2021-05-25",
-      "fetchedAt": "2026-10-15T05:54:40.416Z"
+      "fetchedAt": "2026-10-15T08:57:40.199Z"
     },
     {
       "date": "2021-05-31",
@@ -429,7 +429,7 @@
       "rate": 3.43,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202106/t20210621_3722116.htm",
       "publishedAt": "2021-06-22",
-      "fetchedAt": "2026-10-15T05:54:40.575Z"
+      "fetchedAt": "2026-10-15T08:57:38.603Z"
     },
     {
       "date": "2021-06-30",
@@ -440,7 +440,7 @@
       "rate": 3.46,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202107/t20210726_3740404.htm",
       "publishedAt": "2021-07-26",
-      "fetchedAt": "2026-10-15T05:54:39.842Z"
+      "fetchedAt": "2026-10-15T08:57:40.578Z"
     },
     {
       "date": "2021-07-31",
@@ -451,7 +451,7 @@
       "rate": 3.31,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202108/t20210824_3747368.htm",
       "publishedAt": "2021-08-25",
-      "fetchedAt": "2026-10-15T05:54:39.391Z"
+      "fetchedAt": "2026-10-15T08:57:35.976Z"
     },
     {
       "date": "2021-08-31",
@@ -462,7 +462,7 @@
       "rate": 3.22,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202109/t20210926_3755257.htm",
       "publishedAt": "2021-09-26",
-      "fetchedAt": "2026-10-15T05:54:38.318Z"
+      "fetchedAt": "2026-10-15T08:57:35.505Z"
     },
     {
       "date": "2021-09-30",
@@ -473,7 +473,7 @@
       "rate": 3.24,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202111/t20211101_3762326.htm",
       "publishedAt": "2021-11-02",
-      "fetchedAt": "2026-10-15T05:54:37.747Z"
+      "fetchedAt": "2026-10-15T08:57:35.325Z"
     },
     {
       "date": "2021-10-31",
@@ -484,7 +484,7 @@
       "rate": 3.35,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202111/t20211123_3767948.htm",
       "publishedAt": "2021-11-23",
-      "fetchedAt": "2026-10-15T05:54:39.489Z"
+      "fetchedAt": "2026-10-15T08:57:34.883Z"
     },
     {
       "date": "2021-11-30",
@@ -495,7 +495,7 @@
       "rate": 3.38,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202202/t20220209_3786602.htm",
       "publishedAt": "2022-02-09",
-      "fetchedAt": "2026-10-15T05:54:37.308Z"
+      "fetchedAt": "2026-10-15T08:57:34.736Z"
     },
     {
       "date": "2021-12-31",
@@ -506,7 +506,7 @@
       "rate": 3.14,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202202/t20220209_3786613.htm",
       "publishedAt": "2022-02-09",
-      "fetchedAt": "2026-10-15T05:54:36.659Z"
+      "fetchedAt": "2026-10-15T08:57:34.288Z"
     },
     {
       "date": "2022-01-31",
@@ -517,7 +517,7 @@
       "rate": 3.05,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202203/t20220322_3797108.htm",
       "publishedAt": "2022-03-21",
-      "fetchedAt": "2026-10-15T05:54:36.085Z"
+      "fetchedAt": "2026-10-15T08:57:34.331Z"
     },
     {
       "date": "2022-02-28",
@@ -528,7 +528,7 @@
       "rate": 3.16,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202203/t20220322_3797112.htm",
       "publishedAt": "2022-03-23",
-      "fetchedAt": "2026-10-15T05:54:36.160Z"
+      "fetchedAt": "2026-10-15T08:57:33.261Z"
     },
     {
       "date": "2022-03-31",
@@ -539,7 +539,7 @@
       "rate": 3.14,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202205/t20220518_3811261.htm",
       "publishedAt": "2022-05-18",
-      "fetchedAt": "2026-10-15T05:54:35.357Z"
+      "fetchedAt": "2026-10-15T08:57:30.863Z"
     },
     {
       "date": "2022-04-30",
@@ -550,7 +550,7 @@
       "rate": 2.95,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202205/t20220518_3811310.htm",
       "publishedAt": "2022-05-18",
-      "fetchedAt": "2026-10-15T05:54:35.527Z"
+      "fetchedAt": "2026-10-15T08:57:32.119Z"
     },
     {
       "date": "2022-05-31",
@@ -561,7 +561,7 @@
       "rate": 3.04,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202206/t20220630_3823574.htm",
       "publishedAt": "2022-06-30",
-      "fetchedAt": "2026-10-15T05:54:34.756Z"
+      "fetchedAt": "2026-10-15T08:57:30.275Z"
     },
     {
       "date": "2022-06-30",
@@ -572,7 +572,7 @@
       "rate": 3.08,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202207/t20220726_3829548.htm",
       "publishedAt": "2022-07-27",
-      "fetchedAt": "2026-10-15T05:54:34.435Z"
+      "fetchedAt": "2026-10-15T08:57:29.896Z"
     },
     {
       "date": "2022-07-31",
@@ -583,7 +583,7 @@
       "rate": 2.97,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202209/t20220930_3844165.htm",
       "publishedAt": "2022-09-30",
-      "fetchedAt": "2026-10-15T05:54:33.706Z"
+      "fetchedAt": "2026-10-15T08:57:29.878Z"
     },
     {
       "date": "2022-08-31",
@@ -594,7 +594,7 @@
       "rate": 2.77,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202209/t20220930_3844166.htm",
       "publishedAt": "2022-10-08",
-      "fetchedAt": "2026-10-15T05:54:34.307Z"
+      "fetchedAt": "2026-10-15T08:57:29.448Z"
     },
     {
       "date": "2022-09-30",
@@ -605,7 +605,7 @@
       "rate": 2.74,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202211/t20221103_3849441.htm",
       "publishedAt": "2022-11-03",
-      "fetchedAt": "2026-10-15T05:54:33.131Z"
+      "fetchedAt": "2026-10-15T08:57:28.786Z"
     },
     {
       "date": "2022-10-31",
@@ -616,7 +616,7 @@
       "rate": 2.95,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202211/t20221130_3854835.htm",
       "publishedAt": "2022-11-30",
-      "fetchedAt": "2026-10-15T05:54:31.174Z"
+      "fetchedAt": "2026-10-15T08:57:28.305Z"
     },
     {
       "date": "2022-11-30",
@@ -627,7 +627,7 @@
       "rate": 2.83,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202212/t20221229_3861047.htm",
       "publishedAt": "2022-12-30",
-      "fetchedAt": "2026-10-15T05:54:30.492Z"
+      "fetchedAt": "2026-10-15T08:57:28.126Z"
     },
     {
       "date": "2022-12-31",
@@ -638,7 +638,7 @@
       "rate": 2.77,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202301/t20230128_3864087.htm",
       "publishedAt": "2023-01-29",
-      "fetchedAt": "2026-10-15T05:54:30.785Z"
+      "fetchedAt": "2026-10-15T08:57:27.672Z"
     },
     {
       "date": "2023-01-31",
@@ -649,7 +649,7 @@
       "rate": 3.12,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202302/t20230227_3868366.htm",
       "publishedAt": "2023-02-27",
-      "fetchedAt": "2026-10-15T05:54:29.880Z"
+      "fetchedAt": "2026-10-15T08:57:27.569Z"
     },
     {
       "date": "2023-02-28",
@@ -660,7 +660,7 @@
       "rate": 3.13,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202303/t20230327_3874744.htm",
       "publishedAt": "2023-03-27",
-      "fetchedAt": "2026-10-15T05:54:29.883Z"
+      "fetchedAt": "2026-10-15T08:57:25.390Z"
     },
     {
       "date": "2023-03-31",
@@ -671,7 +671,7 @@
       "rate": 3.05,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202304/t20230426_3881032.htm",
       "publishedAt": "2023-04-26",
-      "fetchedAt": "2026-10-15T05:54:29.222Z"
+      "fetchedAt": "2026-10-15T08:57:24.705Z"
     },
     {
       "date": "2023-04-30",
@@ -682,7 +682,7 @@
       "rate": 3,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202305/t20230529_3887551.htm",
       "publishedAt": "2023-05-29",
-      "fetchedAt": "2026-10-15T05:54:28.079Z"
+      "fetchedAt": "2026-10-15T08:57:24.188Z"
     },
     {
       "date": "2023-05-31",
@@ -693,7 +693,7 @@
       "rate": 2.85,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202306/t20230628_3893293.htm",
       "publishedAt": "2023-06-28",
-      "fetchedAt": "2026-10-15T05:54:29.265Z"
+      "fetchedAt": "2026-10-15T08:57:25.834Z"
     },
     {
       "date": "2023-06-30",
@@ -704,7 +704,7 @@
       "rate": 2.8,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202307/t20230728_3899191.htm",
       "publishedAt": "2023-07-28",
-      "fetchedAt": "2026-10-15T05:54:26.749Z"
+      "fetchedAt": "2026-10-15T08:57:21.079Z"
     },
     {
       "date": "2023-07-31",
@@ -715,7 +715,7 @@
       "rate": 2.74,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202308/t20230829_3904518.htm",
       "publishedAt": "2023-08-29",
-      "fetchedAt": "2026-10-15T05:54:26.175Z"
+      "fetchedAt": "2026-10-15T08:57:20.561Z"
     },
     {
       "date": "2023-08-31",
@@ -726,7 +726,7 @@
       "rate": 2.74,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202309/t20230926_3909090.htm",
       "publishedAt": "2023-09-26",
-      "fetchedAt": "2026-10-15T05:54:27.477Z"
+      "fetchedAt": "2026-10-15T08:57:23.793Z"
     },
     {
       "date": "2023-09-30",
@@ -737,7 +737,7 @@
       "rate": 2.81,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202310/t20231027_3913516.htm",
       "publishedAt": "2023-10-27",
-      "fetchedAt": "2026-10-15T05:54:25.672Z"
+      "fetchedAt": "2026-10-15T08:57:19.890Z"
     },
     {
       "date": "2023-10-31",
@@ -748,7 +748,7 @@
       "rate": 2.92,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202311/t20231129_3918545.htm",
       "publishedAt": "2023-11-29",
-      "fetchedAt": "2026-10-15T05:54:24.531Z"
+      "fetchedAt": "2026-10-15T08:57:20.008Z"
     },
     {
       "date": "2023-11-30",
@@ -759,7 +759,7 @@
       "rate": 2.93,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202312/t20231225_3923816.htm",
       "publishedAt": "2023-12-25",
-      "fetchedAt": "2026-10-15T05:54:23.774Z"
+      "fetchedAt": "2026-10-15T08:57:19.375Z"
     },
     {
       "date": "2023-12-31",
@@ -770,7 +770,7 @@
       "rate": 2.83,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202401/t20240130_3927707.htm",
       "publishedAt": "2024-01-30",
-      "fetchedAt": "2026-10-15T05:54:23.200Z"
+      "fetchedAt": "2026-10-15T08:57:19.044Z"
     },
     {
       "date": "2024-01-31",
@@ -781,7 +781,7 @@
       "rate": 2.6,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202402/t20240229_3929677.htm",
       "publishedAt": "2024-02-29",
-      "fetchedAt": "2026-10-15T05:54:22.698Z"
+      "fetchedAt": "2026-10-15T08:57:18.379Z"
     },
     {
       "date": "2024-02-29",
@@ -792,7 +792,7 @@
       "rate": 2.57,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202403/t20240328_3931768.htm",
       "publishedAt": "2024-03-28",
-      "fetchedAt": "2026-10-15T05:54:22.096Z"
+      "fetchedAt": "2026-10-15T08:57:18.928Z"
     },
     {
       "date": "2024-03-31",
@@ -803,7 +803,7 @@
       "rate": 2.46,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202404/t20240430_3933918.htm",
       "publishedAt": "2024-04-30",
-      "fetchedAt": "2026-10-15T05:54:25.038Z"
+      "fetchedAt": "2026-10-15T08:57:17.861Z"
     },
     {
       "date": "2024-04-30",
@@ -814,7 +814,7 @@
       "rate": 2.41,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202405/t20240531_3936271.htm",
       "publishedAt": "2024-05-31",
-      "fetchedAt": "2026-10-15T05:54:19.890Z"
+      "fetchedAt": "2026-10-15T08:57:17.307Z"
     },
     {
       "date": "2024-05-31",
@@ -825,7 +825,7 @@
       "rate": 2.45,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202406/t20240627_3938206.htm",
       "publishedAt": "2024-06-27",
-      "fetchedAt": "2026-10-15T05:54:19.285Z"
+      "fetchedAt": "2026-10-15T08:57:17.664Z"
     },
     {
       "date": "2024-06-30",
@@ -836,7 +836,7 @@
       "rate": 2.34,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202407/t20240731_3940804.htm",
       "publishedAt": "2024-07-31",
-      "fetchedAt": "2026-10-15T05:54:20.832Z"
+      "fetchedAt": "2026-10-15T08:57:14.363Z"
     },
     {
       "date": "2024-07-31",
@@ -847,7 +847,7 @@
       "rate": 2.24,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202408/t20240830_3942885.htm",
       "publishedAt": "2024-08-30",
-      "fetchedAt": "2026-10-15T05:54:18.728Z"
+      "fetchedAt": "2026-10-15T08:57:15.354Z"
     },
     {
       "date": "2024-08-31",
@@ -858,7 +858,7 @@
       "rate": 2.24,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202409/t20240930_3944792.htm",
       "publishedAt": "2024-09-30",
-      "fetchedAt": "2026-10-15T05:54:17.962Z"
+      "fetchedAt": "2026-10-15T08:57:13.779Z"
     },
     {
       "date": "2024-09-30",
@@ -869,7 +869,7 @@
       "rate": 2.15,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202410/t20241029_3946473.htm",
       "publishedAt": "2024-10-29",
-      "fetchedAt": "2026-10-15T05:54:17.573Z"
+      "fetchedAt": "2026-10-15T08:57:13.525Z"
     },
     {
       "date": "2024-10-31",
@@ -880,7 +880,7 @@
       "rate": 2.24,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202411/t20241129_3948536.htm",
       "publishedAt": "2024-11-29",
-      "fetchedAt": "2026-10-15T05:54:16.931Z"
+      "fetchedAt": "2026-10-15T08:57:13.226Z"
     },
     {
       "date": "2024-11-30",
@@ -891,7 +891,7 @@
       "rate": 2.23,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202412/t20241227_3950717.htm",
       "publishedAt": "2024-12-27",
-      "fetchedAt": "2026-10-15T05:54:15.220Z"
+      "fetchedAt": "2026-10-15T08:57:11.100Z"
     },
     {
       "date": "2024-12-31",
@@ -902,7 +902,7 @@
       "rate": 2.13,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202501/t20250124_3955049.htm",
       "publishedAt": "2025-01-24",
-      "fetchedAt": "2026-10-15T05:54:17.362Z"
+      "fetchedAt": "2026-10-15T08:57:12.293Z"
     },
     {
       "date": "2025-01-31",
@@ -913,7 +913,7 @@
       "rate": 1.87,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202503/t20250328_3960903.htm",
       "publishedAt": "2025-03-28",
-      "fetchedAt": "2026-10-15T05:54:14.663Z"
+      "fetchedAt": "2026-10-15T08:57:10.567Z"
     },
     {
       "date": "2025-02-28",
@@ -924,7 +924,7 @@
       "rate": 1.93,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202503/t20250328_3960904.htm",
       "publishedAt": "2025-03-28",
-      "fetchedAt": "2026-10-15T05:54:10.605Z"
+      "fetchedAt": "2026-10-15T08:57:08.817Z"
     },
     {
       "date": "2025-03-31",
@@ -935,7 +935,7 @@
       "rate": 2.09,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202504/t20250428_3962945.htm",
       "publishedAt": "2025-04-28",
-      "fetchedAt": "2026-10-15T05:54:10.156Z"
+      "fetchedAt": "2026-10-15T08:57:08.263Z"
     },
     {
       "date": "2025-04-30",
@@ -944,9 +944,9 @@
       "newDebt": 2534,
       "balance": 506931,
       "rate": 1.92,
-      "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202505/t20250528_3964717.htm",
+      "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202511/t20251101_3975522.htm",
       "publishedAt": "2025-05-28",
-      "fetchedAt": "2026-10-15T05:54:09.007Z"
+      "fetchedAt": "2026-10-15T08:56:54.631Z"
     },
     {
       "date": "2025-05-31",
@@ -957,7 +957,7 @@
       "rate": 1.87,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202506/t20250627_3966682.htm",
       "publishedAt": "2025-06-27",
-      "fetchedAt": "2026-10-15T05:54:08.270Z"
+      "fetchedAt": "2026-10-15T08:57:02.454Z"
     },
     {
       "date": "2025-06-30",
@@ -968,7 +968,7 @@
       "rate": 1.8,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202507/t20250730_3968958.htm",
       "publishedAt": "2025-07-30",
-      "fetchedAt": "2026-10-15T05:54:12.241Z"
+      "fetchedAt": "2026-10-15T08:57:04.589Z"
     },
     {
       "date": "2025-07-31",
@@ -979,7 +979,7 @@
       "rate": 1.85,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202508/t20250828_3970990.htm",
       "publishedAt": "2025-08-28",
-      "fetchedAt": "2026-10-15T05:54:07.720Z"
+      "fetchedAt": "2026-10-15T08:57:02.059Z"
     },
     {
       "date": "2025-08-31",
@@ -990,7 +990,7 @@
       "rate": 2.04,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202509/t20250929_3973481.htm",
       "publishedAt": "2025-09-29",
-      "fetchedAt": "2026-10-15T05:54:07.272Z"
+      "fetchedAt": "2026-10-15T08:56:59.366Z"
     },
     {
       "date": "2025-09-30",
@@ -1001,7 +1001,7 @@
       "rate": 2.18,
       "sourceUrl": "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202510/t20251024_3974884.htm",
       "publishedAt": "2025-10-24",
-      "fetchedAt": "2026-10-15T05:54:04.474Z"
+      "fetchedAt": "2026-10-15T08:56:58.214Z"
     },
     {
       "date": "2025-10-31",
@@ -1012,7 +1012,7 @@
       "rate": 2.12,
       "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202511/t20251128_3977820.htm",
       "publishedAt": "2025-11-28",
-      "fetchedAt": "2026-10-15T05:53:54.675Z"
+      "fetchedAt": "2026-10-15T08:56:48.918Z"
     },
     {
       "date": "2025-11-30",
@@ -1126,7 +1126,8 @@
     }
   ],
   "errors": [
-    "https://zwgls.mof.gov.cn/tjsj/202511/t20251101_3975519.htm: Error: MOF HTTP 502"
+    "https://zwgls.mof.gov.cn/tjsj/: Error: MOF HTTP 502",
+    "https://yss.mof.gov.cn/zhuantilanmu/dfzgl/sjtj/202505/t20250528_3964717.htm: Error: MOF HTTP 502"
   ],
-  "documents": 112
+  "documents": 102
 }

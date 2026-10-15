@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-15T05:55:11.420Z",
+  "checkedAt": "2026-10-15T08:58:20.025Z",
   "environment": "GitHub Actions or operator runtime; source availability is location-dependent",
   "results": [
     {
@@ -11,11 +11,11 @@
       "first": "2017-12-31",
       "last": "2026-08-31",
       "latest": 11945,
-      "milliseconds": 5861,
-      "warning": "部分新公告未能解析，保留已归档历史；历史采集存在1个失败项，完整性未确认",
+      "milliseconds": 6983,
+      "warning": "历史采集存在2个失败项，完整性未确认",
       "complete": false,
       "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
-      "fetchedAt": "2026-10-15T05:55:11.418Z",
+      "fetchedAt": "2026-10-15T08:58:19.142Z",
       "windows": {
         "1": {
           "first": "2025-08-31",
@@ -44,11 +44,11 @@
       "first": "2021-11-30",
       "last": "2026-08-31",
       "latest": 5505,
-      "milliseconds": 5808,
-      "warning": "部分新公告未能解析，保留已归档历史；历史采集存在1个失败项，完整性未确认",
+      "milliseconds": 6948,
+      "warning": "历史采集存在2个失败项，完整性未确认",
       "complete": false,
       "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
-      "fetchedAt": "2026-10-15T05:55:11.418Z",
+      "fetchedAt": "2026-10-15T08:58:19.142Z",
       "windows": {
         "1": {
           "first": "2025-08-31",
@@ -77,11 +77,11 @@
       "first": "2017-12-31",
       "last": "2026-08-31",
       "latest": 598955,
-      "milliseconds": 5808,
-      "warning": "部分新公告未能解析，保留已归档历史；历史采集存在1个失败项，完整性未确认",
+      "milliseconds": 6948,
+      "warning": "历史采集存在2个失败项，完整性未确认",
       "complete": false,
       "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
-      "fetchedAt": "2026-10-15T05:55:11.418Z",
+      "fetchedAt": "2026-10-15T08:58:19.142Z",
       "windows": {
         "1": {
           "first": "2025-08-31",
@@ -110,11 +110,11 @@
       "first": "2019-05-31",
       "last": "2026-08-31",
       "latest": 1.83,
-      "milliseconds": 5808,
-      "warning": "部分新公告未能解析，保留已归档历史；历史采集存在1个失败项，完整性未确认",
+      "milliseconds": 6948,
+      "warning": "历史采集存在2个失败项，完整性未确认",
       "complete": false,
       "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
-      "fetchedAt": "2026-10-15T05:55:11.418Z",
+      "fetchedAt": "2026-10-15T08:58:19.142Z",
       "windows": {
         "1": {
           "first": "2025-08-31",
@@ -143,11 +143,11 @@
       "first": "2008-01-01",
       "last": "2026-09-01",
       "latest": 50.1,
-      "milliseconds": 954,
+      "milliseconds": 958,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/pmi.html",
-      "fetchedAt": "2026-10-15T05:55:06.565Z",
+      "fetchedAt": "2026-10-15T08:58:14.034Z",
       "windows": {
         "1": {
           "first": "2025-09-01",
@@ -176,11 +176,11 @@
       "first": "2008-01-01",
       "last": "2026-09-01",
       "latest": 50.2,
-      "milliseconds": 953,
+      "milliseconds": 956,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T05:55:06.565Z",
+      "fetchedAt": "2026-10-15T08:58:14.035Z",
       "windows": {
         "1": {
           "first": "2025-09-01",
@@ -209,11 +209,11 @@
       "first": "2008-01-01",
       "last": "2026-08-01",
       "latest": 0.4,
-      "milliseconds": 945,
+      "milliseconds": 859,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T05:55:06.558Z",
+      "fetchedAt": "2026-10-15T08:58:13.938Z",
       "windows": {
         "1": {
           "first": "2025-08-01",
@@ -242,11 +242,11 @@
       "first": "2008-02-01",
       "last": "2026-08-01",
       "latest": 5.2,
-      "milliseconds": 660,
+      "milliseconds": 695,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T05:55:06.274Z",
+      "fetchedAt": "2026-10-15T08:58:13.775Z",
       "windows": {
         "1": {
           "first": "2025-08-01",
@@ -275,11 +275,11 @@
       "first": "2008-01-01",
       "last": "2026-09-01",
       "latest": 0.9,
-      "milliseconds": 970,
+      "milliseconds": 1504,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/cpi.html",
-      "fetchedAt": "2026-10-15T05:55:06.586Z",
+      "fetchedAt": "2026-10-15T08:58:14.584Z",
       "windows": {
         "1": {
           "first": "2025-09-01",
@@ -308,11 +308,11 @@
       "first": "2006-01-01",
       "last": "2026-09-01",
       "latest": 5,
-      "milliseconds": 953,
+      "milliseconds": 685,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/ppi.html",
-      "fetchedAt": "2026-10-15T05:55:06.570Z",
+      "fetchedAt": "2026-10-15T08:58:13.766Z",
       "windows": {
         "1": {
           "first": "2025-09-01",
@@ -341,11 +341,11 @@
       "first": "2008-01-01",
       "last": "2026-09-01",
       "latest": 7.2,
-      "milliseconds": 1134,
+      "milliseconds": 852,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T05:55:06.752Z",
+      "fetchedAt": "2026-10-15T08:58:13.934Z",
       "windows": {
         "1": {
           "first": "2025-09-01",
@@ -374,11 +374,11 @@
       "first": "2008-01-01",
       "last": "2026-09-01",
       "latest": 12734,
-      "milliseconds": 679,
+      "milliseconds": 661,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T05:55:06.298Z",
+      "fetchedAt": "2026-10-15T08:58:13.744Z",
       "windows": {
         "1": {
           "first": "2025-09-01",
@@ -407,11 +407,11 @@
       "first": "2008-01-01",
       "last": "2026-08-01",
       "latest": 5.7,
-      "milliseconds": 1211,
+      "milliseconds": 861,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T05:55:06.831Z",
+      "fetchedAt": "2026-10-15T08:58:13.944Z",
       "windows": {
         "1": {
           "first": "2025-08-01",
@@ -440,11 +440,11 @@
       "first": "2002-01-04",
       "last": "2026-10-14",
       "latest": 1.6516,
-      "milliseconds": 3661,
+      "milliseconds": 4233,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/zmgzsyl.html",
-      "fetchedAt": "2026-10-15T05:55:09.281Z",
+      "fetchedAt": "2026-10-15T08:58:17.318Z",
       "windows": {
         "1": {
           "first": "2025-10-14",
@@ -473,11 +473,11 @@
       "first": "2002-01-04",
       "last": "2026-10-14",
       "latest": 1.3896,
-      "milliseconds": 3670,
+      "milliseconds": 4239,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/zmgzsyl.html",
-      "fetchedAt": "2026-10-15T05:55:09.282Z",
+      "fetchedAt": "2026-10-15T08:58:17.318Z",
       "windows": {
         "1": {
           "first": "2025-10-14",
@@ -506,11 +506,11 @@
       "first": "2019-08-20",
       "last": "2026-09-20",
       "latest": 3,
-      "milliseconds": 1423,
+      "milliseconds": 2697,
       "warning": "采用2019-08改革后的月度报价，不拼接旧日频制度；同月保留最后披露值。",
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T05:55:07.045Z",
+      "fetchedAt": "2026-10-15T08:58:15.783Z",
       "windows": {
         "1": {
           "first": "2025-09-22",
@@ -538,12 +538,12 @@
       "points": 1,
       "first": "2026-10-15",
       "last": "2026-10-15",
-      "latest": 4157.720703125,
-      "milliseconds": 1363,
-      "warning": "仅取得部分历史或报价，不作为完整历史：Yahoo未返回可验证的完整历史；fetch failed",
+      "latest": 4166.01220703125,
+      "milliseconds": 4149,
+      "warning": "仅取得部分历史或报价，不作为完整历史：Yahoo未返回可验证的完整历史；fetch failed；腾讯未遵守历史日期范围",
       "complete": false,
       "sourceUrl": "https://finance.yahoo.com/quote/000300.SS/",
-      "fetchedAt": "2026-10-15T05:55:06.986Z",
+      "fetchedAt": "2026-10-15T08:58:17.235Z",
       "windows": {
         "1": {
           "first": "2026-10-15",
@@ -572,7 +572,7 @@
       "first": null,
       "last": null,
       "latest": null,
-      "milliseconds": 1130,
+      "milliseconds": 1701,
       "warning": "上游 HTTP 403",
       "complete": false,
       "sourceUrl": "https://www.imf.org/external/datamapper/profile/CHN",
@@ -605,11 +605,11 @@
       "first": "1961-12-31",
       "last": "2025-12-31",
       "latest": 4.95994886240992,
-      "milliseconds": 809,
+      "milliseconds": 1510,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.worldbank.org/indicator/NY.GDP.MKTP.KD.ZG?locations=CN",
-      "fetchedAt": "2026-10-15T05:55:06.434Z",
+      "fetchedAt": "2026-10-15T08:58:14.597Z",
       "windows": {
         "1": {
           "first": "2024-12-31",
@@ -638,11 +638,11 @@
       "first": "1960-12-31",
       "last": "2024-12-31",
       "latest": 16.7084895385701,
-      "milliseconds": 804,
+      "milliseconds": 1571,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.worldbank.org/indicator/NE.CON.GOVT.ZS?locations=CN",
-      "fetchedAt": "2026-10-15T05:55:06.429Z",
+      "fetchedAt": "2026-10-15T08:58:14.659Z",
       "windows": {
         "1": {
           "first": "2023-12-31",

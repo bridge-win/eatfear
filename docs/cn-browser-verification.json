@@ -1,5 +1,5 @@
 {
-  "testedAt": "2026-10-15T05:56:29.072Z",
+  "testedAt": "2026-10-15T08:59:43.947Z",
   "checks": [
     "no page overflow at 1440px",
     "real historical CSV export >24 observations",
