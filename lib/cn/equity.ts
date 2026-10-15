@@ -1,12 +1,13 @@
 import type { Point } from "./catalog.ts"
 import { cleanPoints } from "./metrics.ts"
+import { loadTencentCsi } from "./tencent.ts"
 
 type JsonRequest = (url: string, signal: AbortSignal) => Promise<any>
 type Result = { points: Point[]; complete: boolean; warning?: string }
 const YAHOO_SOURCE = "https://finance.yahoo.com/quote/000300.SS/"
 const EASTMONEY_SOURCE = "https://quote.eastmoney.com/zs000300.html"
 const price = (v: unknown): number | null => {
-  if ((typeof v !== "number" && typeof v !== "string") || v === "") return null
+  if ((typeof v !== "number" && typeof v !== "string") || String(v).trim() === "") return null
   const n = Number(v)
   return Number.isFinite(n) && n > 0 ? n : null
 }
@@ -23,11 +24,11 @@ export function parseKlines(lines: unknown): Point[] {
   }))
 }
 export async function loadCsi300(request: JsonRequest, today = new Date().toISOString().slice(0, 10)): Promise<Result> {
-  const signal = AbortSignal.timeout(24000)
+  const deadline = Date.now() + 24000
   let fallback: Point[] = []
   const errors: string[] = []
   try {
-    const body = await request("https://query1.finance.yahoo.com/v8/finance/chart/000300.SS?range=max&interval=1d&events=history", signal)
+    const body = await request("https://query1.finance.yahoo.com/v8/finance/chart/000300.SS?range=max&interval=1d&events=history", AbortSignal.timeout(4000))
     const chart = body.chart?.result?.[0]
     if (!Array.isArray(chart?.timestamp) || !Array.isArray(chart?.indicators?.quote?.[0]?.close)) throw new Error("Yahoo历史字段缺失")
     fallback = cleanPoints(chart.timestamp.flatMap((t: number, i: number) => {
@@ -42,6 +43,7 @@ export async function loadCsi300(request: JsonRequest, today = new Date().toISOS
   let history: Point[] = []
   let end = today.replaceAll("-", "")
   try {
+    const signal = AbortSignal.timeout(8000)
     for (let page = 0; page < 64; page++) {
       const params = new URLSearchParams({ secid: "1.000300", klt: "101", fqt: "0", beg: "19900101", end, lmt: "1000", fields1: "f1,f2,f3,f4,f5,f6", fields2: "f51,f52,f53,f54,f55,f56" })
       const body = await request(`https://push2his.eastmoney.com/api/qt/stock/kline/get?${params}`, signal)
@@ -60,6 +62,10 @@ export async function loadCsi300(request: JsonRequest, today = new Date().toISOS
     }
     throw new Error("分页上限达到，完整性未确认")
   } catch (error) { errors.push(error instanceof Error ? error.message : "东方财富历史获取失败") }
+  try {
+    return await loadTencentCsi(request, today, AbortSignal.timeout(Math.max(1, deadline - Date.now())))
+  } catch (error) { errors.push(error instanceof Error ? error.message : "腾讯历史获取失败") }
+  // Never splice different vendors together to conceal a coverage gap.
   const points = history.length > fallback.length ? history : fallback
   if (!points.length) throw new Error(errors.join("；"))
   return { points, complete: false, warning: `仅取得部分历史或报价，不作为完整历史：${errors.join("；")}` }

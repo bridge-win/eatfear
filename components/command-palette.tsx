@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
-import { BookOpen, Coins, Crown, Home, LineChart, Moon, Newspaper, NotebookPen, Search, Star, Sun } from "lucide-react"
+import { BookOpen, Coins, Crown, Home, Landmark, LineChart, Moon, Newspaper, NotebookPen, Search, Star, Sun } from "lucide-react"
 
 import {
   CommandDialog,
@@ -24,6 +24,7 @@ const PAGE_ITEMS = [
   { href: "/watchlist", key: "nav.watchlist", icon: Star },
   { href: "/journal", key: "nav.journal", icon: NotebookPen },
   { href: "/macro", key: "nav.macro", icon: LineChart },
+  { href: "/cn", key: "nav.macro", icon: Landmark },
   { href: "/methodology", key: "nav.methodology", icon: BookOpen },
   { href: "/news", key: "nav.news", icon: Newspaper },
 ] as const
@@ -71,9 +72,9 @@ export function CommandPalette() {
           <CommandEmpty>{t("command.empty")}</CommandEmpty>
           <CommandGroup heading={t("command.group.pages")}>
             {PAGE_ITEMS.map((item) => (
-              <CommandItem key={item.href} value={t(item.key)} onSelect={() => runCommand(() => router.push(item.href))}>
+              <CommandItem key={item.href} value={item.href === "/cn" ? `${t(item.key)} CN 中国 化债` : t(item.key)} onSelect={() => runCommand(() => router.push(item.href))}>
                 <item.icon className="h-4 w-4" />
-                {t(item.key)}
+                {item.href === "/cn" ? `${t(item.key)} CN` : t(item.key)}
               </CommandItem>
             ))}
           </CommandGroup>

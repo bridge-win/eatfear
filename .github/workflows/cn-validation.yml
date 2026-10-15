@@ -2,7 +2,7 @@ name: China observatory validation
 on:
   push:
     branches: [main, 'feat/cn-observatory']
-    paths: ['app/cn/**', 'app/api/cn/**', 'components/cn/**', 'lib/cn/**', 'public/cn/**', 'scripts/*cn*', 'tsconfig.cn.json', '.github/workflows/cn-validation.yml']
+    paths: ['app/cn/**', 'app/api/cn/**', 'components/cn/**', 'components/main-site-header.tsx', 'components/site-header.tsx', 'components/command-palette.tsx', 'lib/cn/**', 'public/cn/**', 'scripts/*cn*', 'tsconfig.cn.json', '.github/workflows/cn-validation.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -25,6 +25,8 @@ jobs:
         continue-on-error: true
         run: node --experimental-strip-types scripts/check-cn-sources.ts
       - run: corepack enable && pnpm install --frozen-lockfile
+      - name: Existing application regression tests
+        run: pnpm test
       - run: node --experimental-strip-types --test lib/cn/*.test.ts
       - run: pnpm exec tsc -p tsconfig.cn.json --noEmit
       - run: pnpm build

@@ -23,6 +23,7 @@ export const navItems = [
   { href: "/watchlist", key: "nav.watchlist" },
   { href: "/journal", key: "nav.journal" },
   { href: "/macro", key: "nav.macro" },
+  { href: "/cn", key: "nav.macro" },
   { href: "/methodology", key: "nav.methodology" },
   { href: "/news", key: "nav.news" },
 ] as const
@@ -183,7 +184,7 @@ export function SiteHeader() {
                         isActive && "bg-foreground text-background hover:bg-foreground hover:text-background",
                       )}
                     >
-                      {t(item.key)}
+                      {item.href === "/cn" ? `${t(item.key)} CN` : t(item.key)}
                     </Link>
                   )
                 })}
@@ -218,7 +219,7 @@ export function SiteHeader() {
                   isActive && "bg-foreground text-background hover:bg-foreground hover:text-background",
                 )}
               >
-                {t(item.key)}
+                {item.href === "/cn" ? `${t(item.key)} CN` : t(item.key)}
               </Link>
             )
           })}
