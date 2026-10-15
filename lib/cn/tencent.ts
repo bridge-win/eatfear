@@ -20,7 +20,6 @@ export async function loadTencentCsi(request: RequestJson, today = new Date().to
   const firstYear = Number(earliest.slice(0, 4)), lastYear = Number(today.slice(0, 4))
   const years = Array.from({ length: lastYear - firstYear + 1 }, (_, i) => firstYear + i)
   const all: Point[] = []
-  // A calendar-year page has at most 366 days, below the 640-row endpoint limit.
   for (let offset = 0; offset < years.length; offset += 4) {
     const pages = await Promise.all(years.slice(offset, offset + 4).map(async year => {
       const start = year === firstYear ? earliest : `${year}-01-01`
@@ -28,9 +27,10 @@ export async function loadTencentCsi(request: RequestJson, today = new Date().to
       const params = new URLSearchParams({ param: `sh000300,day,${start},${end},640,qfq` })
       const body = await request(`https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get?${params}`, signal)
       const item = body.data?.sh000300
-      const points = parseTencentKlines(item?.day ?? item?.qfqday)
-      if (points.some(p => p.date < start || p.date > end)) throw new Error("腾讯未遵守历史日期范围")
-      if (!points.length || points.length >= 640 || differenceDays(points[0].date, start) > 14 || differenceDays(end, points.at(-1)!.date) > 14 || points.slice(1).some((p, i) => differenceDays(p.date, points[i].date) > 14)) throw new Error("腾讯年度历史完整性未通过检查")
+      // This endpoint includes surrounding sessions even with explicit bounds.
+      // Validate coverage inside each year instead of discarding valid overlap.
+      const points = parseTencentKlines(item?.day ?? item?.qfqday).filter(p => p.date >= start && p.date <= end)
+      if (!points.length || points.length >= 640 || differenceDays(points[0].date, start) > 14 || differenceDays(end, points.at(-1)!.date) > 14 || points.slice(1).some((p, i) => differenceDays(p.date, points[i].date) > 14)) throw new Error(`腾讯${year}年历史完整性未通过检查：目标${start}至${end}，取得${points[0]?.date ?? "无"}至${points.at(-1)?.date ?? "无"}`)
       return points
     }))
     for (const page of pages) all.push(...page)
