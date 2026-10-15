@@ -14,7 +14,7 @@ export function parseMofArticle(html: string, title: string, url: string, fetche
   const issuance = amount(/全国发行(?:地方政府)?债券(?:合计)?([\d.]+)(万?亿元)/)
   const refinance = amount(/全国发行再融资(?:地方政府)?债券([\d.]+)(万?亿元)/)
   const newDebt = amount(/全国发行新增(?:地方政府)?债券([\d.]+)(万?亿元)/)
-  const balance = amount(/全国地方政府债务余额([\d.]+)(万?亿元)/, text)
+  const balance = amount(/全国地方政府债务余额(?:为)?([\d.]+)(万?亿元)/, text)
   const rate = amount(/地方政府债券平均发行利率([\d.]+)%/)
   if (issuance === null && balance === null) return null
   if (issuance !== null && newDebt !== null && refinance !== null && Math.abs(issuance - newDebt - refinance) > 2) return null
@@ -48,7 +48,7 @@ export function mofHistory() {
       }))
       if (outcomes.some(r => r.status === "rejected")) warnings.push("部分新公告未能解析，保留已归档历史")
     } catch { warnings.push("本次官网检查失败，保留已归档历史") }
-    if (seed.errors.length) warnings.push(`历史采集存在${seed.errors.length}个缺口，完整性未确认`)
+    if (seed.errors.length) warnings.push(`历史采集存在${seed.errors.length}个失败项，完整性未确认`)
     return { records: [...records.values()].sort((a, b) => a.date.localeCompare(b.date)), complete: seed.records.length > 0 && seed.errors.length === 0, warning: warnings.length ? warnings.join("；") : null }
   })()
   pending = { until: Date.now() + 900000, promise }

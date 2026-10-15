@@ -25,7 +25,7 @@ jobs:
         continue-on-error: true
         run: node --experimental-strip-types scripts/check-cn-sources.ts
       - run: corepack enable && pnpm install --frozen-lockfile
-      - run: node --experimental-strip-types --test lib/cn/metrics.test.ts
+      - run: node --experimental-strip-types --test lib/cn/*.test.ts
       - run: pnpm exec tsc -p tsconfig.cn.json --noEmit
       - run: pnpm build
       - name: Install test browser

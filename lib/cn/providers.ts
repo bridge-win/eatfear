@@ -1,6 +1,7 @@
 import { BY_ID, SERIES, type Definition, type Point, type SeriesData } from "./catalog.ts"
 import { mofHistory, type MofRecord } from "./mof.ts"
 import { cleanPoints } from "./metrics.ts"
+import { loadCsi300, normalizeLpr } from "./equity.ts"
 
 type Row = Record<string, unknown>
 type Fetcher = typeof fetch
@@ -82,7 +83,10 @@ async function load(d: Definition, fetcher: Fetcher): Promise<Loaded> {
       return value === null ? [] : [{ date: r.date, value, sourceUrl: r.sourceUrl, publishedAt: r.publishedAt, fetchedAt: r.fetchedAt }]
     }) }
   }
-  if (d.provider === "eastmoney") return { points: parseRows(await eastmoneyRows(d, fetcher), d), complete: true }
+  if (d.provider === "eastmoney") {
+    const points = parseRows(await eastmoneyRows(d, fetcher), d)
+    return d.id === "lpr" ? { points: normalizeLpr(points), complete: true, warning: "采用2019-08改革后的月度报价，不拼接旧日频制度；同月保留最后披露值。" } : { points, complete: true }
+  }
   const signal = AbortSignal.timeout(24000)
   if (d.provider === "worldbank") {
     const base = `https://api.worldbank.org/v2/country/CHN/indicator/${encodeURIComponent(d.report)}?format=json&per_page=1000`
@@ -106,13 +110,7 @@ async function load(d: Definition, fetcher: Fetcher): Promise<Loaded> {
     const year = new Date().getUTCFullYear()
     return { complete: true, warning: "IMF年度估算口径；过滤当年及未来年份，不属于官方隐债。", points: cleanPoints(Object.entries(values).flatMap(([y, v]) => { const value = numberValue(v); return /^\d{4}$/.test(y) && Number(y) < year && value !== null ? [{ date: `${y}-12-31`, value }] : [] })) }
   }
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(d.report)}?period1=0&period2=${Math.floor(Date.now() / 1000)}&interval=1d&events=history`
-  const result = await json(url, fetcher, signal)
-  const chart = result.chart?.result?.[0]
-  const stamps: number[] = chart?.timestamp
-  const closes = chart?.indicators?.quote?.[0]?.close
-  if (!Array.isArray(stamps) || !Array.isArray(closes)) throw new Error("行情源暂不可用")
-  return { complete: true, warning: "日终/延迟价格行情，不含分红；授权及可用性以数据源规则为准。", points: cleanPoints(stamps.flatMap((t, i) => { const value = numberValue(closes[i]); return Number.isFinite(t) && value !== null ? [{ date: new Date(t * 1000).toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" }), value }] : [] })) }
+  return loadCsi300((url, signal) => json(url, fetcher, signal))
 }
 export async function getSeries(id: string, fetcher: Fetcher = fetch): Promise<SeriesData> {
   const d = BY_ID[id]

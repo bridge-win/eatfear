@@ -17,22 +17,25 @@ async function main() {
   const errors: string[] = []
   for (const base of ARCHIVES) {
     const signatures = new Set<string>()
-    for (let page = 0; page < 30; page++) {
+    let totalPages = 30
+    for (let page = 0; page < Math.min(30, totalPages); page++) {
       const url = page === 0 ? base : `${base}index_${page}.htm`
       let html: string
       try { html = await retrieve(url) } catch (e) {
         if (page > 0 && String(e).includes("404")) break
-        errors.push(`${url}: ${String(e)}`); break
+        errors.push(`${url}: ${String(e)}`); continue
       }
-      const items = parsePolicyList(html, base).filter(p => /\d{4}年\d{1,2}月地方政府债券发行/.test(p.title))
-      const signature = items.map(p => p.url).join("|")
-      if (!items.length) { if (page === 0) errors.push(`${url}: no monthly disclosures`); break }
+      const all = parsePolicyList(html, base)
+      const count = /createPageHTML\(\s*(\d+)/i.exec(html)
+      if (count) totalPages = Number(count[1])
+      const items = all.filter(p => /\d{4}年\d{1,2}月地方政府债券发行/.test(p.title))
+      const signature = all.map(p => p.url).join("|")
+      if (!all.length) { errors.push(`${url}: no recognizable disclosures`); continue }
       if (signatures.has(signature)) { errors.push(`${url}: repeated page`); break }
       signatures.add(signature)
       for (const p of items) if (Number(p.title.match(/\d{4}/)?.[0]) >= 2015) candidates.set(p.url, p)
       if (items.some(p => Number(p.title.match(/\d{4}/)?.[0]) < 2015)) break
-      const count = /createPageHTML\(\s*(\d+)/i.exec(html)
-      if (count && page + 1 >= Number(count[1])) break
+      if (page + 1 >= totalPages) break
       if (page === 29) errors.push(`${base}: pagination limit reached`)
     }
   }
