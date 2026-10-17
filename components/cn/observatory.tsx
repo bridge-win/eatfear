@@ -9,10 +9,14 @@ import { BY_ID, GROUPS, METHODS, SERIES, type Group, type SeriesData } from "@/l
 import { csv, difference, evaluate, eventStudy, interestSaving, mean, rangePoints } from "@/lib/cn/metrics"
 import { ASSETS, BASELINE, HISTORY, POLICY_SOURCE, TRANSMISSION, type Policy } from "@/lib/cn/research"
 import styles from "./observatory.module.css"
+import researchStyles from "./research-workspace.module.css"
+const ResearchWorkspace = dynamic(() => import("./research-workspace"), { loading: () => <p>正在打开专题研究…</p> })
+const SourceGuide = dynamic(() => import("./source-guide"), { loading: () => <p>正在打开数据源目录…</p> })
 const Chart = dynamic(() => import("./charts").then(m => m.HistoryChart), { ssr: false, loading: () => <div className={styles.chartLoading}>加载图表组件…</div> })
 const Sparkline = dynamic(() => import("./charts").then(m => m.Sparkline), { ssr: false })
 const tabs = [
   { id: "overview", label: "经济全景", icon: LayoutDashboard },
+  { id: "research", label: "专题与标的", icon: Search },
   { id: "indicators", label: "指标实验室", icon: Activity },
   { id: "debt", label: "化债与传导", icon: Network },
   { id: "history", label: "历史与情景", icon: History },
@@ -30,7 +34,8 @@ async function fetcher<T>(url: string): Promise<T> {
 function Probe({ id, onData }: { id: string; onData: (data: SeriesData) => void }) {
   const { data, error } = useSWR<SeriesData>(`/api/cn/series?id=${id}`, fetcher, { refreshInterval: 900000, revalidateOnFocus: false, errorRetryCount: 1, dedupingInterval: 60000 })
   useEffect(() => {
-    if (data) onData(data)
+    if (error && data) onData({ ...data, status: "partial", warning: "本次请求失败，保留上次历史；当前判断待复核。" })
+    else if (data) onData(data)
     else if (error) onData({ id, points: [], status: "unavailable", complete: false, fetchedAt: null, publishedAt: null, firstDate: null, lastDate: null, sourceUrl: BY_ID[id].sourceUrl, warning: "网络或接口暂不可用；可手动重试。" })
   }, [id, data, error, onData])
   return null
@@ -60,10 +65,11 @@ export default function Observatory() {
   const { data: feed } = useSWR<{ items: Policy[]; checkedAt: string; liveCount: number; status: string }>("/api/cn/policies", fetcher, { refreshInterval: 900000, revalidateOnFocus: false, errorRetryCount: 1 })
   useEffect(() => { setMounted(true); const hash = location.hash.slice(1); if (tabs.some(t => t.id === hash)) setTab(hash as Tab) }, [])
   const go = (next: Tab) => { setTab(next); history.replaceState(null, "", `#${next}`); window.scrollTo({ top: 0, behavior: "smooth" }) }
-  const refresh = async () => { setRefreshing(true); try { await Promise.allSettled([...SERIES.map(d => mutate(`/api/cn/series?id=${d.id}`)), mutate("/api/cn/policies")]) } finally { setRefreshing(false) } }
+  const refresh = async () => { setRefreshing(true); try { await Promise.allSettled([...SERIES.map(d => mutate(`/api/cn/series?id=${d.id}`)), mutate("/api/cn/policies"), mutate("/api/cn/securities")]) } finally { setRefreshing(false) } }
   const evaluations = useMemo(() => Object.fromEntries(SERIES.map(d => [d.id, evaluate(d, data[d.id])])), [data])
   const available = SERIES.filter(d => data[d.id]?.points.length).length
   const finished = Object.keys(data).length
+  const partial = SERIES.filter(d => data[d.id]?.status === "partial").length
   const failed = SERIES.filter(d => data[d.id]?.status === "unavailable").length
   const def = BY_ID[selected], current = data[selected], ev = evaluations[selected]
   const filtered = SERIES.filter(d => (group === "all" || d.group === group) && `${d.name} ${d.short} ${d.origin}`.toLowerCase().includes(search.toLowerCase()))
@@ -99,12 +105,14 @@ export default function Observatory() {
   </aside></div>
   return <div className={styles.root} data-theme={mounted && resolvedTheme === "light" ? "light" : "dark"} lang="zh-CN">
     {SERIES.map(d => <Probe key={d.id} id={d.id} onData={onData} />)}
-    <aside className={styles.sidebar}><Link href="/home" className={styles.brand}><span className={styles.brandMark}><Activity size={22} /></span>eatfear<span className={styles.cnBadge}>CN</span></Link><div className={styles.workspace}>CHINA OBSERVATORY<span>中国经济 · 化债观察台</span></div><nav aria-label="中国观察导航">{tabs.map(t => <button key={t.id} aria-current={tab === t.id ? "page" : undefined} className={tab === t.id ? styles.navActive : ""} onClick={() => go(t.id)}><t.icon size={18} />{t.label}{tab === t.id && <span className={styles.navDot} />}</button>)}</nav><div className={styles.sidebarNote}><ShieldCheck size={20} /><strong>证据先于结论</strong><p>从政策到现金流，<br />从预期到真实定价。</p><span>事实 / 估算 / 假设<br />始终分开展示</span></div><Link href="/macro" className={styles.backLink}>全球宏观工作台 <ArrowRight size={14} /></Link></aside>
-    <div className={styles.content}><header className={styles.topbar}><div className={styles.breadcrumb}><span className={styles.mobileBrand}>eatfear <b>CN</b></span><span>研究工作台</span><ChevronRight size={13} /><strong>{tabs.find(t => t.id === tab)?.label}</strong></div><div className={styles.topActions}><span className={styles.connection}><i />{available}/{SERIES.length} 数据就绪</span><button className={styles.iconButton} onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} aria-label="切换深色浅色">{mounted && resolvedTheme === "light" ? <Moon size={17} /> : <Sun size={17} />}</button><button className={styles.refresh} disabled={refreshing} onClick={refresh}><RefreshCw size={14} className={refreshing ? styles.spinning : ""} /><span>{refreshing ? "更新中" : "刷新"}</span></button></div></header>
+    <aside className={styles.sidebar}><Link href="/home" className={styles.brand}><span className={styles.brandMark}><Activity size={22} /></span>eatfear<span className={styles.cnBadge}>CN</span></Link><div className={styles.workspace}>CHINA OBSERVATORY<span>中国经济 · 专题研究台</span></div><nav aria-label="中国观察导航">{tabs.map(t => <button key={t.id} aria-current={tab === t.id ? "page" : undefined} className={tab === t.id ? styles.navActive : ""} onClick={() => go(t.id)}><t.icon size={18} />{t.label}{tab === t.id && <span className={styles.navDot} />}</button>)}</nav><div className={styles.sidebarNote}><ShieldCheck size={20} /><strong>证据先于结论</strong><p>从政策到现金流，<br />从预期到真实定价。</p><span>事实 / 估算 / 假设<br />始终分开展示</span></div><Link href="/macro" className={styles.backLink}>全球宏观工作台 <ArrowRight size={14} /></Link></aside>
+    <div className={styles.content}><header className={styles.topbar}><div className={styles.breadcrumb}><span className={styles.mobileBrand}>eatfear <b>CN</b></span><span>研究工作台</span><ChevronRight size={13} /><strong>{tabs.find(t => t.id === tab)?.label}</strong></div><div className={styles.topActions}><span className={styles.connection}><i />{available}/{SERIES.length} 有历史</span><button className={styles.iconButton} onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} aria-label="切换深色浅色">{mounted && resolvedTheme === "light" ? <Moon size={17} /> : <Sun size={17} />}</button><button className={styles.refresh} disabled={refreshing} onClick={refresh}><RefreshCw size={14} className={refreshing ? styles.spinning : ""} /><span>{refreshing ? "更新中" : "刷新"}</span></button></div></header>
       <nav className={styles.mobileNav} aria-label="页面分区">{tabs.map(t => <button key={t.id} aria-pressed={tab === t.id} className={tab === t.id ? styles.activeChip : ""} onClick={() => go(t.id)}>{t.label}</button>)}</nav>
       <main className={styles.main}>
-        <section className={styles.hero}><div><div className={styles.heroKicker}><span /> FOLLOW THE EVIDENCE, NOT THE NOISE</div><h1>{tab === "overview" ? <>读懂政策的方向，<br /><em>看见经济的温度。</em></> : tab === "indicators" ? <>让判断，<em>经得起数据验证。</em></> : tab === "debt" ? <>从债务置换，<em>追到现金流。</em></> : tab === "history" ? <>理解来路，<em>而非复制过去。</em></> : <>每一个结论，<em>都有来处。</em></>}</h1><p>政策 ≠ 资金到账 ≠ 企业盈利 ≠ 投资收益。用真实历史、透明指标和可追溯证据，理解中国经济与这一轮化债。</p><div className={styles.heroTags}><span><Database size={13} />官方与第三方数据</span><span><Layers3 size={13} />五维观察框架</span><span><ShieldCheck size={13} />非买卖信号</span></div></div><div className={styles.heroOrbit} aria-hidden="true"><div /><div /><div /><Landmark size={40} /><span>POLICY → CASH FLOW</span></div></section>
-        <div className={styles.statusLine}><span><i className={finished < SERIES.length ? styles.pulse : ""} />{finished < SERIES.length ? `连接上游 ${finished}/${SERIES.length}` : `本轮获取完成 · ${available}项有数据${failed ? ` · ${failed}项暂不可用` : ""}`}</span><span>打开页面每15分钟检查 · 月度 / 日终 / 年度按原始频率展示</span></div>
+        <section className={styles.hero}><div><div className={styles.heroKicker}><span /> FOLLOW THE EVIDENCE, NOT THE NOISE</div><h1>{tab === "overview" ? <>读懂政策的方向，<br /><em>看见经济的温度。</em></> : tab === "research" ? <>从经济变化，<em>找到值得研究的标的。</em></> : tab === "indicators" ? <>让判断，<em>经得起数据验证。</em></> : tab === "debt" ? <>从债务置换，<em>追到现金流。</em></> : tab === "history" ? <>理解来路，<em>而非复制过去。</em></> : <>每一个结论，<em>都有来处。</em></>}</h1><p>从政策、信用和需求出发，追踪行业传导、公司现金流与资产定价。每一步都保留来源、假设和反证。</p><div className={styles.heroTags}><span><Database size={13} />官方与第三方数据</span><span><Layers3 size={13} />五维观察框架</span><span><ShieldCheck size={13} />非买卖信号</span></div></div><div className={styles.heroOrbit} aria-hidden="true"><div /><div /><div /><Landmark size={40} /><span>POLICY → CASH FLOW</span></div></section>
+        <div className={styles.statusLine}><span><i className={finished < SERIES.length ? styles.pulse : ""} />{finished < SERIES.length ? `连接上游 ${finished}/${SERIES.length}` : `本轮获取完成 · ${available}项有数据${partial ? ` · ${partial}项历史待核对` : ""}${failed ? ` · ${failed}项暂不可用` : ""}`}</span><span>打开页面每15分钟检查 · 月度 / 日终 / 年度按原始频率展示</span></div>
+        {tab === "overview" && <section className={researchStyles.intro}><div><span className={researchStyles.eyebrow}>YOUR RESEARCH STARTS HERE</span><h2>经济变化，如何落实到具体标的？</h2><p>五个专题 · 真实股票与ETF · 财报对比 · 估值情景 · 研究笔记</p></div><button onClick={() => go("research")}>进入专题与标的 <ArrowRight size={16} /></button></section>}
+        {tab === "research" && <ResearchWorkspace data={data} onIndicator={choose} />}
         {(tab === "overview" || tab === "indicators") && <>
           <div className={styles.heatGrid}>{GROUPS.map(g => { const ids = heatIds[g.id]; const valid = ids.filter(id => evaluations[id].percentile !== null && !evaluations[id].stale && data[id]?.complete); const value = valid.length >= Math.ceil(ids.length / 2) ? mean(valid.map(id => evaluations[id].percentile!)) : null; return <button className={styles.heatCard} key={g.id} onClick={() => { setGroup(g.id); choose(ids[0]) }}><div><span>{g.name}</span><ArrowUpRight size={16} /></div><strong>{fmt(value, 0)}<small>/100</small></strong><div className={styles.heatBar}><i style={{ width: `${value ?? 0}%` }} /></div><p>{g.id === "markets" ? "长端利率相对位置" : g.id === "fiscal" ? "财政收入增速位置" : g.subtitle}</p><small>有效覆盖 {valid.length}/{ids.length} · {value === null ? "暂不评分" : "历史分位等权"}</small></button> })}</div>
           <p className={styles.subtle}>温度只表达相对历史强弱，不代表资产便宜或经济好坏。各组样本与统计期不同，不合成总买入分。</p>
@@ -134,8 +142,9 @@ export default function Observatory() {
           </div>
         </>}
         {tab === "sources" && <>
+          <SourceGuide />
           <SectionTitle kicker="DATA CONTRACT" title="数据从哪里来，什么时候才算新？"><Tag>{available}/{SERIES.length} 有效历史</Tag></SectionTitle><div className={styles.callout}><Database size={25} /><div><strong>统计期、发布日期和获取时间，不能混为一谈。</strong><p>当前接口未提供可靠发布日期时保留空值。展示最新修订历史，不宣称已经拥有历史时点版本库；本页面不是无前视偏差的量化回测。</p></div></div>
-          <div className={styles.sourceGrid}>{SERIES.map(d => { const s = data[d.id]; return <article className={styles.panel} key={d.id}><div className={styles.panelHead}><h3>{d.name}</h3><Tag kind={s?.status === "ok" ? "teal" : "amber"}>{s?.status === "ok" ? "已获取" : s?.status === "partial" ? "历史缓存" : s ? "暂不可用" : "连接中"}</Tag></div><p>{d.origin}</p><dl><dt>历史区间</dt><dd>{s?.firstDate ?? "—"} → {s?.lastDate ?? "—"}</dd><dt>原始观测</dt><dd>{s?.points.length ?? 0} · {s?.complete ? "上游分页已遍历" : "未确认完整"}</dd><dt>获取时间</dt><dd>{dateTime(s?.fetchedAt)}</dd><dt>发布日期</dt><dd>{dateTime(s?.publishedAt)}</dd></dl>{s?.warning && <p className={styles.warning}>{s.warning}</p>}<p className={styles.subtle}>{d.caveat}</p><Out href={s?.sourceUrl ?? d.sourceUrl}>来源与口径</Out></article> })}</div>
+          <div className={styles.sourceGrid}>{SERIES.map(d => { const s = data[d.id]; return <article className={styles.panel} key={d.id}><div className={styles.panelHead}><h3>{d.name}</h3><Tag kind={s?.status === "ok" ? "teal" : "amber"}>{s?.status === "ok" ? "已获取" : s?.status === "partial" ? "历史待核对" : s ? "暂不可用" : "连接中"}</Tag></div><p>{d.origin}</p><dl><dt>历史区间</dt><dd>{s?.firstDate ?? "—"} → {s?.lastDate ?? "—"}</dd><dt>原始观测</dt><dd>{s?.points.length ?? 0} · {s?.complete ? "上游分页已遍历" : "未确认完整"}</dd><dt>获取时间</dt><dd>{dateTime(s?.fetchedAt)}</dd><dt>发布日期</dt><dd>{dateTime(s?.publishedAt)}</dd></dl>{s?.warning && <p className={styles.warning}>{s.warning}</p>}<p className={styles.subtle}>{d.caveat}</p><Out href={s?.sourceUrl ?? d.sourceUrl}>来源与口径</Out></article> })}</div>
           <SectionTitle kicker="RESEARCH METHODOLOGY" title="公式公开，阈值可解释" /><div className={styles.assetGrid}>{METHODS.map(m => <article key={m.title} className={styles.panel}><h3>{m.title}</h3><code className={styles.formula}>{m.formula}</code><p>{m.text}</p><Out href={m.url}>方法参考</Out></article>)}</div>
           <section className={styles.panel}><h3>尚未接入，不用代理变量冒充</h3><p>全国实际化债资金穿透流向、城投贷款合同与隐债明细、企业逐笔回款、REITs基金级估值、实时ETF申赎，目前不在已接通范围。政策目录用于发现公告，不自动推算执行金额。</p><p>东方财富和Yahoo的公开网页接口不提供可用性保证；公开展示与商业再分发需核对各来源授权。没有把API可访问等同于拥有再分发许可，也不声称获得研究机构认证。</p></section>
         </>}

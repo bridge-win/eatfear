@@ -72,11 +72,11 @@ export function evaluate(d: Definition, data?: SeriesData, now = new Date()): Ev
   const prices = pricePoints.map(p => p.value)
   const continuousPrices = pricePoints.slice(1).every((p, i) => ageDays(p.date, pricePoints[i].date) <= 14)
   const returns = prices.slice(1).map((p, i) => p > 0 && prices[i] > 0 ? Math.log(p / prices[i]) : NaN)
-  const comparablePrevious = previous && (d.frequency !== "monthly" || monthIndex(last.date) - monthIndex(previous.date) === 1)
+  const comparablePrevious = previous && (d.frequency === "monthly" ? monthIndex(last.date) - monthIndex(previous.date) === 1 : d.frequency === "annual" ? Number(last.date.slice(0, 4)) - Number(previous.date.slice(0, 4)) === 1 : ageDays(last.date, previous.date) <= 14)
   return {
     value: last.value, delta: comparablePrevious && !d.seasonal ? last.value - previous!.value : null, momentum,
     percentile: pct, z, robustZ, samples: n, stale, label, explanation,
-    drawdown: d.price && verified && prices.length >= 2 && prices.every(p => p > 0) ? 100 * (last.value / Math.max(...prices.slice(-252)) - 1) : null,
+    drawdown: d.price && verified && continuousPrices && prices.length >= 252 && prices.every(p => p > 0) ? 100 * (last.value / Math.max(...prices.slice(-252)) - 1) : null,
     volatility: d.price && verified && continuousPrices && returns.length >= 60 && returns.every(Number.isFinite) ? deviation(returns) * Math.sqrt(252) * 100 : null,
   }
 }
@@ -91,7 +91,7 @@ export function rangePoints(points: Point[], years: number | null): Point[] {
   return points.filter(p => p.date >= last.toISOString().slice(0, 10))
 }
 export function eventStudy(input: Point[], date: string, periods = 120) {
-  if (!Number.isInteger(periods) || periods < 1 || !Number.isFinite(Date.parse(date))) return null
+  if (!Number.isInteger(periods) || periods < 1 || !cleanPoints([{ date, value: 1 }]).length) return null
   const points = cleanPoints(input)
   const index = points.findIndex(p => p.date >= date)
   if (index <= 0 || index + periods >= points.length || points[index].value <= 0 || (Date.parse(points[index].date) - Date.parse(date)) / 86400000 > 10) return null
@@ -107,5 +107,5 @@ export function interestSaving(principal: number, oldRate: number, newRate: numb
 }
 export function csv(d: Definition, data: SeriesData): string {
   const esc = (v: unknown) => '"' + String(v ?? "").replaceAll('"', '""') + '"'
-  return '\ufeff' + ["period,value,unit,source,fetched_at,published_at", ...data.points.map(p => [p.date, p.value, d.unit, p.sourceUrl ?? data.sourceUrl, p.fetchedAt ?? data.fetchedAt, p.publishedAt ?? data.publishedAt].map(esc).join(","))].join("\n")
+  return '\ufeff' + ["period,value,unit,source,fetched_at,published_at", ...data.points.map(p => [p.date, p.value, d.unit, p.sourceUrl ?? data.sourceUrl, p.fetchedAt ?? data.fetchedAt, p.publishedAt ?? (p.date === data.lastDate ? data.publishedAt : null)].map(esc).join(","))].join("\n")
 }

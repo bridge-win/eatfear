@@ -19,3 +19,15 @@ Tencent endpoint schema was cross-checked against the maintainers' current `stoc
 The first verified implementation had incomplete official archive coverage and an unavailable IMF API. These remain explicit data states; no placeholder values or fabricated history are substituted. Core national macro data do not require user API keys. Production is a Node.js Next application, not a static export. Runtime polling is 15 minutes while the page is open; macro observations retain their original daily/monthly/annual frequency. This is not a seconds-level trading feed or a guaranteed always-running background collector.
 
 See `docs/cn-observatory.md` for methodology, API contracts, archive collection and operational limits.
+
+## Research workspace upgrade — 2026-10-18
+
+`/cn#research` adds five evidence-driven topics, nine manually verified stock/ETF identities and Tencent quotes, four stocks' same-period financial statements via Eastmoney, manual equity/bond scenarios, browser-local notes/watchlist and JSON research snapshots. `/cn#sources` includes seventeen official, market and institutional-source entries, with actual connection and subscription status. See `cn-research-upgrade.md` for source research, methodologies and remaining coverage limits.
+
+Data review fixed official archive completeness, refresh failures, financial publication lineage in CSV, and insufficient price-history risk calculations. Macro diagnostics now identify four MOF series as partial due to historical coverage gaps; those series remain viewable but do not create current scores. No missing history is synthesized.
+
+Local validation: 79 existing application tests and 85 CN tests passed, CN TypeScript check passed independently of the build's existing `ignoreBuildErrors` setting, and full Next.js production build passed. Chromium verified six workspaces, five topics, security filtering, valuation arithmetic, notes after reload, watchlist persistence, JSON export, source search, main navigation and command palette. Layout checks passed at 320/390/768/1440px with no page errors. Live verification returned nine quotes and all four stock financial adapters worked; formal browser report verifies China State Construction's same-period financial response.
+
+The new UI was also reviewed using the React best-practices checklist: lazy-loaded research panels, client-safe catalogs, typed server responses, deduplicated requests, versioned local storage, labeled form controls and responsive table overflow. Browser testing found and fixed the persisted textarea accessible-label issue.
+
+Public data availability depends on location and upstream changes. Paid Wind/CEIC feeds, complete industry/ETF valuation/holdings coverage, release-vintage databases and automatic whole-market opportunity ranking are not included. Candidate mappings and scenario assumptions are research inputs, not a validated return model.

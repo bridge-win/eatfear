@@ -1,21 +1,21 @@
 {
-  "checkedAt": "2026-10-15T09:04:49.128Z",
+  "checkedAt": "2026-10-17T19:12:41.856Z",
   "environment": "GitHub Actions or operator runtime; source availability is location-dependent",
   "results": [
     {
       "id": "lg_issuance",
       "name": "地方债当月发行",
       "provider": "mof",
-      "status": "ok",
+      "status": "partial",
       "points": 102,
       "first": "2017-12-31",
       "last": "2026-08-31",
       "latest": 11945,
-      "milliseconds": 4684,
-      "warning": null,
-      "complete": true,
+      "milliseconds": 595,
+      "warning": "自2015年起的采集范围缺少38个月公告（2015-01、2015-02、2015-03等）；未披露与未采集不填0；自2015年起的采集范围缺少38个月该字段（2015-01、2015-02、2015-03等）；未披露与未采集不填0",
+      "complete": false,
       "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
-      "fetchedAt": "2026-10-15T09:04:47.746Z",
+      "fetchedAt": "2026-10-17T19:12:40.688Z",
       "windows": {
         "1": {
           "first": "2025-08-31",
@@ -39,16 +39,16 @@
       "id": "lg_refinance",
       "name": "地方再融资债当月发行",
       "provider": "mof",
-      "status": "ok",
+      "status": "partial",
       "points": 58,
       "first": "2021-11-30",
       "last": "2026-08-31",
       "latest": 5505,
-      "milliseconds": 4649,
-      "warning": null,
-      "complete": true,
+      "milliseconds": 580,
+      "warning": "自2015年起的采集范围缺少38个月公告（2015-01、2015-02、2015-03等）；未披露与未采集不填0；自2015年起的采集范围缺少82个月该字段（2015-01、2015-02、2015-03等）；未披露与未采集不填0",
+      "complete": false,
       "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
-      "fetchedAt": "2026-10-15T09:04:47.746Z",
+      "fetchedAt": "2026-10-17T19:12:40.688Z",
       "windows": {
         "1": {
           "first": "2025-08-31",
@@ -72,16 +72,16 @@
       "id": "lg_balance",
       "name": "地方政府债务余额",
       "provider": "mof",
-      "status": "ok",
+      "status": "partial",
       "points": 99,
       "first": "2017-12-31",
       "last": "2026-08-31",
       "latest": 598955,
-      "milliseconds": 4649,
-      "warning": null,
-      "complete": true,
+      "milliseconds": 580,
+      "warning": "自2015年起的采集范围缺少38个月公告（2015-01、2015-02、2015-03等）；未披露与未采集不填0；自2015年起的采集范围缺少41个月该字段（2015-01、2015-02、2015-03等）；未披露与未采集不填0",
+      "complete": false,
       "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
-      "fetchedAt": "2026-10-15T09:04:47.746Z",
+      "fetchedAt": "2026-10-17T19:12:40.688Z",
       "windows": {
         "1": {
           "first": "2025-08-31",
@@ -105,16 +105,16 @@
       "id": "lg_rate",
       "name": "地方债当月平均发行利率",
       "provider": "mof",
-      "status": "ok",
+      "status": "partial",
       "points": 88,
       "first": "2019-05-31",
       "last": "2026-08-31",
       "latest": 1.83,
-      "milliseconds": 4650,
-      "warning": null,
-      "complete": true,
+      "milliseconds": 580,
+      "warning": "自2015年起的采集范围缺少38个月公告（2015-01、2015-02、2015-03等）；未披露与未采集不填0；自2015年起的采集范围缺少52个月该字段（2015-01、2015-02、2015-03等）；未披露与未采集不填0",
+      "complete": false,
       "sourceUrl": "https://zwgls.mof.gov.cn/tjsj/202609/t20260924_3998108.htm",
-      "fetchedAt": "2026-10-15T09:04:47.746Z",
+      "fetchedAt": "2026-10-17T19:12:40.688Z",
       "windows": {
         "1": {
           "first": "2025-08-31",
@@ -143,11 +143,11 @@
       "first": "2008-01-01",
       "last": "2026-09-01",
       "latest": 50.1,
-      "milliseconds": 923,
+      "milliseconds": 186,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/pmi.html",
-      "fetchedAt": "2026-10-15T09:04:44.460Z",
+      "fetchedAt": "2026-10-17T19:12:40.450Z",
       "windows": {
         "1": {
           "first": "2025-09-01",
@@ -176,11 +176,11 @@
       "first": "2008-01-01",
       "last": "2026-09-01",
       "latest": 50.2,
-      "milliseconds": 921,
+      "milliseconds": 186,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T09:04:44.460Z",
+      "fetchedAt": "2026-10-17T19:12:40.450Z",
       "windows": {
         "1": {
           "first": "2025-09-01",
@@ -209,11 +209,11 @@
       "first": "2008-01-01",
       "last": "2026-08-01",
       "latest": 0.4,
-      "milliseconds": 960,
+      "milliseconds": 302,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T09:04:44.499Z",
+      "fetchedAt": "2026-10-17T19:12:40.566Z",
       "windows": {
         "1": {
           "first": "2025-08-01",
@@ -242,11 +242,11 @@
       "first": "2008-02-01",
       "last": "2026-08-01",
       "latest": 5.2,
-      "milliseconds": 653,
+      "milliseconds": 164,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T09:04:44.194Z",
+      "fetchedAt": "2026-10-17T19:12:40.429Z",
       "windows": {
         "1": {
           "first": "2025-08-01",
@@ -275,11 +275,11 @@
       "first": "2008-01-01",
       "last": "2026-09-01",
       "latest": 0.9,
-      "milliseconds": 1038,
+      "milliseconds": 209,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/cpi.html",
-      "fetchedAt": "2026-10-15T09:04:44.580Z",
+      "fetchedAt": "2026-10-17T19:12:40.474Z",
       "windows": {
         "1": {
           "first": "2025-09-01",
@@ -308,11 +308,11 @@
       "first": "2006-01-01",
       "last": "2026-09-01",
       "latest": 5,
-      "milliseconds": 915,
+      "milliseconds": 174,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/ppi.html",
-      "fetchedAt": "2026-10-15T09:04:44.457Z",
+      "fetchedAt": "2026-10-17T19:12:40.440Z",
       "windows": {
         "1": {
           "first": "2025-09-01",
@@ -341,11 +341,11 @@
       "first": "2008-01-01",
       "last": "2026-09-01",
       "latest": 7.2,
-      "milliseconds": 931,
+      "milliseconds": 265,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T09:04:44.474Z",
+      "fetchedAt": "2026-10-17T19:12:40.531Z",
       "windows": {
         "1": {
           "first": "2025-09-01",
@@ -374,11 +374,11 @@
       "first": "2008-01-01",
       "last": "2026-09-01",
       "latest": 12734,
-      "milliseconds": 652,
+      "milliseconds": 204,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T09:04:44.196Z",
+      "fetchedAt": "2026-10-17T19:12:40.471Z",
       "windows": {
         "1": {
           "first": "2025-09-01",
@@ -407,11 +407,11 @@
       "first": "2008-01-01",
       "last": "2026-08-01",
       "latest": 5.7,
-      "milliseconds": 900,
+      "milliseconds": 297,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T09:04:44.445Z",
+      "fetchedAt": "2026-10-17T19:12:40.564Z",
       "windows": {
         "1": {
           "first": "2025-08-01",
@@ -436,31 +436,31 @@
       "name": "中国10年国债收益率",
       "provider": "eastmoney",
       "status": "ok",
-      "points": 6188,
+      "points": 6190,
       "first": "2002-01-04",
-      "last": "2026-10-14",
-      "latest": 1.6516,
-      "milliseconds": 3301,
+      "last": "2026-10-16",
+      "latest": 1.648,
+      "milliseconds": 1577,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/zmgzsyl.html",
-      "fetchedAt": "2026-10-15T09:04:46.847Z",
+      "fetchedAt": "2026-10-17T19:12:41.841Z",
       "windows": {
         "1": {
-          "first": "2025-10-14",
+          "first": "2025-10-16",
           "count": 249
         },
         "5": {
-          "first": "2021-10-14",
+          "first": "2021-10-18",
           "count": 1248
         },
         "10": {
-          "first": "2016-10-14",
-          "count": 2500
+          "first": "2016-10-17",
+          "count": 2501
         },
         "max": {
           "first": "2002-01-04",
-          "count": 6188
+          "count": 6190
         }
       }
     },
@@ -469,31 +469,31 @@
       "name": "中国2年国债收益率",
       "provider": "eastmoney",
       "status": "ok",
-      "points": 6188,
+      "points": 6190,
       "first": "2002-01-04",
-      "last": "2026-10-14",
-      "latest": 1.3896,
-      "milliseconds": 3306,
+      "last": "2026-10-16",
+      "latest": 1.3815,
+      "milliseconds": 1581,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/zmgzsyl.html",
-      "fetchedAt": "2026-10-15T09:04:46.847Z",
+      "fetchedAt": "2026-10-17T19:12:41.845Z",
       "windows": {
         "1": {
-          "first": "2025-10-14",
+          "first": "2025-10-16",
           "count": 249
         },
         "5": {
-          "first": "2021-10-14",
+          "first": "2021-10-18",
           "count": 1248
         },
         "10": {
-          "first": "2016-10-14",
-          "count": 2500
+          "first": "2016-10-17",
+          "count": 2501
         },
         "max": {
           "first": "2002-01-04",
-          "count": 6188
+          "count": 6190
         }
       }
     },
@@ -506,11 +506,11 @@
       "first": "2019-08-20",
       "last": "2026-09-20",
       "latest": 3,
-      "milliseconds": 1904,
+      "milliseconds": 351,
       "warning": "采用2019-08改革后的月度报价，不拼接旧日频制度；同月保留最后披露值。",
       "complete": true,
       "sourceUrl": "https://data.eastmoney.com/cjsj/",
-      "fetchedAt": "2026-10-15T09:04:45.451Z",
+      "fetchedAt": "2026-10-17T19:12:40.620Z",
       "windows": {
         "1": {
           "first": "2025-09-22",
@@ -535,31 +535,31 @@
       "name": "沪深300价格指数",
       "provider": "yahoo",
       "status": "ok",
-      "points": 5227,
-      "first": "2005-04-08",
-      "last": "2026-10-15",
-      "latest": 4166.01,
-      "milliseconds": 5575,
-      "warning": "腾讯CSI300日终/延迟价格历史；按年分页并验证首尾与缺口，不含分红。",
+      "points": 5289,
+      "first": "2005-01-04",
+      "last": "2026-10-16",
+      "latest": 4170.61,
+      "milliseconds": 799,
+      "warning": "已切换东方财富CSI300价格历史；向前分页至源端无更早记录，不含分红。",
       "complete": true,
-      "sourceUrl": "https://gu.qq.com/sh000300/zs",
-      "fetchedAt": "2026-10-15T09:04:49.123Z",
+      "sourceUrl": "https://quote.eastmoney.com/zs000300.html",
+      "fetchedAt": "2026-10-17T19:12:41.068Z",
       "windows": {
         "1": {
-          "first": "2025-10-15",
+          "first": "2025-10-16",
           "count": 243
         },
         "5": {
-          "first": "2021-10-15",
+          "first": "2021-10-18",
           "count": 1212
         },
         "10": {
           "first": "2016-10-17",
-          "count": 2428
+          "count": 2429
         },
         "max": {
-          "first": "2005-04-08",
-          "count": 5227
+          "first": "2005-01-04",
+          "count": 5289
         }
       }
     },
@@ -567,32 +567,32 @@
       "id": "debt",
       "name": "IMF一般政府债务 / GDP",
       "provider": "imf",
-      "status": "unavailable",
-      "points": 0,
-      "first": null,
-      "last": null,
-      "latest": null,
-      "milliseconds": 757,
-      "warning": "上游 HTTP 403",
-      "complete": false,
+      "status": "ok",
+      "points": 31,
+      "first": "1995-12-31",
+      "last": "2025-12-31",
+      "latest": 98.6,
+      "milliseconds": 759,
+      "warning": "IMF年度估算口径；过滤当年及未来年份，不属于官方隐债。",
+      "complete": true,
       "sourceUrl": "https://www.imf.org/external/datamapper/profile/CHN",
-      "fetchedAt": null,
+      "fetchedAt": "2026-10-17T19:12:41.028Z",
       "windows": {
         "1": {
-          "first": null,
-          "count": 0
+          "first": "2024-12-31",
+          "count": 2
         },
         "5": {
-          "first": null,
-          "count": 0
+          "first": "2020-12-31",
+          "count": 6
         },
         "10": {
-          "first": null,
-          "count": 0
+          "first": "2015-12-31",
+          "count": 11
         },
         "max": {
-          "first": null,
-          "count": 0
+          "first": "1995-12-31",
+          "count": 31
         }
       }
     },
@@ -605,11 +605,11 @@
       "first": "1961-12-31",
       "last": "2025-12-31",
       "latest": 4.95994886240992,
-      "milliseconds": 688,
+      "milliseconds": 203,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.worldbank.org/indicator/NY.GDP.MKTP.KD.ZG?locations=CN",
-      "fetchedAt": "2026-10-15T09:04:44.237Z",
+      "fetchedAt": "2026-10-17T19:12:40.473Z",
       "windows": {
         "1": {
           "first": "2024-12-31",
@@ -638,11 +638,11 @@
       "first": "1960-12-31",
       "last": "2024-12-31",
       "latest": 16.7084895385701,
-      "milliseconds": 732,
+      "milliseconds": 193,
       "warning": null,
       "complete": true,
       "sourceUrl": "https://data.worldbank.org/indicator/NE.CON.GOVT.ZS?locations=CN",
-      "fetchedAt": "2026-10-15T09:04:44.282Z",
+      "fetchedAt": "2026-10-17T19:12:40.463Z",
       "windows": {
         "1": {
           "first": "2023-12-31",

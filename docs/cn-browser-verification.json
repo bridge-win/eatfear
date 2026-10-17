@@ -1,5 +1,5 @@
 {
-  "testedAt": "2026-10-15T09:06:00.731Z",
+  "testedAt": "2026-10-17T19:13:22.426Z",
   "checks": [
     "no page overflow at 1440px",
     "real historical CSV export >24 observations",
@@ -10,12 +10,26 @@
     "no page overflow at 320px",
     "no page overflow at 390px",
     "unknown identifiers rejected; no arbitrary upstream proxy",
-    "five panels navigate; search, ranges, themes, scenarios work",
+    "six panels navigate; search, ranges, themes, scenarios work",
+    "no page overflow at 1440px",
+    "no page overflow at 768px",
+    "no page overflow at 390px",
+    "no page overflow at 320px",
+    "no page overflow at 320px",
+    "five research themes navigate; security search and stock details work",
+    "valuation formula, local notes persistence, watchlist and research JSON export verified",
+    "research sources search and mobile layout verified; APIs reject non-whitelisted identifiers",
     "main navigation and command palette open /cn without a duplicate header"
   ],
   "runtimeErrors": [],
   "policies": {
     "status": "ok",
     "liveCount": 20
+  },
+  "research": {
+    "securitiesStatus": "ok",
+    "quotes": 9,
+    "financialsStatus": "ok",
+    "reportDate": "2026-06-30"
   }
 }
