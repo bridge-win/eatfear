@@ -2,6 +2,9 @@ import type { Coverage, MarketRow, MarketSnapshot, ProfitState } from "./market-
 
 export const MARKET_SCHEMA = 1
 export const SNAPSHOT_ID = /^cn-\d{8}-[a-f0-9]{12}$/
+// SSE assigns 689 to STAR depositary receipts, distinct from ordinary A shares.
+// https://www.sse.com.cn/aboutus/publication/factbook/documents/c/10170562/files/da4f403a0b7443fa9b2ba2e002d38f10.pdf
+export const isDepositaryReceiptCode = (code: string) => /^689\d{3}$/.test(code)
 export const dateOnly = (raw: unknown): string | null => {
   if (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}(?:$|[ T])/.test(raw)) return null
   const s = raw.slice(0, 10), t = Date.parse(`${s}T00:00:00Z`)

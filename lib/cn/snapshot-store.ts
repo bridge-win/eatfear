@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { decodeSnapshot, validateManifest, MAX_COMPRESSED } from "./snapshot-codec.ts"
-import { SNAPSHOT_ID } from "./market-model.ts"
+import { SNAPSHOT_ID, isDepositaryReceiptCode } from "./market-model.ts"
 import type { CollectionHealth, MarketSnapshot, SnapshotContext } from "./market-types.ts"
 const ROOT = "https://raw.githubusercontent.com/bridge-win/eatfear/codex/cn-market-data/"
 const UNKNOWN: CollectionHealth = { lastAttemptAt: "", lastSuccessAt: null, status: "unknown", errors: ["未取得采集运行状态"], runUrl: null }
+const legacyScopeWarning = (snapshot: MarketSnapshot) => snapshot.rows.some(r => isDepositaryReceiptCode(r.code)) ? "此历史版本名录含科创CDR条目；财务筛选按A股类型约束，后续采集已排除该证券品种，请检查更新。" : null
 let archive: Promise<MarketSnapshot> | undefined
 export class SnapshotError extends Error { code: string; status: number; constructor(code: string, status: number) { super(code); this.code = code; this.status = status } }
 async function bytes(url: string, limit: number, revalidate: number, fetcher: typeof fetch) {
@@ -34,13 +35,13 @@ export async function getMarketSnapshot(snapshotId?: string | null, fetcher: typ
     if (!entry) throw new SnapshotError("snapshot_expired", 410)
     const data = decodeSnapshot(new Uint8Array(await bytes(ROOT + entry.file, MAX_COMPRESSED, 86400, fetcher)), entry)
     const status = await h
-    return { snapshot: data, mode: "remote", health: status, warning: status.status !== "ok" ? "本次更新状态异常或未知，以下为最近成功快照。" : Date.now() - Date.parse(status.lastAttemptAt) > 72 * 3600000 ? "超过72小时未确认采集任务运行，请核对数据日期。" : null }
+    return { snapshot: data, mode: "remote", health: status, warning: [legacyScopeWarning(data), status.status !== "ok" ? "本次更新状态异常或未知，以下为最近成功快照。" : Date.now() - Date.parse(status.lastAttemptAt) > 72 * 3600000 ? "超过72小时未确认采集任务运行，请核对数据日期。" : null].filter(Boolean).join(" ") || null }
   } catch (error) {
     if (error instanceof SnapshotError) throw error
     try {
       const data = await localArchive()
       if (snapshotId && snapshotId !== data.snapshotId) throw new SnapshotError("snapshot_temporarily_unavailable", 503)
-      return { snapshot: data, mode: "archive", health: await h, warning: "远端快照暂不可用；显示随应用保存的真实归档，请核对原始日期。" }
+      return { snapshot: data, mode: "archive", health: await h, warning: ["远端快照暂不可用；显示随应用保存的真实归档，请核对原始日期。", legacyScopeWarning(data)].filter(Boolean).join(" ") }
     } catch (e) { if (e instanceof SnapshotError) throw e; throw new SnapshotError("market_data_unavailable", 503) }
   }
 }

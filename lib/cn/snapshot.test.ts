@@ -4,6 +4,8 @@ import { gzipSync } from "node:zlib"
 import { encodeSnapshot, decodeSnapshot, validateManifest, identifySnapshot, MAX_UNCOMPRESSED } from "./snapshot-codec.ts"
 import { getMarketSnapshot } from "./snapshot-store.ts"
 import { marketSnapshot } from "./market-fixtures.ts"
+import { marketRow } from "./market-fixtures.ts"
+import { isDepositaryReceiptCode } from "./market-model.ts"
 test("snapshot roundtrip verifies compressed checksum and immutable metadata", () => {
   const s = marketSnapshot(), { bytes, entry } = encodeSnapshot(s)
   assert.equal(decodeSnapshot(bytes, entry).snapshotId, s.snapshotId)
@@ -48,4 +50,11 @@ test("failed update health stays visible while the last successful snapshot rema
 test("unreachable or corrupt remote data uses dated real local archive", async () => {
   const result = await getMarketSnapshot(undefined, (async () => new Response("unavailable", { status: 503 })) as typeof fetch)
   assert.equal(result.mode, "archive"); assert.ok(result.snapshot.rows.length > 4000); assert.match(result.warning!, /真实归档/)
+  assert.ok(result.snapshot.rows.every(row => !isDepositaryReceiptCode(row.code)))
+})
+test("legacy published receipt metadata remains readable with an explicit scope warning", async () => {
+  const s = marketSnapshot([marketRow({ code: "689009", id: "sh689009", secucode: "689009.SH", reportDate: null, netIncome: null, revenue: null })]), { bytes, entry } = encodeSnapshot(s)
+  const fetcher = (async (url: string | URL | Request) => String(url).endsWith("health.json") ? new Response(JSON.stringify({ status: "ok", errors: [], lastAttemptAt: s.fetchedAt, lastSuccessAt: s.fetchedAt, runUrl: null })) : String(url).endsWith("manifest.json") ? new Response(JSON.stringify({ schemaVersion: 1, current: s.snapshotId, snapshots: [entry] })) : new Response(bytes)) as typeof fetch
+  const result = await getMarketSnapshot(s.snapshotId, fetcher)
+  assert.equal(result.snapshot.snapshotId, s.snapshotId); assert.match(result.warning!, /CDR/)
 })

@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { reportingPeriods, yoy, profitState, addPeerValuations, validateSnapshot } from "./market-model.ts"
+import { reportingPeriods, yoy, profitState, addPeerValuations, validateSnapshot, isDepositaryReceiptCode } from "./market-model.ts"
 import { selectStatementRows, parsePage, table } from "./market-providers.ts"
 import { marketRow, marketSnapshot, peerRows } from "./market-fixtures.ts"
 test("reporting seasons switch only after the common reporting deadline, annual ROE is independent", () => {
@@ -13,6 +13,10 @@ test("negative and zero profit bases never create ordinary growth rates", () => 
   assert.equal(yoy(50, -100), null); assert.equal(yoy(50, 0), null); assert.equal(yoy(null, 100), null)
   assert.equal(yoy(120, 100), 19.999999999999996)
   assert.equal(profitState(50, -100), "turnaround"); assert.equal(profitState(-50, -100), "loss-narrowing"); assert.equal(profitState(-150, -100), "loss-widening")
+})
+test("STAR depositary receipts are not ordinary A shares in the candidate universe", () => {
+  assert.equal(isDepositaryReceiptCode("689009"), true)
+  for (const code of ["688330", "302132", "920000", "600036"]) assert.equal(isDepositaryReceiptCode(code), false)
 })
 test("peer valuation requires ten same-day same-industry profitable peers and excludes loss PE", () => {
   assert.equal(peerRows(9)[0].pePercentile, null)

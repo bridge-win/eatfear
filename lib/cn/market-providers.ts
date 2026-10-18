@@ -1,4 +1,4 @@
-import { dateOnly, finite, reportingPeriods, yoy, profitState, isFinancialIndustry, addPeerValuations, coverageOf } from "./market-model.ts"
+import { dateOnly, finite, reportingPeriods, yoy, profitState, isFinancialIndustry, addPeerValuations, coverageOf, isDepositaryReceiptCode } from "./market-model.ts"
 import type { Exchange, MarketRow, MarketSnapshot, SourceHealth } from "./market-types.ts"
 
 type Row = Record<string, unknown>
@@ -56,7 +56,7 @@ async function officialIdentities(fetcher: Fetcher, today: string) {
   const cn = JSON.parse(await boundedFetch(cnUrl, fetcher, "https://www.cninfo.com.cn/"))
   if (!Array.isArray(cn.stockList) || cn.stockList.length < 4000) throw new Error("巨潮证券目录无效")
   for (const r of cn.stockList) {
-    const code = text(r.code); if (!/^\d{6}$/.test(code) || r.category !== "A股") continue
+    const code = text(r.code); if (!/^\d{6}$/.test(code) || isDepositaryReceiptCode(code) || r.category !== "A股") continue
     const exchange: Exchange | null = /^6/.test(code) ? "SSE" : /^[03]/.test(code) ? "SZSE" : /^(4|8|92)/.test(code) ? "BSE" : null
     if (!exchange) continue
     const prefix = exchange === "SSE" ? "sh" : exchange === "SZSE" ? "sz" : "bj"
@@ -80,7 +80,7 @@ async function officialIdentities(fetcher: Fetcher, today: string) {
         if (all.length !== first.total || new Set(all.map(r => r.A_STOCK_CODE)).size !== all.length) throw new Error("上交所名录不完整")
         for (const r of all) {
           const code = text(r.A_STOCK_CODE), name = plain(r.SEC_NAME_CN), listedAt = text(r.LIST_DATE)
-          if (!/^\d{6}$/.test(code) || listedAt && listedAt.replaceAll("-", "") > today.replaceAll("-", "")) continue
+          if (!/^\d{6}$/.test(code) || isDepositaryReceiptCode(code) || listedAt && listedAt.replaceAll("-", "") > today.replaceAll("-", "")) continue
           const old = identities.get("sh" + code)
           identities.set("sh" + code, { code, name, exchange: "SSE", listed: !dateOnly(r.DELIST_DATE), verified: true, orgId: old?.orgId ?? null, url: old?.url ?? `https://www.sse.com.cn/assortment/stock/list/info/company/index.shtml?COMPANY_CODE=${code}` }); count++
         }

@@ -1,19 +1,19 @@
 {
-  "checkedAt": "2026-10-18T09:54:58.206Z",
-  "snapshotId": "cn-20261016-389bc16fb7fe",
+  "checkedAt": "2026-10-18T10:22:31.462Z",
+  "snapshotId": "cn-20261016-d4837b2ffcf5",
   "tradeDate": "2026-10-16",
   "reportDate": "2026-06-30",
   "comparisonDate": "2025-06-30",
   "annualReportDate": "2025-12-31",
   "coverage": {
-    "universe": 5577,
-    "identityVerified": 5577,
-    "listingVerified": 2320,
-    "valuation": 5577,
+    "universe": 5576,
+    "identityVerified": 5576,
+    "listingVerified": 2319,
+    "valuation": 5576,
     "financials": 5574,
     "screenable": 5573,
     "exchanges": {
-      "SSE": 2320,
+      "SSE": 2319,
       "SZSE": 2906,
       "BSE": 351
     }
@@ -32,7 +32,7 @@
       "name": "上交所A股名录",
       "url": "https://www.sse.com.cn/assortment/stock/list/share/",
       "status": "ok",
-      "count": 2320,
+      "count": 2319,
       "note": "主板与科创板名录完整分页；不含B股/CDR。"
     },
     {
