@@ -124,7 +124,8 @@ export function selectRows(snapshot: MarketSnapshot, f: ScreenFilters) {
     if (!failures.length) rows.push(r)
     else for (const reason of failures) counts.set(reason, (counts.get(reason) ?? 0) + 1)
   }
-  rows.sort((a, b) => { const av = a[f.sort], bv = b[f.sort]; if (av === null && bv !== null) return 1; if (bv === null && av !== null) return -1; return (av !== null && bv !== null ? (av - bv) * (f.direction === "asc" ? 1 : -1) : 0) || a.code.localeCompare(b.code) || a.exchange.localeCompare(b.exchange) })
+  const sortValue = (r: MarketRow) => { const value = r[f.sort]; return (f.sort === "peTtm" || f.sort === "pb") && value !== null && value <= 0 ? null : value }
+  rows.sort((a, b) => { const av = sortValue(a), bv = sortValue(b); if (av === null && bv !== null) return 1; if (bv === null && av !== null) return -1; return (av !== null && bv !== null ? (av - bv) * (f.direction === "asc" ? 1 : -1) : 0) || a.code.localeCompare(b.code) || a.exchange.localeCompare(b.exchange) })
   return { rows, excluded: [...counts].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason)) }
 }
 export function screenMarket(context: SnapshotContext, filters: ScreenFilters): ScreenResult {

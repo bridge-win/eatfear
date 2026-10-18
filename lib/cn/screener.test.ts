@@ -48,6 +48,14 @@ test("cross-market sort ties follow security code rather than exchange prefix", 
   const rows = [marketRow({ id: "bj920001", code: "920001", secucode: "920001.BJ", exchange: "BSE" }), marketRow()]
   assert.deepEqual(selectRows(marketSnapshot(rows), presetFilters("value")).rows.map(r => r.code), ["600001", "920001"])
 })
+test("loss PE and nonpositive PB stay outside low-valuation ordering in either direction", () => {
+  const rows = [marketRow({ id: "sh600000", code: "600000", secucode: "600000.SH", peTtm: -3, pb: -.5 }), marketRow(), marketRow({ id: "sh600002", code: "600002", secucode: "600002.SH", peTtm: 20, pb: 2 })]
+  for (const sort of ["peTtm", "pb"] as const) for (const direction of ["asc", "desc"] as const) {
+    const result = selectRows(marketSnapshot(rows), { ...presetFilters("custom"), sort, direction }).rows
+    assert.equal(result.at(-1)!.code, "600000")
+    assert.equal(result[0].code, direction === "asc" ? "600001" : "600002")
+  }
+})
 test("conclusions contain actual values, periods, sources and adverse evidence", () => {
   const r = marketRow({ operatingCashFlow: -1e8, revenueGrowth: -10 }), c = companyConclusions(r, presetFilters("value"))
   assert.deepEqual(c.map(x => x.kind), ["business", "valuation", "match", "risk", "missing"])
