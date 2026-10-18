@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react"
 import dynamic from "next/dynamic"
-import useSWR from "swr"
+import useSWR, { useSWRConfig } from "swr"
 import { ArrowRight, Bookmark, Download, ExternalLink, RefreshCw } from "lucide-react"
 import type { MarketAnalysis } from "@/lib/cn/market-analysis"
 import type { Preset, ScreenFilters, ScreenItem, ScreenResult } from "@/lib/cn/market-types"
@@ -46,7 +46,8 @@ export default function MarketWorkspace({ compact = false, initialPreset = "valu
   const [notebook, setNotebook] = useState<ResearchNotebook>({ version: 1, watchlist: [], notes: {} })
   const [ready, setReady] = useState(false), [message, setMessage] = useState(""), [exporting, setExporting] = useState(false)
   const [scenario, setScenario] = useState<Record<string, unknown>>({})
-  const { data: analysis, error: analysisError, mutate: refreshAnalysis } = useSWR<MarketAnalysis>("/api/cn/analysis", fetchJson, { revalidateOnFocus: false, errorRetryCount: 1, dedupingInterval: 60000 })
+  const { mutate: updateCache } = useSWRConfig()
+  const { data: analysis, error: analysisError } = useSWR<MarketAnalysis>(pinned ? `/api/cn/analysis?snapshotId=${encodeURIComponent(pinned)}` : "/api/cn/analysis", fetchJson, { revalidateOnFocus: false, errorRetryCount: 1, dedupingInterval: 60000 })
   const snapshotId = pinned || analysis?.snapshotId
   const p = paramsFor({ ...filters, pageSize: compact ? 10 : filters.pageSize }, snapshotId)
   const { data: result, error, isLoading, mutate } = useSWR<ScreenResult>(snapshotId ? `/api/cn/screener?${p}` : null, fetchJson, { revalidateOnFocus: false, errorRetryCount: 0, keepPreviousData: false })
@@ -81,10 +82,19 @@ export default function MarketWorkspace({ compact = false, initialPreset = "valu
     catch (e) { setMessage(e instanceof Error ? `导出失败：${e.message}` : "导出失败") }
     finally { setExporting(false) }
   }
-  const reload = async () => { setPinned(""); setSelectedId(""); await refreshAnalysis(); await mutate(); setMessage("已重新检查最新成功快照。") }
+  const reload = async () => {
+    try {
+      const latest = await fetchJson<MarketAnalysis>("/api/cn/analysis")
+      await updateCache("/api/cn/analysis", latest, { revalidate: false })
+      setPinned(""); setSelectedId("")
+      if (latest.snapshotId === snapshotId) await mutate()
+      if (!compact) history.replaceState(null, "", `?${paramsFor(filters, latest.snapshotId)}#research`)
+      setMessage("已重新检查最新成功快照。")
+    } catch { setMessage("最新快照暂不可用，保留当前版本；请稍后检查更新。") }
+  }
   return <div className={s.workspace} data-testid="cn-market-workspace">
     <div className={s.heading}><div><span className={s.kicker}>CHINA / DATA → EVIDENCE → COMPANIES</span><h2>{compact ? "先看经济判断，再看具体公司" : "沪深北A股 · 全市场筛选"}</h2><p>日终估值 × 统一报告期财务。打开就有结果，每条结论都能查看依据。</p></div><button className={s.button} onClick={() => void reload()}><RefreshCw size={14} />检查更新</button></div>
-    {analysisError ? <p className={s.warning} role="alert">经济分析暂不可用，{analysisError.message}。<button onClick={() => void refreshAnalysis()}>重试</button></p> : !analysis ? <p className={s.loading} role="status">正在读取最近成功的真实市场快照…</p> : <>
+    {analysisError ? <p className={s.warning} role="alert">{analysisError.status === 410 ? "该快照已过保留期，请检查更新后重新筛选。" : "经济分析暂不可用，请检查更新或稍后重试。"}<button onClick={() => void reload()}>检查最新版本</button></p> : !analysis ? <p className={s.loading} role="status">正在读取最近成功的真实市场快照…</p> : <>
       <p className={s.dates}>估值日期 <b>{analysis.tradeDate}</b> · 统一财报 <b>{analysis.reportDate}</b> · 年度ROE <b>{analysis.annualReportDate}</b> · 抓取 {time(analysis.fetchedAt)}</p>
       <div className={s.coverage} aria-label="真实数据覆盖">{[{ label: "候选名单", n: analysis.coverage.universe }, { label: "官方身份核验", n: analysis.coverage.identityVerified }, { label: "上市名录核验", n: analysis.coverage.listingVerified }, { label: "有日终估值", n: analysis.coverage.valuation }, { label: "有本期财报", n: analysis.coverage.financials }, { label: "基础可筛选", n: analysis.coverage.screenable }].map(x => <div key={x.label}><strong>{number(x.n, 0)}</strong><span>{x.label}</span></div>)}</div>
       {(analysis.warning || analysis.health.status !== "ok") && <p className={s.warning}>{analysis.warning ?? "最新采集状态待核对。"} 最近尝试 {time(analysis.health.lastAttemptAt)}。{analysis.health.errors.join("；")}</p>}

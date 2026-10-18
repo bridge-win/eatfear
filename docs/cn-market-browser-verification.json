@@ -1,5 +1,6 @@
 {
-  "testedAt": "2026-10-18T10:08:25.640Z",
+  "testedAt": "2026-10-18T10:13:29.933Z",
+  "snapshotId": "cn-20261016-dc5bbe092119",
   "coverage": {
     "universe": 5577,
     "identityVerified": 5577,
@@ -15,7 +16,7 @@
   },
   "tradeDate": "2026-10-16",
   "reportDate": "2026-06-30",
-  "mode": "archive",
+  "mode": "remote",
   "presets": [
     {
       "id": "value",
@@ -93,13 +94,12 @@
   },
   "checks": [
     "real market coverage, all three presets, BSE identities, numeric gates, pinned pagination, empty reasons and input rejection",
-    "first visit shows real economic conclusions and companies; search, notes, watchlist, URL reload and provenance export work",
+    "first visit shows real economic conclusions and companies; search, notes, watchlist, URL reload, pinned macro analysis and provenance export work",
     "no page overflow at 1440px",
     "no page overflow at 768px",
     "no page overflow at 390px",
     "no page overflow at 320px",
     "dynamic BSE company fundamentals no longer limited to four stocks; light and dark layouts render"
   ],
-  "runtimeErrors": [],
-  "snapshotId": "cn-20261016-389bc16fb7fe"
+  "runtimeErrors": []
 }
