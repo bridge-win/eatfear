@@ -83,7 +83,8 @@ export function assessRule(rule: EvidenceRule, data: Record<string, SeriesData>,
   const series = data[rule.seriesId], definition = BY_ID[rule.seriesId]
   const ev = evaluate(definition, series, now)
   const value = ev[rule.metric]
-  const valid = series?.status === "ok" && series.complete && !ev.stale && value !== null && Number.isFinite(value)
+  const latestVerified = series?.latestVerified ?? (series?.status === "ok" && series.complete)
+  const valid = latestVerified && !ev.stale && value !== null && Number.isFinite(value)
   const base = { rule, value: valid ? value : null, period: series?.lastDate ?? null, sourceUrl: series?.points.at(-1)?.sourceUrl ?? series?.sourceUrl ?? definition.sourceUrl, fetchedAt: series?.fetchedAt ?? null }
   if (!valid) return { ...base, state: "missing", reason: series?.warning ?? (ev.stale ? "统计期陈旧，等待新披露" : "等待可验证数据、连续月份或足够基准样本") }
   const difference = (value! - rule.threshold) * (rule.direction === "higher" ? 1 : -1)
@@ -110,14 +111,15 @@ export function bondScenario(duration: number, yieldChangeBp: number, annualCarr
 }
 export type ResearchNote = { thesis: string; confirmation: string; invalidation: string; sourceUrl: string; reviewedAt: string; savedAt: string }
 export type ResearchNotebook = { version: 1; watchlist: string[]; notes: Record<string, ResearchNote> }
-export function readNotebook(raw: string | null, allowedIds: string[]): ResearchNotebook {
+export function readNotebook(raw: string | null, allowedIds: string[], includeMarket = false): ResearchNotebook {
   const empty: ResearchNotebook = { version: 1, watchlist: [], notes: {} }
   try {
     const input = JSON.parse(raw ?? "null")
     if (!input || input.version !== 1 || !Array.isArray(input.watchlist) || !input.notes || typeof input.notes !== "object") return empty
-    const watchlist = [...new Set(input.watchlist.filter((id: unknown): id is string => typeof id === "string" && allowedIds.includes(id)))] as string[]
+    const allowed = (id: string) => allowedIds.includes(id) || includeMarket && /^(sh|sz|bj)\d{6}$/.test(id)
+    const watchlist = [...new Set(input.watchlist.filter((id: unknown): id is string => typeof id === "string" && allowed(id)))].slice(0, 1000) as string[]
     const notes: Record<string, ResearchNote> = {}
-    for (const id of allowedIds) {
+    for (const id of Object.keys(input.notes).filter(allowed).slice(0, 1000)) {
       const n = input.notes[id]
       if (n && ["thesis", "confirmation", "invalidation", "sourceUrl", "reviewedAt", "savedAt"].every(key => typeof n[key] === "string")) {
         const sourceUrl = /^https?:\/\//.test(n.sourceUrl) ? n.sourceUrl.slice(0, 2000) : ""

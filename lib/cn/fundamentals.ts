@@ -12,7 +12,7 @@ export type CnFundamentalMetric = {
   change: number | null
   yoyPercent: number | null
   unit: "CNY"
-  applicability: "standard" | "bank-specific" | "not-applicable"
+  applicability: "standard" | "bank-specific" | "financial-specific" | "not-applicable"
   note: string
 }
 export type CnFundamentalsResponse = {
@@ -22,6 +22,7 @@ export type CnFundamentalsResponse = {
   comparisonDate: string | null
   periodLabel: string | null
   bank: boolean
+  financial: boolean
   fetchedAt: string
   source: string
   sourceUrl: string
@@ -85,10 +86,11 @@ function statementRows(input: unknown, security: CnSecurity, today: string): Map
 }
 
 /** Match statements on a common period before comparing the exact prior-year period. */
-export function assembleCnFundamentals(id: string, tables: Record<StatementKind, unknown>, now = Date.now()): CnFundamentalsResponse {
-  const security = STOCKS.find(s => s.id === id)
+export function assembleCnFundamentals(id: string, tables: Record<StatementKind, unknown>, now = Date.now(), verifiedSecurity?: CnSecurity): CnFundamentalsResponse {
+  const security = STOCKS.find(s => s.id === id) ?? (verifiedSecurity?.id === id && verifiedSecurity.kind === "stock" ? verifiedSecurity : undefined)
   if (!security) throw new Error("Unsupported CN stock")
-  const bank = security.id === "sh600036"
+  const bank = security.id === "sh600036" || security.exposure.includes("银行")
+  const financial = security.financial ?? bank
   const today = new Date(now + 8 * 3600000).toISOString().slice(0, 10)
   const parsed = Object.fromEntries(KINDS.map(kind => [kind, statementRows(tables[kind], security, today)])) as Record<StatementKind, Map<string, StatementRow>>
   const common = [...parsed.income.keys()].filter(date => KINDS.every(k => parsed[k].has(date))).sort().reverse()
@@ -111,10 +113,10 @@ export function assembleCnFundamentals(id: string, tables: Record<StatementKind,
     { id: "totalEquity", label: "股东权益合计", kind: "balance", field: "TOTAL_EQUITY", note: "合并权益含少数股东权益；不能直接用来计算归母ROE或每股净资产。" },
   ]
   const metrics = definitions.map((d): CnFundamentalMetric => {
-    const notApplicable = bank && d.id === "receivables"
+    const notApplicable = financial && d.id === "receivables"
     const current = !notApplicable && reportDate ? amount(parsed[d.kind].get(reportDate)?.values[d.field]) : null
     const previous = !notApplicable && comparisonDate ? amount(parsed[d.kind].get(comparisonDate)?.values[d.field]) : null
-    return { id: d.id, label: d.label, basis: d.kind === "balance" ? "period-end" : "year-to-date", current, previous, change: current !== null && previous !== null ? current - previous : null, yoyPercent: current !== null && previous !== null && previous > 0 ? (current / previous - 1) * 100 : null, unit: "CNY", applicability: notApplicable ? "not-applicable" : bank ? "bank-specific" : "standard", note: `${d.note}${previous !== null && previous <= 0 ? " 上年基数非正，仅比较金额差，不输出同比百分比。" : ""}` }
+    return { id: d.id, label: d.label, basis: d.kind === "balance" ? "period-end" : "year-to-date", current, previous, change: current !== null && previous !== null ? current - previous : null, yoyPercent: current !== null && previous !== null && previous > 0 ? (current / previous - 1) * 100 : null, unit: "CNY", applicability: notApplicable ? "not-applicable" : bank ? "bank-specific" : financial ? "financial-specific" : "standard", note: `${d.note}${financial && !bank ? " 金融行业需按业务模式另行解读，不套用工业企业现金转化率和负债率门槛。" : ""}${previous !== null && previous <= 0 ? " 上年基数非正，仅比较金额差，不输出同比百分比。" : ""}` }
   })
   let status: CnFundamentalsResponse["status"] = "ok"
   if (!reportDate || !metrics.some(m => m.current !== null)) {
@@ -127,8 +129,9 @@ export function assembleCnFundamentals(id: string, tables: Record<StatementKind,
     if ((now - Date.parse(`${reportDate}T00:00:00+08:00`)) / 86400000 > 200) { status = "partial"; warnings.push("共同报告期距今超过200天，数据可能陈旧，需检查公司最新披露。") }
   }
   if (bank) warnings.push("银行采用专门研究口径；本表未接入净息差、不良率、拨备覆盖率及资本充足率，不据此自动评估银行投资价值。")
+  if (financial && !bank) warnings.push("证券、保险和多元金融需结合各自资本、风险资产和业务结构，不能按工业企业现金流或负债率评价。")
   const periodLabel = reportDate ? `${reportDate.slice(0, 4)}年${({ "03-31": "1—3月", "06-30": "1—6月", "09-30": "1—9月", "12-31": "全年" } as Record<string, string>)[reportDate.slice(5)]}` : null
-  return { id, status, reportDate, comparisonDate, periodLabel, bank, fetchedAt: new Date(now).toISOString(), source: "东方财富 · 上市公司三大报表", sourceUrl: `https://emweb.securities.eastmoney.com/PC_HSF10/NewFinanceAnalysis/Index?type=web&code=${id}`, officialUrl: security.officialUrl, publicationDates, comparisonPublicationDates, latestAvailableDates, metrics, warnings }
+  return { id, status, reportDate, comparisonDate, periodLabel, bank, financial, fetchedAt: new Date(now).toISOString(), source: "东方财富 · 上市公司三大报表", sourceUrl: `https://emweb.securities.eastmoney.com/PC_HSF10/NewFinanceAnalysis/Index?type=web&code=${id}`, officialUrl: security.officialUrl, publicationDates, comparisonPublicationDates, latestAvailableDates, metrics, warnings }
 }
 
 async function boundedJson(response: Response): Promise<unknown> {
@@ -151,8 +154,8 @@ async function boundedJson(response: Response): Promise<unknown> {
   return JSON.parse(new TextDecoder().decode(bytes))
 }
 
-export async function getCnFundamentals(id: string, fetcher: typeof fetch = fetch, now = Date.now()): Promise<CnFundamentalsResponse> {
-  const security = STOCKS.find(s => s.id === id)
+export async function getCnFundamentals(id: string, fetcher: typeof fetch = fetch, now = Date.now(), verifiedSecurity?: CnSecurity): Promise<CnFundamentalsResponse> {
+  const security = STOCKS.find(s => s.id === id) ?? (verifiedSecurity?.id === id && verifiedSecurity.kind === "stock" ? verifiedSecurity : undefined)
   if (!security) throw new Error("Unsupported CN stock")
   const cached = fetcher === fetch ? cache.get(id) : undefined
   if (cached && cached.until > now) return cached.data
@@ -167,9 +170,9 @@ export async function getCnFundamentals(id: string, fetcher: typeof fetch = fetc
         if (!body || body.success !== true || !Array.isArray(body.result?.data)) throw new Error("财报上游字段或权限发生变化")
         return [kind, body.result.data] as const
       }))
-      return assembleCnFundamentals(id, Object.fromEntries(results) as Record<StatementKind, unknown>, now)
+      return assembleCnFundamentals(id, Object.fromEntries(results) as Record<StatementKind, unknown>, now, security)
     } catch (error) {
-      const data = assembleCnFundamentals(id, { income: [], balance: [], cashflow: [] }, now)
+      const data = assembleCnFundamentals(id, { income: [], balance: [], cashflow: [] }, now, security)
       const reason = error instanceof Error && /^(财报|同一期|公告日期)/.test(error.message) ? error.message : "财报服务暂不可用"
       data.warnings.push(`${reason}；请通过原始披露复核，未使用模拟财务数据。`)
       return data
@@ -180,6 +183,7 @@ export async function getCnFundamentals(id: string, fetcher: typeof fetch = fetc
   try {
     const data = await task
     cache.set(id, { until: now + (data.status === "ok" ? 900000 : 60000), data })
+    if (cache.size > 100) cache.delete(cache.keys().next().value!)
     return data
   } finally { pending.delete(id) }
 }

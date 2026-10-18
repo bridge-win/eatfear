@@ -1,0 +1,82 @@
+name: China market daily snapshot
+on:
+  schedule:
+    - cron: '23 10 * * 1-5'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: cn-market-daily-data
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: app
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate collector and screening rules
+        working-directory: app
+        run: node --experimental-strip-types --test lib/cn/market*.test.ts lib/cn/screener.test.ts lib/cn/snapshot*.test.ts
+      - name: Prepare isolated data checkout
+        run: |
+          set -euo pipefail
+          if git -C app fetch origin codex/cn-market-data; then
+            git -C app worktree add --detach ../data FETCH_HEAD
+          else
+            git -C app worktree add --detach ../data HEAD
+            git -C data switch --orphan codex/cn-market-data
+          fi
+          mkdir -p staging/snapshots
+          if test -f data/manifest.json; then cp data/manifest.json staging/manifest.json; fi
+          if test -d data/snapshots; then cp -R data/snapshots/. staging/snapshots/; fi
+      - name: Collect real daily data
+        id: collect
+        continue-on-error: true
+        working-directory: app
+        run: node --experimental-strip-types scripts/collect-cn-market.ts --output ../staging
+      - name: Validate staged snapshots
+        if: steps.collect.outcome == 'success'
+        id: validate
+        continue-on-error: true
+        working-directory: app
+        run: node --experimental-strip-types scripts/verify-cn-market.ts --directory ../staging
+      - name: Publish data or failure status atomically
+        id: publish
+        env:
+          COLLECT_OK: ${{ steps.collect.outcome }}
+          VALIDATE_OK: ${{ steps.validate.outcome }}
+        run: |
+          set -euo pipefail
+          cp staging/health.json data/health.json
+          if test "$COLLECT_OK" = success && test "$VALIDATE_OK" = success; then
+            mkdir -p data/snapshots
+            rsync -a --delete staging/snapshots/ data/snapshots/
+            cp staging/manifest.json data/manifest.json
+          elif test "$COLLECT_OK" = success; then
+            node -e 'const fs=require("fs");const p="data/health.json";const h=JSON.parse(fs.readFileSync(p));h.status="failed";h.errors=["快照发布前验证失败，保留上一成功版本"];fs.writeFileSync(p,JSON.stringify(h,null,2)+"\n")'
+          fi
+          git -C data config user.name 'github-actions[bot]'
+          git -C data config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C data add --all
+          if ! git -C data diff --cached --quiet; then
+            git -C data commit -m 'data(cn): refresh daily market snapshot and collection health'
+            git -C data push origin HEAD:refs/heads/codex/cn-market-data
+          fi
+          echo "revision=$(git -C data rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Verify published immutable files
+        if: steps.collect.outcome == 'success' && steps.validate.outcome == 'success'
+        working-directory: app
+        run: node --experimental-strip-types scripts/verify-cn-market.ts --revision '${{ steps.publish.outputs.revision }}'
+      - name: Report collection failure
+        if: steps.collect.outcome != 'success' || steps.validate.outcome != 'success'
+        run: exit 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cn-market-collection-status
+          path: staging/health.json

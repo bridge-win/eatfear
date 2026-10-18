@@ -1,0 +1,105 @@
+{
+  "testedAt": "2026-10-18T10:08:25.640Z",
+  "coverage": {
+    "universe": 5577,
+    "identityVerified": 5577,
+    "listingVerified": 2320,
+    "valuation": 5577,
+    "financials": 5574,
+    "screenable": 5573,
+    "exchanges": {
+      "SSE": 2320,
+      "SZSE": 2906,
+      "BSE": 351
+    }
+  },
+  "tradeDate": "2026-10-16",
+  "reportDate": "2026-06-30",
+  "mode": "archive",
+  "presets": [
+    {
+      "id": "value",
+      "name": "盈利增长且估值较低",
+      "description": "非金融；收入、利润同比为正，经营现金流为正，年度ROE≥10%，正PE处于同行较低40%。",
+      "count": 334,
+      "examples": [
+        {
+          "id": "sh688330",
+          "name": "宏力达",
+          "code": "688330"
+        },
+        {
+          "id": "sz000685",
+          "name": "中山公用",
+          "code": "000685"
+        },
+        {
+          "id": "sz300628",
+          "name": "亿联网络",
+          "code": "300628"
+        }
+      ]
+    },
+    {
+      "id": "improving",
+      "name": "经营改善",
+      "description": "非金融；收入同比为正，利润同比≥10%，经营现金流为正且高于上年同期。",
+      "count": 677,
+      "examples": [
+        {
+          "id": "sz002466",
+          "name": "天齐锂业",
+          "code": "002466"
+        },
+        {
+          "id": "sz002458",
+          "name": "益生股份",
+          "code": "002458"
+        },
+        {
+          "id": "sz300981",
+          "name": "中红医疗",
+          "code": "300981"
+        }
+      ]
+    },
+    {
+      "id": "financial",
+      "name": "金融股PB与ROE",
+      "description": "金融行业；0<PB≤1，年度ROE≥10%，本期归母利润为正。",
+      "count": 21,
+      "examples": [
+        {
+          "id": "sh601528",
+          "name": "瑞丰银行",
+          "code": "601528"
+        },
+        {
+          "id": "sh603323",
+          "name": "苏农银行",
+          "code": "603323"
+        },
+        {
+          "id": "sh601577",
+          "name": "长沙银行",
+          "code": "601577"
+        }
+      ]
+    }
+  ],
+  "dynamicFundamentals": {
+    "id": "bj920186",
+    "status": "ok"
+  },
+  "checks": [
+    "real market coverage, all three presets, BSE identities, numeric gates, pinned pagination, empty reasons and input rejection",
+    "first visit shows real economic conclusions and companies; search, notes, watchlist, URL reload and provenance export work",
+    "no page overflow at 1440px",
+    "no page overflow at 768px",
+    "no page overflow at 390px",
+    "no page overflow at 320px",
+    "dynamic BSE company fundamentals no longer limited to four stocks; light and dark layouts render"
+  ],
+  "runtimeErrors": [],
+  "snapshotId": "cn-20261016-389bc16fb7fe"
+}

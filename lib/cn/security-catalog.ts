@@ -2,7 +2,7 @@ export type CnSecurityKind = "equity-etf" | "bond-etf" | "stock"
 export type CnSecurity = {
   id: string
   code: string
-  exchange: "SSE" | "SZSE"
+  exchange: "SSE" | "SZSE" | "BSE"
   name: string
   fullName: string
   kind: CnSecurityKind
@@ -13,6 +13,7 @@ export type CnSecurity = {
   risks: string[]
   officialUrl: string
   verifiedAt: string
+  financial?: boolean
 }
 
 // Manually verified identities, not an exhaustive universe or a scored buy list.

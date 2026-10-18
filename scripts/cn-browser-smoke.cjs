@@ -63,9 +63,9 @@ const assert = require('node:assert/strict')
   assert.equal((await context.request.get(base + '/api/cn/series?id=__proto__')).status(), 400)
   assert.equal((await context.request.get(base + '/api/cn/series?id=https://example.com')).status(), 400)
   const policies = await (await context.request.get(base + '/api/cn/policies')).json()
-  report.checks.push('unknown identifiers rejected; no arbitrary upstream proxy', 'six panels navigate; search, ranges, themes, scenarios work')
+  report.checks.push('unknown identifiers rejected; no arbitrary upstream proxy', 'macro panels navigate; search, ranges, themes, scenarios work')
   report.policies = { status: policies.status, liveCount: policies.liveCount }
-  await page.getByRole('button', { name: '专题与标的', exact: true }).click()
+  await page.getByRole('button', { name: 'ETF与情景', exact: true }).click()
   await page.getByRole('heading', { name: '从一个问题，开始一份研究' }).waitFor()
   for (const name of ['消费与内需', '工业与再通胀', '利率与久期', '广谱复苏', '化债与清欠']) {
     await page.getByRole('group', { name: '选择研究专题' }).getByRole('button', { name: new RegExp(name) }).click()

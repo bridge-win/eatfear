@@ -2,7 +2,7 @@ name: China observatory validation
 on:
   push:
     branches: [main, 'feat/cn-observatory']
-    paths: ['app/cn/**', 'app/api/cn/**', 'components/cn/**', 'components/main-site-header.tsx', 'components/site-header.tsx', 'components/command-palette.tsx', 'lib/cn/**', 'public/cn/**', 'scripts/*cn*', 'tsconfig.cn.json', '.github/workflows/cn-validation.yml']
+    paths: ['app/cn/**', 'app/api/cn/**', 'components/cn/**', 'components/main-site-header.tsx', 'components/site-header.tsx', 'components/command-palette.tsx', 'lib/cn/**', 'public/cn/**', 'scripts/*cn*', 'tsconfig.cn.json', '.github/workflows/cn-validation.yml', '.github/workflows/cn-market-refresh.yml']
   workflow_dispatch:
 permissions:
   contents: write
@@ -39,12 +39,14 @@ jobs:
           PORT=3111 pnpm start > /tmp/cn-next.log 2>&1 &
           for i in $(seq 1 60); do curl -fsS http://localhost:3111/cn >/dev/null && break; sleep 2; done
           NODE_PATH=/tmp/cn-browser/node_modules node scripts/cn-browser-smoke.cjs
+          NODE_PATH=/tmp/cn-browser/node_modules node scripts/cn-market-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cn-observatory-verification
           path: |
             artifacts/cn/
+            artifacts/cn-market/
             docs/cn-provider-verification.json
             public/cn/mof-history.json
             /tmp/cn-next.log

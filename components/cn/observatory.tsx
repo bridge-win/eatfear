@@ -10,13 +10,16 @@ import { csv, difference, evaluate, eventStudy, interestSaving, mean, rangePoint
 import { ASSETS, BASELINE, HISTORY, POLICY_SOURCE, TRANSMISSION, type Policy } from "@/lib/cn/research"
 import styles from "./observatory.module.css"
 import researchStyles from "./research-workspace.module.css"
+import type { Preset } from "@/lib/cn/market-types"
+const MarketWorkspace = dynamic(() => import("./market-workspace"), { loading: () => <p>正在读取全市场研究工作台…</p> })
 const ResearchWorkspace = dynamic(() => import("./research-workspace"), { loading: () => <p>正在打开专题研究…</p> })
 const SourceGuide = dynamic(() => import("./source-guide"), { loading: () => <p>正在打开数据源目录…</p> })
 const Chart = dynamic(() => import("./charts").then(m => m.HistoryChart), { ssr: false, loading: () => <div className={styles.chartLoading}>加载图表组件…</div> })
 const Sparkline = dynamic(() => import("./charts").then(m => m.Sparkline), { ssr: false })
 const tabs = [
-  { id: "overview", label: "经济全景", icon: LayoutDashboard },
-  { id: "research", label: "专题与标的", icon: Search },
+  { id: "overview", label: "今日经济判断", icon: LayoutDashboard },
+  { id: "research", label: "全市场筛选", icon: Search },
+  { id: "tools", label: "ETF与情景", icon: Layers3 },
   { id: "indicators", label: "指标实验室", icon: Activity },
   { id: "debt", label: "化债与传导", icon: Network },
   { id: "history", label: "历史与情景", icon: History },
@@ -34,7 +37,7 @@ async function fetcher<T>(url: string): Promise<T> {
 function Probe({ id, onData }: { id: string; onData: (data: SeriesData) => void }) {
   const { data, error } = useSWR<SeriesData>(`/api/cn/series?id=${id}`, fetcher, { refreshInterval: 900000, revalidateOnFocus: false, errorRetryCount: 1, dedupingInterval: 60000 })
   useEffect(() => {
-    if (error && data) onData({ ...data, status: "partial", warning: "本次请求失败，保留上次历史；当前判断待复核。" })
+    if (error && data) onData({ ...data, status: "partial", latestVerified: false, warning: "本次请求失败，保留上次历史；当前判断待复核。" })
     else if (data) onData(data)
     else if (error) onData({ id, points: [], status: "unavailable", complete: false, fetchedAt: null, publishedAt: null, firstDate: null, lastDate: null, sourceUrl: BY_ID[id].sourceUrl, warning: "网络或接口暂不可用；可手动重试。" })
   }, [id, data, error, onData])
@@ -47,6 +50,7 @@ function SectionTitle({ kicker, title, children }: { kicker: string; title: stri
 function Flow() { return <div className={styles.flow}>{TRANSMISSION.map((s, i) => <article key={s.title}><div className={styles.flowNum}>0{i + 1}<ArrowRight size={17} /></div><Tag>{s.kind}</Tag><h3>{s.title}</h3><p>{s.text}</p><div className={styles.evidence}><Check size={13} />{s.evidence}</div><small>{s.missing}</small></article>)}</div> }
 export default function Observatory() {
   const [tab, setTab] = useState<Tab>("overview")
+  const [marketPreset, setMarketPreset] = useState<Preset>("value")
   const [selected, setSelected] = useState("pmi")
   const [group, setGroup] = useState<Group | "all">("all")
   const [search, setSearch] = useState("")
@@ -65,7 +69,8 @@ export default function Observatory() {
   const { data: feed } = useSWR<{ items: Policy[]; checkedAt: string; liveCount: number; status: string }>("/api/cn/policies", fetcher, { refreshInterval: 900000, revalidateOnFocus: false, errorRetryCount: 1 })
   useEffect(() => { setMounted(true); const hash = location.hash.slice(1); if (tabs.some(t => t.id === hash)) setTab(hash as Tab) }, [])
   const go = (next: Tab) => { setTab(next); history.replaceState(null, "", `#${next}`); window.scrollTo({ top: 0, behavior: "smooth" }) }
-  const refresh = async () => { setRefreshing(true); try { await Promise.allSettled([...SERIES.map(d => mutate(`/api/cn/series?id=${d.id}`)), mutate("/api/cn/policies"), mutate("/api/cn/securities")]) } finally { setRefreshing(false) } }
+  const refresh = async () => { setRefreshing(true); try { await Promise.allSettled([...SERIES.map(d => mutate(`/api/cn/series?id=${d.id}`)), mutate("/api/cn/policies"), mutate("/api/cn/securities"), mutate("/api/cn/analysis")]) } finally { setRefreshing(false) } }
+  const openMarket = (preset: Preset) => { setMarketPreset(preset); history.replaceState(null, "", location.pathname); go("research") }
   const evaluations = useMemo(() => Object.fromEntries(SERIES.map(d => [d.id, evaluate(d, data[d.id])])), [data])
   const available = SERIES.filter(d => data[d.id]?.points.length).length
   const finished = Object.keys(data).length
@@ -109,10 +114,10 @@ export default function Observatory() {
     <div className={styles.content}><header className={styles.topbar}><div className={styles.breadcrumb}><span className={styles.mobileBrand}>eatfear <b>CN</b></span><span>研究工作台</span><ChevronRight size={13} /><strong>{tabs.find(t => t.id === tab)?.label}</strong></div><div className={styles.topActions}><span className={styles.connection}><i />{available}/{SERIES.length} 有历史</span><button className={styles.iconButton} onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} aria-label="切换深色浅色">{mounted && resolvedTheme === "light" ? <Moon size={17} /> : <Sun size={17} />}</button><button className={styles.refresh} disabled={refreshing} onClick={refresh}><RefreshCw size={14} className={refreshing ? styles.spinning : ""} /><span>{refreshing ? "更新中" : "刷新"}</span></button></div></header>
       <nav className={styles.mobileNav} aria-label="页面分区">{tabs.map(t => <button key={t.id} aria-pressed={tab === t.id} className={tab === t.id ? styles.activeChip : ""} onClick={() => go(t.id)}>{t.label}</button>)}</nav>
       <main className={styles.main}>
-        <section className={styles.hero}><div><div className={styles.heroKicker}><span /> FOLLOW THE EVIDENCE, NOT THE NOISE</div><h1>{tab === "overview" ? <>读懂政策的方向，<br /><em>看见经济的温度。</em></> : tab === "research" ? <>从经济变化，<em>找到值得研究的标的。</em></> : tab === "indicators" ? <>让判断，<em>经得起数据验证。</em></> : tab === "debt" ? <>从债务置换，<em>追到现金流。</em></> : tab === "history" ? <>理解来路，<em>而非复制过去。</em></> : <>每一个结论，<em>都有来处。</em></>}</h1><p>从政策、信用和需求出发，追踪行业传导、公司现金流与资产定价。每一步都保留来源、假设和反证。</p><div className={styles.heroTags}><span><Database size={13} />官方与第三方数据</span><span><Layers3 size={13} />五维观察框架</span><span><ShieldCheck size={13} />非买卖信号</span></div></div><div className={styles.heroOrbit} aria-hidden="true"><div /><div /><div /><Landmark size={40} /><span>POLICY → CASH FLOW</span></div></section>
+        <section className={`${styles.hero} ${(tab === "overview" || tab === "research") ? styles.marketHero : ""}`}><div><div className={styles.heroKicker}><span /> FOLLOW THE EVIDENCE, NOT THE NOISE</div><h1>{tab === "overview" ? <>看懂经济变化，<br /><em>筛出具体公司。</em></> : tab === "research" ? <>从经济变化，<em>找到值得研究的标的。</em></> : tab === "indicators" ? <>让判断，<em>经得起数据验证。</em></> : tab === "debt" ? <>从债务置换，<em>追到现金流。</em></> : tab === "history" ? <>理解来路，<em>而非复制过去。</em></> : <>每一个结论，<em>都有来处。</em></>}</h1><p>查看日终更新的经济判断、公司财务和估值筛选。先看结论，再核对数字、来源和风险。</p><div className={styles.heroTags}><span><Database size={13} />官方与第三方数据</span><span><Layers3 size={13} />五维观察框架</span><span><ShieldCheck size={13} />非买卖信号</span></div></div><div className={styles.heroOrbit} aria-hidden="true"><div /><div /><div /><Landmark size={40} /><span>POLICY → CASH FLOW</span></div></section>
         <div className={styles.statusLine}><span><i className={finished < SERIES.length ? styles.pulse : ""} />{finished < SERIES.length ? `连接上游 ${finished}/${SERIES.length}` : `本轮获取完成 · ${available}项有数据${partial ? ` · ${partial}项历史待核对` : ""}${failed ? ` · ${failed}项暂不可用` : ""}`}</span><span>打开页面每15分钟检查 · 月度 / 日终 / 年度按原始频率展示</span></div>
-        {tab === "overview" && <section className={researchStyles.intro}><div><span className={researchStyles.eyebrow}>YOUR RESEARCH STARTS HERE</span><h2>经济变化，如何落实到具体标的？</h2><p>五个专题 · 真实股票与ETF · 财报对比 · 估值情景 · 研究笔记</p></div><button onClick={() => go("research")}>进入专题与标的 <ArrowRight size={16} /></button></section>}
-        {tab === "research" && <ResearchWorkspace data={data} onIndicator={choose} />}
+        {(tab === "overview" || tab === "research") && <MarketWorkspace key={tab} compact={tab === "overview"} initialPreset={marketPreset} onOpen={openMarket} onIndicator={id => { setSelected(id); go("indicators") }} />}
+        {tab === "tools" && <><section className={researchStyles.intro}><div><h2>ETF与手动情景工具</h2><p>这里保留原有9个核验案例；全部A股公司的真实筛选结果，请打开“全市场筛选”。</p></div><button onClick={() => openMarket("value")}>进入全市场筛选 <ArrowRight size={16} /></button></section><ResearchWorkspace data={data} onIndicator={choose} /></>}
         {(tab === "overview" || tab === "indicators") && <>
           <div className={styles.heatGrid}>{GROUPS.map(g => { const ids = heatIds[g.id]; const valid = ids.filter(id => evaluations[id].percentile !== null && !evaluations[id].stale && data[id]?.complete); const value = valid.length >= Math.ceil(ids.length / 2) ? mean(valid.map(id => evaluations[id].percentile!)) : null; return <button className={styles.heatCard} key={g.id} onClick={() => { setGroup(g.id); choose(ids[0]) }}><div><span>{g.name}</span><ArrowUpRight size={16} /></div><strong>{fmt(value, 0)}<small>/100</small></strong><div className={styles.heatBar}><i style={{ width: `${value ?? 0}%` }} /></div><p>{g.id === "markets" ? "长端利率相对位置" : g.id === "fiscal" ? "财政收入增速位置" : g.subtitle}</p><small>有效覆盖 {valid.length}/{ids.length} · {value === null ? "暂不评分" : "历史分位等权"}</small></button> })}</div>
           <p className={styles.subtle}>温度只表达相对历史强弱，不代表资产便宜或经济好坏。各组样本与统计期不同，不合成总买入分。</p>

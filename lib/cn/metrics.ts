@@ -47,7 +47,9 @@ export function evaluate(d: Definition, data?: SeriesData, now = new Date()): Ev
   const minimum = d.seasonal ? 5 : d.frequency === "annual" ? 10 : 24
   // A complete cached history can still be unverified after a failed refresh.
   const verified = data?.status === "ok" && data.complete && !stale
-  const ready = n >= minimum && verified && !d.estimated && !d.noScore
+  const latestVerified = (data?.latestVerified ?? (data?.status === "ok" && data.complete)) && !stale
+  const continuousHistory = d.frequency === "monthly" ? !!prior.length && (d.seasonal ? Number(last.date.slice(0, 4)) - Number(prior.at(-1)!.date.slice(0, 4)) === 1 : monthIndex(last.date) - monthIndex(prior.at(-1)!.date) === 1) && prior.slice(1).every((p, i) => d.seasonal ? Number(p.date.slice(0, 4)) - Number(prior[i].date.slice(0, 4)) === 1 : monthIndex(p.date) - monthIndex(prior[i].date) === 1) : true
+  const ready = n >= minimum && latestVerified && (data?.complete || d.frequency === "monthly" && continuousHistory) && !d.estimated && !d.noScore
   const pct = ready ? percentile(last.value, sample) : null
   const sd = n > 1 ? deviation(sample) : 0
   const med = n ? median(sample) : 0

@@ -31,3 +31,11 @@ Local validation: 79 existing application tests and 85 CN tests passed, CN TypeS
 The new UI was also reviewed using the React best-practices checklist: lazy-loaded research panels, client-safe catalogs, typed server responses, deduplicated requests, versioned local storage, labeled form controls and responsive table overflow. Browser testing found and fixed the persisted textarea accessible-label issue.
 
 Public data availability depends on location and upstream changes. Paid Wind/CEIC feeds, complete industry/ETF valuation/holdings coverage, release-vintage databases and automatic whole-market opportunity ranking are not included. Candidate mappings and scenario assumptions are research inputs, not a validated return model.
+
+## Whole-market screening — 2026-10-18
+
+The default page now presents five computed economic observations, real company results and traceable conclusions. A-share screening covers Shanghai, Shenzhen and Beijing using a dated public-source snapshot; ETF and manual scenarios remain in `/cn#tools`. See [current capabilities, source limits and operating guide](cn-market-screening.md) and [real-data verification](cn-market-verification.json).
+
+The new collection workflow publishes validated compressed snapshots to `codex/cn-market-data` after each weekday close. Identity coverage, official listing verification, financial coverage and data freshness remain separate. The local SZSE listing request failed and BSE full listing integration remains incomplete; these are visible source states, not claims of complete official listing verification.
+
+Local release checks: existing application tests passed (79); CN test suite passed (111, including cross-market stable sorting); independent CN typecheck and production build passed. Both Chromium suites passed, including full-market filters, BSE statements, persisted notes, legacy ETF/scenario tools, navigation and 320/390/768/1440px layouts. Full custom export returned all 5,373 matching non-ST records via gzip. Reports retain the tested snapshot and dates.

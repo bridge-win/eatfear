@@ -1,5 +1,5 @@
 {
-  "testedAt": "2026-10-17T19:13:22.426Z",
+  "testedAt": "2026-10-18T10:01:12.091Z",
   "checks": [
     "no page overflow at 1440px",
     "real historical CSV export >24 observations",
@@ -10,7 +10,7 @@
     "no page overflow at 320px",
     "no page overflow at 390px",
     "unknown identifiers rejected; no arbitrary upstream proxy",
-    "six panels navigate; search, ranges, themes, scenarios work",
+    "macro panels navigate; search, ranges, themes, scenarios work",
     "no page overflow at 1440px",
     "no page overflow at 768px",
     "no page overflow at 390px",

@@ -45,6 +45,7 @@ export type SeriesData = {
   id: string; points: Point[]; status: "ok" | "partial" | "unavailable"
   fetchedAt: string | null; publishedAt: string | null; sourceUrl: string
   warning: string | null; complete: boolean; firstDate: string | null; lastDate: string | null
+  latestVerified?: boolean
 }
 export const METHODS = [
   { title: "历史分位", formula: "100 × (低于当前的样本数 + 0.5 × 相同值样本数) / N", text: "当前值不进入基准。月频取此前60期、日频756期；信贷流量只取过去10年同月，少于5个不评分。P10/P90为本站观察阈值，不是投资买卖点。", url: "https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm" },

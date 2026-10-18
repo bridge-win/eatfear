@@ -1,0 +1,303 @@
+{
+  "checkedAt": "2026-10-18T09:54:58.206Z",
+  "snapshotId": "cn-20261016-389bc16fb7fe",
+  "tradeDate": "2026-10-16",
+  "reportDate": "2026-06-30",
+  "comparisonDate": "2025-06-30",
+  "annualReportDate": "2025-12-31",
+  "coverage": {
+    "universe": 5577,
+    "identityVerified": 5577,
+    "listingVerified": 2320,
+    "valuation": 5577,
+    "financials": 5574,
+    "screenable": 5573,
+    "exchanges": {
+      "SSE": 2320,
+      "SZSE": 2906,
+      "BSE": 351
+    }
+  },
+  "sources": [
+    {
+      "id": "cninfo",
+      "name": "巨潮公开披露身份目录",
+      "url": "https://www.cninfo.com.cn/new/data/szse_stock.json",
+      "status": "ok",
+      "count": 6182,
+      "note": "核验证券与披露机构身份，含退市历史记录；不单独证明当前上市状态。"
+    },
+    {
+      "id": "sse",
+      "name": "上交所A股名录",
+      "url": "https://www.sse.com.cn/assortment/stock/list/share/",
+      "status": "ok",
+      "count": 2320,
+      "note": "主板与科创板名录完整分页；不含B股/CDR。"
+    },
+    {
+      "id": "szse",
+      "name": "深交所A股名录",
+      "url": "https://www.szse.cn/market/product/stock/list/index.html",
+      "status": "unavailable",
+      "count": 0,
+      "note": "fetch failed"
+    },
+    {
+      "id": "bse",
+      "name": "北交所有效上市名录",
+      "url": "https://www.bse.cn/",
+      "status": "unavailable",
+      "count": 0,
+      "note": "尚未取得可验证的完整名录；北交所身份通过巨潮核对，候选范围来自当日日终数据，不宣称完整官方上市核验。"
+    },
+    {
+      "id": "valuation",
+      "name": "东方财富日终估值",
+      "url": "https://data.eastmoney.com/gzfx/list.html",
+      "status": "ok",
+      "count": 5577,
+      "note": "公开网页结构化转引，不是官方直连API；当前修订版，不用于历史当时可知回测。"
+    },
+    {
+      "id": "current",
+      "name": "东方财富统一报告期业绩",
+      "url": "https://data.eastmoney.com/bbsj/202606/yjbb.html",
+      "status": "ok",
+      "count": 5581,
+      "note": "公开网页结构化转引，不是官方直连API；当前修订版，不用于历史当时可知回测。"
+    },
+    {
+      "id": "previous",
+      "name": "东方财富上年同期业绩",
+      "url": "https://data.eastmoney.com/bbsj/202506/yjbb.html",
+      "status": "ok",
+      "count": 5582,
+      "note": "公开网页结构化转引，不是官方直连API；当前修订版，不用于历史当时可知回测。"
+    },
+    {
+      "id": "annual",
+      "name": "东方财富完整年度ROE",
+      "url": "https://data.eastmoney.com/bbsj/202512/yjbb.html",
+      "status": "ok",
+      "count": 5581,
+      "note": "公开网页结构化转引，不是官方直连API；当前修订版，不用于历史当时可知回测。"
+    },
+    {
+      "id": "cashflow",
+      "name": "东方财富本期现金流",
+      "url": "https://data.eastmoney.com/bbsj/202606/yjbb.html",
+      "status": "ok",
+      "count": 5581,
+      "note": "公开网页结构化转引，不是官方直连API；当前修订版，不用于历史当时可知回测。"
+    },
+    {
+      "id": "previousCashflow",
+      "name": "东方财富上年同期现金流",
+      "url": "https://data.eastmoney.com/bbsj/202506/yjbb.html",
+      "status": "ok",
+      "count": 5587,
+      "note": "公开网页结构化转引，不是官方直连API；当前修订版，不用于历史当时可知回测。"
+    },
+    {
+      "id": "balance",
+      "name": "东方财富本期资产负债",
+      "url": "https://data.eastmoney.com/bbsj/202606/yjbb.html",
+      "status": "ok",
+      "count": 5581,
+      "note": "公开网页结构化转引，不是官方直连API；当前修订版，不用于历史当时可知回测。"
+    }
+  ],
+  "macroSeries": 20,
+  "presets": [
+    {
+      "id": "value",
+      "filters": {
+        "preset": "value",
+        "theme": "all",
+        "exchange": "all",
+        "industry": "",
+        "search": "",
+        "peMin": 0,
+        "peMax": null,
+        "pbMin": null,
+        "pbMax": null,
+        "pePercentileMax": 40,
+        "roeMin": 10,
+        "revenueGrowthMin": 0,
+        "profitGrowthMin": 0,
+        "debtRatioMax": null,
+        "cashFlow": "positive",
+        "sector": "nonfinancial",
+        "profit": "positive",
+        "excludeSt": true,
+        "sort": "pePercentile",
+        "direction": "asc",
+        "page": 1,
+        "pageSize": 50
+      },
+      "count": 334,
+      "examples": [
+        {
+          "id": "sh688330",
+          "name": "宏力达",
+          "peTtm": 5.56520996,
+          "pb": 1.00083513,
+          "pePercentile": 0.4424778761061947,
+          "annualRoe": 15.62,
+          "revenueGrowth": 2.8404047986182235,
+          "profitGrowth": 194.69969584787012,
+          "operatingCashFlow": 208093992.49
+        },
+        {
+          "id": "sz000685",
+          "name": "中山公用",
+          "peTtm": 5.80913732,
+          "pb": 0.78786348,
+          "pePercentile": 0.7142857142857143,
+          "annualRoe": 10.51,
+          "revenueGrowth": 2.4460001140210075,
+          "profitGrowth": 104.01160698006731,
+          "operatingCashFlow": 248044383.02
+        },
+        {
+          "id": "sz300628",
+          "name": "亿联网络",
+          "peTtm": 15.77051606,
+          "pb": 4.94053593,
+          "pePercentile": 0.8064516129032258,
+          "annualRoe": 28.38,
+          "revenueGrowth": 26.39580256930696,
+          "profitGrowth": 22.919207249295415,
+          "operatingCashFlow": 828724469.66
+        }
+      ]
+    },
+    {
+      "id": "improving",
+      "filters": {
+        "preset": "improving",
+        "theme": "all",
+        "exchange": "all",
+        "industry": "",
+        "search": "",
+        "peMin": null,
+        "peMax": null,
+        "pbMin": null,
+        "pbMax": null,
+        "pePercentileMax": null,
+        "roeMin": null,
+        "revenueGrowthMin": 0,
+        "profitGrowthMin": 10,
+        "debtRatioMax": null,
+        "cashFlow": "improving",
+        "sector": "nonfinancial",
+        "profit": "positive",
+        "excludeSt": true,
+        "sort": "profitGrowth",
+        "direction": "desc",
+        "page": 1,
+        "pageSize": 50
+      },
+      "count": 677,
+      "examples": [
+        {
+          "id": "sz002466",
+          "name": "天齐锂业",
+          "peTtm": 13.51133778,
+          "pb": 1.29194492,
+          "pePercentile": 45.833333333333336,
+          "annualRoe": 1.1,
+          "revenueGrowth": 153.32199394657974,
+          "profitGrowth": 4925.459126920511,
+          "operatingCashFlow": 2212067158.9
+        },
+        {
+          "id": "sz002458",
+          "name": "益生股份",
+          "peTtm": 23.29876591,
+          "pb": 2.34500944,
+          "pePercentile": null,
+          "annualRoe": 3.75,
+          "revenueGrowth": 28.43626903864884,
+          "profitGrowth": 4897.293058016455,
+          "operatingCashFlow": 460504034.29
+        },
+        {
+          "id": "sz300981",
+          "name": "中红医疗",
+          "peTtm": 201.43694166,
+          "pb": 1.55224818,
+          "pePercentile": 89.60396039603961,
+          "annualRoe": -2.09,
+          "revenueGrowth": 19.46040392856756,
+          "profitGrowth": 2662.3774103140518,
+          "operatingCashFlow": 211021981.25
+        }
+      ]
+    },
+    {
+      "id": "financial",
+      "filters": {
+        "preset": "financial",
+        "theme": "all",
+        "exchange": "all",
+        "industry": "",
+        "search": "",
+        "peMin": null,
+        "peMax": null,
+        "pbMin": 0,
+        "pbMax": 1,
+        "pePercentileMax": null,
+        "roeMin": 10,
+        "revenueGrowthMin": null,
+        "profitGrowthMin": null,
+        "debtRatioMax": null,
+        "cashFlow": "any",
+        "sector": "financial",
+        "profit": "positive",
+        "excludeSt": true,
+        "sort": "pb",
+        "direction": "asc",
+        "page": 1,
+        "pageSize": 50
+      },
+      "count": 21,
+      "examples": [
+        {
+          "id": "sh601528",
+          "name": "瑞丰银行",
+          "peTtm": 5.0787828,
+          "pb": 0.49146895,
+          "pePercentile": 13.095238095238095,
+          "annualRoe": 10.2,
+          "revenueGrowth": -1.9643523640899052,
+          "profitGrowth": 0.9425192522343417,
+          "operatingCashFlow": 10883888000
+        },
+        {
+          "id": "sh603323",
+          "name": "苏农银行",
+          "peTtm": 4.7637522,
+          "pb": 0.49647221,
+          "pePercentile": 8.333333333333334,
+          "annualRoe": 10.84,
+          "revenueGrowth": 0.9978017139877782,
+          "profitGrowth": 3.0156336327212374,
+          "operatingCashFlow": -3674237000
+        },
+        {
+          "id": "sh601577",
+          "name": "长沙银行",
+          "peTtm": 4.62696064,
+          "pb": 0.50714525,
+          "pePercentile": 5.9523809523809526,
+          "annualRoe": 11.24,
+          "revenueGrowth": 4.005177905008939,
+          "profitGrowth": 5.0579557915712225,
+          "operatingCashFlow": -28195165000
+        }
+      ]
+    }
+  ]
+}

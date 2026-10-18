@@ -46,7 +46,7 @@ export default function ResearchWorkspace({ data, onIndicator }: { data: Record<
   const receiveScenario = useCallback((id: string, value: unknown) => setScenarios(previous => ({ ...previous, [id]: value })), [])
   const { data: securities, error, isLoading, mutate } = useSWR<CnSecuritiesResponse>("/api/cn/securities", fetchSecurities, { refreshInterval: 300000, revalidateOnFocus: false, errorRetryCount: 1, dedupingInterval: 60000 })
   useEffect(() => {
-    try { setNotebook(readNotebook(localStorage.getItem(STORAGE_KEY), CN_SECURITIES.map(item => item.id))) }
+    try { setNotebook(readNotebook(localStorage.getItem(STORAGE_KEY), CN_SECURITIES.map(item => item.id), true)) }
     catch { setStorageWarning("浏览器未允许本地存储；可下载研究快照保存。") }
     setStorageReady(true)
   }, [])
@@ -117,7 +117,7 @@ export default function ResearchWorkspace({ data, onIndicator }: { data: Record<
 function NumberField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
   return <label className={s.field}><span>{label}</span><input type="number" step="any" value={value} placeholder={placeholder} onChange={event => onChange(event.target.value)} /></label>
 }
-function ValuationLab({ security, quote, onScenario }: { security: CnSecurity; quote: CnSecurityQuote | null; onScenario: (id: string, value: unknown) => void }) {
+export function ValuationLab({ security, quote, onScenario }: { security: CnSecurity; quote: CnSecurityQuote | null; onScenario: (id: string, value: unknown) => void }) {
   const [price, setPrice] = useState("")
   const [eps, setEps] = useState("")
   const [growth, setGrowth] = useState("5")
@@ -147,7 +147,7 @@ function ValuationLab({ security, quote, onScenario }: { security: CnSecurity; q
   </section>
 }
 
-function NoteEditor({ security, note, ready, onSave }: { security: CnSecurity; note: ResearchNote; ready: boolean; onSave: (note: ResearchNote) => void }) {
+export function NoteEditor({ security, note, ready, onSave }: { security: CnSecurity; note: ResearchNote; ready: boolean; onSave: (note: ResearchNote) => void }) {
   const [draft, setDraft] = useState(note)
   const [error, setError] = useState("")
   useEffect(() => { setDraft(note) }, [note])

@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingIncludes: { "/api/cn/*": ["./public/cn/market-seed.json.gz"] },
   typescript: {
     ignoreBuildErrors: true,
   },

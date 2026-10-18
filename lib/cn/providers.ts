@@ -138,12 +138,12 @@ export async function getSeries(id: string, fetcher: Fetcher = fetch): Promise<S
       const today = new Date().toISOString().slice(0, 10)
       const points = cleanPoints(loaded.points).filter(p => p.date <= today)
       if (!points.length) throw new Error("上游未返回有效历史观测；没有使用模拟值填充")
-      const data: SeriesData = { id, points, status: loaded.complete ? "ok" : "partial", complete: loaded.complete, fetchedAt: points.at(-1)?.fetchedAt ?? new Date().toISOString(), publishedAt: points.at(-1)?.publishedAt ?? null, sourceUrl: points.at(-1)?.sourceUrl ?? d.sourceUrl, warning: loaded.warning ?? null, firstDate: points[0].date, lastDate: points.at(-1)!.date }
+      const data: SeriesData = { id, points, status: loaded.complete ? "ok" : "partial", complete: loaded.complete, latestVerified: !/官网检查失败|新公告未能解析/.test(loaded.warning ?? ""), fetchedAt: points.at(-1)?.fetchedAt ?? new Date().toISOString(), publishedAt: points.at(-1)?.publishedAt ?? null, sourceUrl: points.at(-1)?.sourceUrl ?? d.sourceUrl, warning: loaded.warning ?? null, firstDate: points[0].date, lastDate: points.at(-1)!.date }
       if (fetcher === fetch) cache.set(id, { until: Date.now() + (d.frequency === "annual" ? 86400000 : 900000), data })
       return data
     } catch (error) {
       const warning = error instanceof Error ? error.message.slice(0, 200) : "上游暂不可用"
-      if (cached) return { ...cached.data, status: "partial", warning: `本次获取失败，保留上次成功数据：${warning}` }
+      if (cached) return { ...cached.data, status: "partial", latestVerified: false, warning: `本次获取失败，保留上次成功数据：${warning}` }
       return { id, points: [], status: "unavailable", complete: false, fetchedAt: null, publishedAt: null, sourceUrl: d.sourceUrl, warning, firstDate: null, lastDate: null }
     } finally { if (fetcher === fetch) inflight.delete(id) }
   })()
