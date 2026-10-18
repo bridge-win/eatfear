@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "current": "cn-20261016-dc5bbe092119",
+  "snapshots": [
+    {
+      "snapshotId": "cn-20261016-dc5bbe092119",
+      "file": "snapshots/cn-20261016-dc5bbe092119.json.gz",
+      "sha256": "9c0cc15b9b057dc55911f4d613555b22f82ac718b42dba4cf505c7e709295746",
+      "compressedBytes": 1178369,
+      "uncompressedBytes": 6978867,
+      "tradeDate": "2026-10-16",
+      "fetchedAt": "2026-10-18T10:09:39.520Z"
+    }
+  ]
+}
