@@ -1,7 +1,16 @@
 {
   "schemaVersion": 1,
-  "current": "cn-20261021-d15f1c26251b",
+  "current": "cn-20261022-81b48e66f2af",
   "snapshots": [
+    {
+      "snapshotId": "cn-20261022-81b48e66f2af",
+      "file": "snapshots/cn-20261022-81b48e66f2af.json.gz",
+      "sha256": "90d2af7711e77e9aac8a42a310b416dbafc2da88eeddc31222dad714c44b90bd",
+      "compressedBytes": 1178275,
+      "uncompressedBytes": 6977829,
+      "tradeDate": "2026-10-22",
+      "fetchedAt": "2026-10-22T15:24:10.985Z"
+    },
     {
       "snapshotId": "cn-20261021-d15f1c26251b",
       "file": "snapshots/cn-20261021-d15f1c26251b.json.gz",
