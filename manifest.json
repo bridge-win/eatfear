@@ -1,7 +1,16 @@
 {
   "schemaVersion": 1,
-  "current": "cn-20261028-6dde38f9e828",
+  "current": "cn-20261029-ef727953ca58",
   "snapshots": [
+    {
+      "snapshotId": "cn-20261029-ef727953ca58",
+      "file": "snapshots/cn-20261029-ef727953ca58.json.gz",
+      "sha256": "00756bc741ac0e414b421f4d1f9b06973b22b12cd65067280affac96b0ef1df4",
+      "compressedBytes": 1176086,
+      "uncompressedBytes": 6909334,
+      "tradeDate": "2026-10-29",
+      "fetchedAt": "2026-10-29T16:59:19.271Z"
+    },
     {
       "snapshotId": "cn-20261028-6dde38f9e828",
       "file": "snapshots/cn-20261028-6dde38f9e828.json.gz",
@@ -55,15 +64,6 @@
       "uncompressedBytes": 6977941,
       "tradeDate": "2026-10-21",
       "fetchedAt": "2026-10-21T15:23:26.006Z"
-    },
-    {
-      "snapshotId": "cn-20261020-e68f73926dbc",
-      "file": "snapshots/cn-20261020-e68f73926dbc.json.gz",
-      "sha256": "efc2d7a75ee180919915afff39d66cc85f56d3b7aa18a98bee1f2382818afb0e",
-      "compressedBytes": 1180567,
-      "uncompressedBytes": 7113412,
-      "tradeDate": "2026-10-20",
-      "fetchedAt": "2026-10-20T15:12:40.606Z"
     }
   ]
 }
