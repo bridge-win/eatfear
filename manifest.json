@@ -1,7 +1,16 @@
 {
   "schemaVersion": 1,
-  "current": "cn-20261109-fe8e9e6fa9fb",
+  "current": "cn-20261110-27163633f492",
   "snapshots": [
+    {
+      "snapshotId": "cn-20261110-27163633f492",
+      "file": "snapshots/cn-20261110-27163633f492.json.gz",
+      "sha256": "8d9d9f7ffb4252b06ecf676d17514798ae6c1aa0d7045fc371e67b17973753be",
+      "compressedBytes": 1178876,
+      "uncompressedBytes": 6919737,
+      "tradeDate": "2026-11-10",
+      "fetchedAt": "2026-11-10T17:58:41.977Z"
+    },
     {
       "snapshotId": "cn-20261109-fe8e9e6fa9fb",
       "file": "snapshots/cn-20261109-fe8e9e6fa9fb.json.gz",
@@ -55,15 +64,6 @@
       "uncompressedBytes": 6914560,
       "tradeDate": "2026-11-02",
       "fetchedAt": "2026-11-02T20:25:05.658Z"
-    },
-    {
-      "snapshotId": "cn-20261030-93d961960c93",
-      "file": "snapshots/cn-20261030-93d961960c93.json.gz",
-      "sha256": "7e2568a8b805f82de9154490461e8e1c18b0294272427b4222a9ee42a1599a28",
-      "compressedBytes": 1177046,
-      "uncompressedBytes": 6976929,
-      "tradeDate": "2026-10-30",
-      "fetchedAt": "2026-10-30T16:44:20.863Z"
     }
   ]
 }
